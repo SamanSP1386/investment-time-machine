@@ -6,6 +6,8 @@
 
 Every PR, every milestone, every "done" claim is measured against all six items above — not just "it runs."
 
+**"Documentation updated" is not satisfied by a docstring.** Per [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md), a milestone is not complete until `docs/DEVLOG.md`, `docs/CHANGELOG.md`, `docs/SECURITY_LOG.md`, `docs/TESTING_REPORT.md`, and `docs/PERFORMANCE_LOG.md` all have a new appended entry for it, `docs/KNOWN_ISSUES.md` reflects any issue found/changed/resolved, and `docs/ARCHITECTURE_DECISIONS.md` has a new ADR for any significant decision made. A milestone with code merged but no DEVLOG entry is not done.
+
 ## Code review priority order (Part 3.9.15 / 2.18.7 — identical in both sections)
 
 1. **Correctness** — does it produce the right result, including edge cases?
@@ -27,6 +29,9 @@ Every PR, every milestone, every "done" claim is measured against all six items 
 - [ ] AI service changes: confirm no path lets the AI compute, alter, or "correct" a financial figure.
 - [ ] Coverage target for the touched component (see [TESTING_GUIDELINES.md](TESTING_GUIDELINES.md)) is met or the shortfall is explicitly called out with a reason.
 - [ ] Anything left unfinished is documented as *intentional, temporary, tracked* technical debt (see below) — not silent.
+- [ ] `docs/DEVLOG.md`, `docs/CHANGELOG.md`, `docs/SECURITY_LOG.md`, `docs/TESTING_REPORT.md`, `docs/PERFORMANCE_LOG.md` each have a new appended entry for this milestone (see [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md)).
+- [ ] `docs/KNOWN_ISSUES.md` updated if any issue was found, changed status, or was resolved.
+- [ ] `docs/ARCHITECTURE_DECISIONS.md` has a new ADR for any significant decision made this milestone (never edit a prior ADR — supersede it).
 
 ## Technical debt policy
 

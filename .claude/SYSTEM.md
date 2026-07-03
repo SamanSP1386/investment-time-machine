@@ -47,4 +47,4 @@ Prohibited without explicit written approval: Django, Flask, MongoDB, Marshmallo
 - **Part 2.6.27 — Entity Relationship Design was never written.** No consolidated ERD exists; relationships are scattered per-table across Part 2.6.
 - Part 2.8 (Security), Part 2.16 (Roadmap), Part 2.18 (Engineering Workflow), and Part 2.6.26 (AI Explanation Table) each appear twice, verbatim, in the source document — harmless duplication artifacts, not content conflicts.
 
-See [MVP_RULES.md](MVP_RULES.md) for scope, [DATABASE_RULES.md](DATABASE_RULES.md) for schema law, [SECURITY_POLICY.md](SECURITY_POLICY.md) for the threat model.
+See [MVP_RULES.md](MVP_RULES.md) for scope, [DATABASE_RULES.md](DATABASE_RULES.md) for schema law, [SECURITY_POLICY.md](SECURITY_POLICY.md) for the threat model, and [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md) for the mandatory `docs/` journal — no milestone is complete without it.
