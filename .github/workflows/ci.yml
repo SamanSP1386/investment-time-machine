@@ -56,7 +56,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Scan for secrets (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # gitleaks/gitleaks-action@v2 was replaced with a direct CLI invocation:
+      # the action infers a commit range from the GitHub event (push/PR refs),
+      # which becomes ambiguous after a merge or an unrelated-history pull and
+      # can fail the job even when no leak exists ("no leaks found" followed by
+      # a non-zero exit). Running `gitleaks detect` directly against the
+      # checked-out path scans the repository's full git history unconditionally
+      # instead of diffing two refs, so it has no commit range to resolve and
+      # cannot hit this failure mode. Pinned to the same version used in
+      # .pre-commit-config.yaml so local and CI scans match.
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 755 gitleaks /usr/local/bin/gitleaks
+          rm -f gitleaks.tar.gz gitleaks
+
+      - name: Scan repository for secrets (gitleaks, full history)
+        run: gitleaks detect --source . --redact --verbose

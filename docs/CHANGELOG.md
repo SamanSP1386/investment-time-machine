@@ -4,6 +4,28 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.2.2] — 2026-07-07 — CI Reliability Fix: Stable Secret Scanning
+
+### Added
+- N/A.
+
+### Changed
+- `.github/workflows/ci.yml`: `secret-scan` job now installs and runs the `gitleaks` CLI directly (`gitleaks detect --source . --redact --verbose`, pinned v8.18.4) instead of `gitleaks/gitleaks-action@v2`, scanning the repository's full git history unconditionally rather than an event-inferred commit range.
+
+### Fixed
+- CI `secret-scan` job no longer fails with an ambiguous-commit-range error after a merge or unrelated-history pull. Root cause was the wrapper action's range inference, not a detected secret — see `docs/KNOWN_ISSUES.md` KI-011 (resolved).
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- Secret-scanning coverage unchanged or stronger (full history scan every run, not a diff range). No leak was ever missed by the prior bug — it was a false-positive CI failure.
+
+---
+
 ## [0.2.1] — 2026-07-06 — Repository Hygiene Pass
 
 ### Added

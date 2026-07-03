@@ -117,3 +117,39 @@ Permanent engineering journal. One entry is appended per completed milestone. **
 **Production Readiness Score**: Not applicable to a hygiene pass — does not change the M1 score (4/10).
 
 **Next Milestone**: M2 — Historical Data Ingestion Pipeline.
+
+---
+
+## 2026-07-07 — CI Reliability Fix: Stable Secret Scanning (not a feature milestone)
+
+**Version**: 0.2.2
+
+**Objective**: Fix a GitHub Actions failure in the `secret-scan` job — `gitleaks/gitleaks-action@v2` was failing intermittently on an ambiguous commit range after a merge, despite reporting "no leaks found." No secret leak was ever involved; this is a CI reliability fix only.
+
+**Scope**: `.github/workflows/ci.yml` `secret-scan` job only. `lint-and-test` job left unchanged. No application logic touched.
+
+**Implementation Summary**: The wrapper action `gitleaks/gitleaks-action@v2` infers a commit range from the GitHub event's push/PR refs to scan only the diff — that inference fails once local/remote history is merged (a merge commit or an unrelated-history pull leaves no single unambiguous range), and the action exits non-zero even when the underlying scan found nothing. Replaced it with a direct `gitleaks detect --source . --redact --verbose` CLI call: `detect` scans the full git history of the checked-out repository unconditionally, so there is no ref-to-ref range to resolve and this failure mode cannot occur. Installed gitleaks by downloading the pinned v8.18.4 Linux release binary directly (matching the version already pinned in `.pre-commit-config.yaml`, so local pre-commit scans and CI scans are now on the same version). No SARIF upload existed before this fix and none was added, per the "keep tests/lint/format unchanged, CI-reliability-only" scope.
+
+**Files Modified**: `.github/workflows/ci.yml` (secret-scan job only), `docs/KNOWN_ISSUES.md` (KI-011, logged and resolved in the same entry).
+
+**Architecture Decisions**: None — this is a CI implementation detail, not a design decision warranting an ADR.
+
+**Problems Encountered**: The prior CI approach (a maintained wrapper action) offered less control over exactly how the commit range was computed, and no documented flag was reachable to force a full-repository scan instead of an event-based range within that action.
+
+**Solutions**: Bypassed the wrapper entirely in favor of the underlying `gitleaks` CLI, which has always supported unconditional full-history scanning via `detect --source .` — verified the exact release download URL, archive contents, and extraction command locally before committing to this approach (the Linux binary itself couldn't be executed in this Windows-based session, but the download/extract steps were confirmed to produce a valid Linux ELF executable matching what the `ubuntu-latest` runner needs).
+
+**Lessons Learned**: Wrapper GitHub Actions that infer scan scope from event context are convenient in the common case but introduce a failure mode (ambiguous ref resolution) that a direct CLI invocation with an explicit, unconditional scope avoids entirely. When a CI tool's automatic behavior is the source of flakiness, replacing "automatic" with "explicit and unconditional" is usually the more stable fix, even at the cost of a slightly longer workflow step.
+
+**Security Review Summary**: Secret-scanning coverage is unchanged or arguably stronger — the new command scans full git history every run rather than depending on a correctly-resolved event diff range. No secrets were exposed by the original bug; it was a false-positive CI failure, not a missed scan.
+
+**Testing Summary**: `lint-and-test` job unaffected (not modified). Locally re-ran `ruff check .`, `black --check .`, `pytest -v` (27/27 passed) to confirm the CI-only change had zero effect on the application test suite, as expected. CI YAML re-validated as well-formed; the gitleaks download URL, archive structure, and extraction command were verified locally against the exact pinned version and platform CI will use.
+
+**Technical Debt Introduced**: None.
+
+**Performance Notes**: Not applicable — CI-step change only, no measurable effect on application performance. The new step adds a small, one-time binary download to the `secret-scan` job's runtime.
+
+**Recruiter Value**: Low-to-Medium on its own, but demonstrates the ability to diagnose a CI tool's actual failure mechanism (not just retry-and-hope) and fix it at the right layer.
+
+**Production Readiness Score**: Not applicable — CI-only fix, does not change the M1 score.
+
+**Next Milestone**: M2 — Historical Data Ingestion Pipeline.
