@@ -6,7 +6,9 @@ __pycache__/
 venv/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 .coverage
+.coverage.*
 htmlcov/
 
 # Environment
@@ -24,3 +26,9 @@ build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Generic local artifacts
+*.log
+*.bak
+*.orig
+*.rej

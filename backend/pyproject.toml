@@ -11,3 +11,4 @@ target-version = ["py312"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: requires a reachable Postgres instance (skips otherwise)"]

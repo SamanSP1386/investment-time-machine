@@ -8,8 +8,9 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 
 - **Description**: `docker compose up --build` has not been executed end-to-end against a running Docker daemon; the backend was instead verified independently (venv, ruff, black, pytest) because no Docker daemon was available in the session that authored `docker-compose.yml`.
 - **Severity**: Low
-- **Status**: Open
-- **Planned Resolution**: Run `docker compose up --build` locally and confirm `/health` responds before starting M1.
+- **Status**: Open — Partially Verified
+- **Update (M1, 2026-07-05)**: A live Postgres 16 instance matching `docker-compose.yml`'s exact credentials (`itm_user`/`itm_dev`) was reachable at `localhost:5432` during the M1 session, and `alembic upgrade head` was run against it successfully (all 10 tables created, verified via introspection, then a full upgrade/downgrade round-trip confirmed zero drift against the models). This strongly indicates the Postgres service in `docker-compose.yml` is functioning correctly. It does not confirm the **backend container image** builds and runs correctly, since the `docker` CLI itself remains unavailable in this environment — only the Postgres service has been indirectly exercised.
+- **Planned Resolution**: Run `docker compose up --build` (the full stack, including the backend image) and confirm `/health` responds before or during M2.
 - **Resolution Date**: —
 
 ### KI-002
@@ -32,16 +33,18 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 
 - **Description**: Founder Specification Part 2.6.27 — Entity Relationship Design was never written. No consolidated ERD exists in the source spec.
 - **Severity**: Low
-- **Status**: Open — Pending Founder Approval
-- **Planned Resolution**: Produce a derived ERD during the Database Schema milestone (M1), marked unofficial until reviewed.
+- **Status**: Derived Artifact Produced — Pending Founder Approval
+- **Update (M1, 2026-07-05)**: A derived ERD was produced at `docs/erd.md`, generated from the actual `backend/app/models/` SQLAlchemy models (Mermaid diagram + relationship notes). It is implementation-complete but not founder-reviewed.
+- **Planned Resolution**: Founder review of `docs/erd.md`; supersede this status once approved or amended.
 - **Resolution Date**: —
 
 ### KI-005
 
 - **Description**: The Economic Indicators domain is named in Part 2.6.3 with a required index (2.6.13) but has no physical table specification anywhere in the source document.
 - **Severity**: Medium
-- **Status**: Open — Pending Founder Approval
-- **Planned Resolution**: Design the table following `historical_prices` conventions during M1; flag for founder sign-off before finalizing.
+- **Status**: Implemented Conservatively — Pending Founder Approval
+- **Update (M1, 2026-07-05)**: Implemented as a two-table catalog + time-series pair (`economic_indicators`, `economic_indicator_values`), structurally mirroring `assets`/`historical_prices` rather than folding indicators into the asset catalog — see ADR-008 in `docs/ARCHITECTURE_DECISIONS.md`.
+- **Planned Resolution**: Founder review of the design at ADR-008; supersede this status once approved or amended.
 - **Resolution Date**: —
 
 ### KI-006
@@ -58,4 +61,28 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Severity**: Low
 - **Status**: Open — Pending Founder Approval
 - **Planned Resolution**: Confirm with founder before investing significant effort in either feature.
+- **Resolution Date**: —
+
+### KI-008
+
+- **Description**: `historical_prices` stores both `close_price` and `adjusted_close_price`, but the schema (M1) does not decide which one feeds the growth/return formula. Using `adjusted_close_price` while also manually reinvesting dividends (Founder Specification Part 2.14.10) would double-count dividends.
+- **Severity**: Medium
+- **Status**: Open
+- **Planned Resolution**: Resolve explicitly at the start of the Simulation Engine milestone (M3) — documented in `.claude/DATABASE_RULES.md`.
+- **Resolution Date**: —
+
+### KI-009
+
+- **Description**: `tests/test_migrations.py` applies and then downgrades the migration against whatever `DATABASE_URL` points to. Run locally against the `docker compose` dev database (`itm_dev`), this leaves the dev database schema-less after `pytest` completes. CI is unaffected (it targets a dedicated `itm_test` Postgres service).
+- **Severity**: Low
+- **Status**: Open
+- **Planned Resolution**: Either re-run `alembic upgrade head` after local test runs, or create a dedicated local `itm_test` database and point `DATABASE_URL` at it for test runs — documented in `docs/setup_guide.md`.
+- **Resolution Date**: —
+
+### KI-010
+
+- **Description**: `.gitattributes` (added during the Repository Hygiene pass) explicitly sets line-ending rules only for the file types that exist in the repository today (`.py`, `.md`, `.yml`/`.yaml`, `Dockerfile`, `.sh`, `.bat`, `.ps1`). New source file types introduced by future milestones (e.g. `.json`, `.toml`, `.tsx`/`.ts` at the Frontend milestone) will fall back to the `* text=auto eol=lf` catch-all rather than an explicit rule.
+- **Severity**: Low
+- **Status**: Open
+- **Planned Resolution**: Add explicit `.gitattributes` entries for each new source file type as it's introduced, per ADR-010 (`docs/ARCHITECTURE_DECISIONS.md`), rather than relying on the catch-all indefinitely.
 - **Resolution Date**: —

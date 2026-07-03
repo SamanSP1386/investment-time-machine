@@ -11,6 +11,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: itm_user
+          POSTGRES_PASSWORD: itm_password
+          POSTGRES_DB: itm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U itm_user -d itm_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://itm_user:itm_password@localhost:5432/itm_test
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +42,9 @@ jobs:
 
       - name: Format check (black)
         run: black --check .
+
+      - name: Apply migrations
+        run: alembic upgrade head
 
       - name: Test (pytest)
         run: pytest --maxfail=1

@@ -1,6 +1,6 @@
 # Setup Guide
 
-Covers M0 only: the repository/environment foundation. No database models, ingestion, simulation logic, auth, or frontend exist yet — see [.claude/MVP_RULES.md](../.claude/MVP_RULES.md) for the full build order.
+Covers M0 (repository/environment foundation) and M1 (database schema & migrations). No data ingestion, simulation logic, auth, or frontend exist yet — see [.claude/MVP_RULES.md](../.claude/MVP_RULES.md) for the full build order.
 
 ## Prerequisites
 
@@ -62,8 +62,25 @@ This runs ruff, black, and a gitleaks secret scan before each commit — the sam
 
 ## Alembic
 
-Alembic is initialized (`backend/alembic/`) but there are no models or migrations yet — that begins in the Database Schema milestone. `alembic.ini` reads the database connection from `DATABASE_URL` via `app.core.config.Settings`, not from a hardcoded value.
+`backend/alembic/versions/0001_initial_schema.py` creates the nine Founder Specification database domains (ten tables — Economic Indicators is a catalog + time-series pair). Apply it with:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+`alembic.ini` reads the database connection from `DATABASE_URL` via `app.core.config.Settings`, not from a hardcoded value. To roll back: `alembic downgrade base`.
+
+### Running tests will downgrade your dev database — read this before running `pytest`
+
+`tests/test_migrations.py` applies the migration to whatever `DATABASE_URL` points at, diffs it against the models, and **downgrades back to base** as part of the test (this is intentional — it proves the migration and models never drift). If you run `pytest` locally against the same `itm_dev` database from `docker compose up`, your dev database will end up schema-less afterward.
+
+Two options:
+- Re-run `alembic upgrade head` after running tests, if you want the dev DB populated with tables for manual poking.
+- Point `DATABASE_URL` at a separate scratch database when running tests locally (matching what CI does with `itm_test`), e.g. `DATABASE_URL=postgresql://itm_user:itm_password@localhost:5432/itm_test pytest` — you'll need to create that database once (`createdb itm_test` inside the postgres container, or via any Postgres client).
+
+CI already isolates this correctly (`.github/workflows/ci.yml` provisions a dedicated `itm_test` Postgres service) — this only affects local runs. Tracked as `docs/KNOWN_ISSUES.md` KI-008.
 
 ## Environment variables
 
-See `.env.example` for the full list. `JWT_SECRET`, `AI_PROVIDER_API_KEY`, and `REDIS_URL` are reserved names for future milestones (Auth, AI Explanations, and API/rate-limiting respectively) — do not set them yet, they're not read by anything in M0.
+See `.env.example` for the full list. `JWT_SECRET`, `AI_PROVIDER_API_KEY`, and `REDIS_URL` are reserved names for future milestones (Auth, AI Explanations, and API/rate-limiting respectively) — do not set them yet, they're not read by anything through M1.

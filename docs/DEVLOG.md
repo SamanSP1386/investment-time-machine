@@ -39,3 +39,81 @@ Permanent engineering journal. One entry is appended per completed milestone. **
 **Production Readiness Score**: 2/10 — appropriate for a foundation milestone with zero product logic. Blocking items before this number moves: real database schema (M1), and a verified (not just authored) Docker Compose run (KI-001).
 
 **Next Milestone**: M1 — Database Schema & Migrations.
+
+---
+
+## 2026-07-05 — M1: Database Schema & Migrations
+
+**Version**: 0.2.0
+
+**Objective**: Implement the nine Founder Specification database domains as SQLAlchemy 2.0 models and a corresponding Alembic migration, with the three founder-approved fixes (nullable simulation/AI-explanation outputs, `calculation_version` from migration 1, conservative Economic Indicators design) applied, plus derived ERD documentation.
+
+**Scope**: SQLAlchemy models, one initial Alembic migration, PostgreSQL native enums, UUID PKs, UTC timestamps, relationships, constraints, indexes, tests, ERD, and this documentation update. Explicitly excluded: ingestion, API endpoints, simulation logic, authentication, frontend logic.
+
+**Implementation Summary**: Built `backend/app/models/base.py` with a shared `Base` (naming-convention-enforced `MetaData`), `UUIDPrimaryKeyMixin`, `TimestampMixin`, and a `pg_enum()` helper. Defined five native Postgres enums (`app/models/enums.py`) and ten tables across nine domains (`assets`, `historical_prices`, `dividends`, `stock_splits`, `economic_indicators` + `economic_indicator_values`, `users`, `simulations`, `audit_logs`, `ai_explanations`). Applied all three approved fixes directly in the models rather than as follow-up patches. Since no Docker/live Postgres was expected to be available (per M0's KI-001), the initial migration's DDL was generated mechanically from the models via SQLAlchemy's offline DDL compiler (`create_mock_engine`) rather than hand-retyped, to guarantee zero drift — this turned out to matter less than expected, because a live Postgres 16 instance (matching the M0 `docker-compose.yml` credentials exactly) was unexpectedly reachable in this session, so the migration was additionally verified end-to-end: applied, diffed against the models (zero drift), downgraded cleanly, and re-applied to leave the dev database at `head`.
+
+**Files Created**: `backend/app/models/__init__.py`, `base.py`, `enums.py`, `asset.py`, `historical_price.py`, `dividend.py`, `stock_split.py`, `economic_indicator.py`, `user.py`, `simulation.py`, `audit_log.py`, `ai_explanation.py`; `backend/alembic/versions/0001_initial_schema.py`; `backend/tests/test_models.py` (25 tests), `backend/tests/test_migrations.py` (2 tests); `docs/erd.md`.
+
+**Files Modified**: `backend/alembic/env.py` (`target_metadata = Base.metadata`, replacing the M0 placeholder), `backend/pyproject.toml` (registered `integration` pytest marker), `.github/workflows/ci.yml` (added a Postgres service + `alembic upgrade head` step), `docs/setup_guide.md` (migration commands, test/dev-DB interaction note), `.claude/DATABASE_RULES.md` (updated from "gaps to fill" to "as implemented"), `docs/KNOWN_ISSUES.md` (KI-001 updated, KI-004/KI-005 updated, KI-008/KI-009 added), `docs/ARCHITECTURE_DECISIONS.md` (ADR-008, ADR-009 added).
+
+**Architecture Decisions**: ADR-008 (Economic Indicators as a separate catalog + time-series pair, not folded into `assets`) and ADR-009 (`audit_logs.user_id` uses `ON DELETE SET NULL`) — both in `docs/ARCHITECTURE_DECISIONS.md`. ADR-002 and ADR-003 (from the M0 entry) were implemented, not just planned, in this milestone.
+
+**Problems Encountered**: (1) SQLAlchemy's `Enum(PyEnum)` defaults to storing the Python enum member **name** (`"STOCK"`) rather than the `.value` (`"stock"`) I'd defined — would have silently diverged from every lowercase value documented in `.claude/DATABASE_RULES.md` and the Founder Specification. (2) `historical_prices` initially carried a standalone `asset_id` index in addition to a composite `(asset_id, price_date)` index — redundant, since the composite's leading column already serves asset-only lookups. (3) Minor ruff/black issues (line length, one unused test variable) on first pass.
+
+**Solutions**: (1) Added a `pg_enum()` helper (`app/models/base.py`) with an explicit `values_callable` forcing `.value` usage — caught by inspecting the generated DDL directly before it ever reached a migration file, specifically because a live Postgres was reachable and I dumped real DDL to check it. (2) Dropped the redundant index, documented the reasoning inline. (3) `ruff --fix` / `black .`, re-verified clean.
+
+**Lessons Learned**: Generating migration DDL mechanically from the models (via a mock engine) rather than hand-typing it eliminates an entire class of drift bugs, and is worth doing even when a live database *might* be available — it removes the question entirely rather than trusting careful manual transcription. Separately: always dump and read the actual generated DDL for enum/default-heavy schemas before trusting an ORM's defaults — the enum name-vs-value behavior is a well-known but easy-to-miss SQLAlchemy gotcha that would have shipped silently wrong otherwise.
+
+**Security Review Summary**: See `SECURITY_LOG.md` M1 entry. No new exploitable risk (no code reads/writes this schema yet); structural risks noted for carry-forward: `audit_logs.ip_address` PII retention/redaction is an application-layer responsibility, `users.password_hash` nullability requires future application-level invariant enforcement.
+
+**Testing Summary**: See `TESTING_REPORT.md` M1 entry. 27 tests total (1 from M0 + 25 metadata-only model tests + 2 DB-integration tests), all passing. The DB-integration tests ran for real against a live Postgres 16 instance in this session (not skipped) and confirmed zero schema drift.
+
+**Technical Debt Introduced**: None judged unintentional. Two items are explicitly flagged pending founder review rather than treated as settled: the Economic Indicators two-table design (ADR-008, KI-005) and the derived ERD (KI-004). One new minor operational note: running `pytest` locally against the same database as `docker compose`'s dev Postgres will downgrade it — documented in `docs/setup_guide.md` and KI-009, not treated as a blocking issue.
+
+**Performance Notes**: See `PERFORMANCE_LOG.md` M1 entry. No representative query workload exists yet; one proactive indexing decision made (dropped redundant `historical_prices.asset_id`-only index) given this table's ~50M-row projection.
+
+**Recruiter Value**: High. This milestone is a strong, concrete artifact: a financial-domain schema with deliberate NUMERIC precision, native enum handling (including catching a real ORM footgun), a documented FK-less exception, delete-behavior reasoning (ON DELETE SET NULL for audit integrity), and a migration verified against a live database with an automated zero-drift check — the kind of detail that reads well in a technical interview.
+
+**Production Readiness Score**: 4/10 — the schema itself is solid and verified, but nothing yet reads or writes through it in a real workflow (no ingestion, no API, no auth), and two design choices (Economic Indicators shape, ERD) remain pending founder sign-off. Blocking items before this number moves: Data Ingestion (M2) actually exercising this schema at volume, and founder review of KI-004/KI-005.
+
+**Next Milestone**: M2 — Historical Data Ingestion Pipeline.
+
+---
+
+## 2026-07-06 — Repository Hygiene Pass (not a feature milestone)
+
+**Version**: 0.2.1
+
+**Objective**: Improve repository consistency and developer experience ahead of M2 — no application logic, no architecture change. Standardize line endings across Windows/Linux/Docker/CI, add editor defaults, and clean up structural issues found along the way.
+
+**Scope**: `.gitattributes`, `.editorconfig`, `.gitignore` review, pre-commit hygiene hooks, a stray nested git repository, and documentation of the LF-standardization rationale. Explicitly excluded: any change to application behavior, database schema, or architecture.
+
+**Implementation Summary**: Added `.gitattributes` forcing LF for `.py`/`.md`/`.yml`/`.yaml`/`Dockerfile`/`.sh`, CRLF for `.bat`/`.ps1` (neither of which exist in the repo yet, but the rule is now in place for when they do), and explicit `binary` declarations for `.pdf`/`.docx`/common image formats. Added `.editorconfig` mirroring the same line-ending rules plus UTF-8, 4-space indentation, required final newline, and trailing-whitespace trimming (except Markdown, where trailing double-spaces are an intentional line-break marker). Ran `git add --renormalize .` to confirm the existing tree was already fully LF-consistent (it was — no files changed). Extended `.gitignore` with a few generically useful entries (`.mypy_cache/`, `.coverage.*`, `*.log`, `*.bak`, `*.orig`, `*.rej`) not currently exercised by the toolchain but harmless and standard. Added five hygiene hooks from `pre-commit/pre-commit-hooks` (trailing-whitespace, end-of-file-fixer, mixed-line-ending, check-merge-conflict, check-added-large-files, check-yaml, check-toml) so the new `.editorconfig`/`.gitattributes` rules are enforced automatically, not just documented. While reviewing directory structure, found and removed an empty, commit-less, remote-less nested `.git` directory inside `backend/` — almost certainly an accidental `git init` from earlier tooling, verified to contain zero history before deletion.
+
+**Files Created**: `.gitattributes`, `.editorconfig`.
+
+**Files Modified**: `.gitignore` (additional ignore patterns), `.pre-commit-config.yaml` (hygiene hooks added), `docs/ARCHITECTURE_DECISIONS.md` (ADR-010), `docs/KNOWN_ISSUES.md` (KI-010).
+
+**Files Removed**: `backend/.git/` (stray nested repository — zero commits, zero refs, zero remotes; confirmed empty before removal).
+
+**Architecture Decisions**: ADR-010 — Standardize on LF line endings, CRLF only for Windows-native scripts (`docs/ARCHITECTURE_DECISIONS.md`). Not an architecture change in the application sense; recorded as an ADR because it's a deliberate, project-wide, hard-to-reverse-cheaply convention.
+
+**Problems Encountered**: (1) A stray nested `.git` directory inside `backend/` was discovered during directory-consistency review — not caused by this pass, but surfaced by it. (2) None of the line-ending rules actually changed any file content, since the repository was already LF-consistent — the risk the ADR addresses was latent, not yet manifested.
+
+**Solutions**: (1) Verified the nested repo had no commits (`git log` inside it: "does not have any commits yet"), no refs, and no configured remote, before deleting it — nothing of value was at risk. (2) `git add --renormalize .` confirmed zero content changes; the new `.gitattributes`/`.editorconfig` are preventative, not corrective.
+
+**Lessons Learned**: A hygiene pass is a good moment to check for structural artifacts (nested `.git` folders, accidentally-tracked build output) that don't show up in day-to-day feature work — nobody notices a stray nested repo until it causes a confusing `git add` warning or submodule-like behavior down the line.
+
+**Security Review Summary**: No security surface touched. `check-added-large-files` (new pre-commit hook) incidentally guards against accidentally committing an oversized binary (e.g. a database dump) in the future.
+
+**Testing Summary**: No new tests (none applicable to configuration files). Full existing suite re-run to confirm no regression: `ruff check .`, `black --check .`, `pytest -v` — 27/27 passed, unchanged from the M1 baseline. `.pre-commit-config.yaml` validated as well-formed YAML.
+
+**Technical Debt Introduced**: None. One debt-adjacent note recorded (KI-010): `.gitattributes` only covers file types that exist today; future milestones must extend it deliberately rather than relying on the catch-all rule indefinitely.
+
+**Performance Notes**: Not applicable.
+
+**Recruiter Value**: Low-to-Medium on its own, but signals exactly the kind of engineering discipline (cross-platform consistency, catching a stray nested repo, enforcing conventions via tooling rather than tribal knowledge) that reads well alongside the higher-value milestones.
+
+**Production Readiness Score**: Not applicable to a hygiene pass — does not change the M1 score (4/10).
+
+**Next Milestone**: M2 — Historical Data Ingestion Pipeline.
