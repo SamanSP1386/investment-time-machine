@@ -55,3 +55,21 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: Per-record SAVEPOINT (ADR-013) trades a small amount of overhead per insert for correctness (preserving prior rows in a batch on a later failure) — a deliberate correctness-over-raw-throughput choice, consistent with "Accuracy is more important than speed" (Founder Specification, Part 2.13).
 
 **Future Improvements**: Once Data Ingestion runs against real multi-year historical ranges (thousands of rows per asset) rather than test fixtures, revisit: (1) whether the in-memory record list needs batching/streaming, (2) whether `historical_prices`' indexing (established in M1) holds up under real write volume, (3) whether CoinGecko rate limits require an explicit throttle before any scheduled/automated ingestion is introduced.
+
+---
+
+## M3 — Simulation Engine (2026-07-09)
+
+**API Response Time**: N/A — no API endpoints exist yet (M4).
+
+**Database Query Time**: Not formally benchmarked against production-scale data. Per-simulation query cost is bounded and small by design: one exact-match price lookup each for `start_date` and `end_date`, one indexed range query for dividends (`idx_dividends_asset_date`-equivalent), one indexed range query for splits (disclosure only), and up to two as-of CPI lookups — none of which scale with the size of `historical_prices` itself (no full-table or full-range scan is required for the basic growth calculation, since only two exact-date rows are read).
+
+**Memory Usage**: Not measured. Bounded by design: the dividend-reinvestment loop holds only the (typically small, per Founder Specification 2.6.21's own volume estimate of ≤12 events/year) list of dividend events for the requested range in memory — not the full price history between start and end.
+
+**Startup Time**: Not affected — `app.simulation` has no heavyweight import dependencies (no pandas/numpy/yfinance, unlike `app.ingestion`).
+
+**Performance Bottlenecks**: None identified. The Founder Specification's <2s single-simulation target (Part 2.14.15) is almost certainly satisfied by this design's query shape (a handful of indexed point/range lookups, no full scans), but this has not been benchmarked against production-scale `historical_prices` volume (the ~50M-row projection from M1).
+
+**Optimizations**: None needed yet — Founder Specification Part 2.14.15 is explicit that "correctness remains more important than speed," and this milestone's design already avoids the main correctness-vs-performance tension point (no need to scan the full price history for the basic growth calculation; only dividend reinvestment reads a bounded range).
+
+**Future Improvements**: Benchmark `run_simulation` against realistic `historical_prices` volume (thousands of rows/asset, from a real M2 backfill) once available, to confirm the <2s target holds in practice, not just by design reasoning.

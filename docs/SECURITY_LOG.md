@@ -64,3 +64,26 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 **Remaining Risks**: The TOCTOU race in asset/indicator resolution (KI-012) should be closed before any concurrent/scheduled ingestion path is introduced. No rate-limiting or backoff exists for provider requests (KI-015) — not a security risk today (single-operator, manually-triggered imports) but would become an availability concern (self-inflicted rate-limit bans) under automated, frequent scheduling.
 
 **Threats Deferred**: "Malicious Data Import" and "Corrupted Historical Data" (Founder Specification threat model, Part 3.6) are the threats this milestone most directly addresses — validation and idempotent storage are the primary mitigations now in place. "Provider Outage" is partially mitigated (explicit `ProviderUnavailableError`/`NetworkTimeoutError` handling) but retry/backoff (KI-015) remains deferred to a future scheduler milestone.
+
+---
+
+## M3 — Simulation Engine (2026-07-09)
+
+**Risks Found**:
+- The Simulation Engine is the platform's "sole source of financial truth" (Founder Specification 2.14.2) — an incorrect calculation here is the single highest-impact risk in the entire platform (ranked #1 in the Founder Specification's own risk register, Part 2.21).
+- The split-consistency assumption underlying `close_price`-based calculation (Founder Decision 001) remains empirically unverified against live data (KI-016) — if wrong, historical returns spanning a stock split would be silently incorrect.
+- `run_simulation` accepts a caller-supplied `symbol` string used in a database query — reviewed for injection risk.
+
+**Severity**: High for the split-consistency assumption (unverified, but code-level behavior is correct and tested); Low for the symbol-lookup path (parameterized query, no injection vector).
+
+**Mitigations Implemented**:
+- Deterministic, explicit, per-event calculation model (Founder Decision 001) — no opaque provider-adjustment black box; every dollar of return traceable to a specific stored price or dividend row, directly serving auditability.
+- `adjusted_close_price` is structurally never read by any Simulation Engine code path — verified by a dedicated test (`test_adjusted_close_price_is_never_read_even_when_wildly_different`) that would fail loudly if a future change accidentally introduced a read.
+- All database access in `app/simulation/repository.py` uses parameterized SQLAlchemy Core/ORM constructs (`select()`) — no string-interpolated SQL, no injection vector via `symbol` or any other caller-supplied value.
+- Every controlled error path is explicit and named (Founder Specification 2.14.14) — no bare `except Exception` anywhere in the Simulation Engine; a genuine unclassified bug is allowed to propagate rather than being silently absorbed into a generic failure.
+- Failed simulations are persisted with a descriptive `error_message` (Founder Specification 2.6.24) for debugging, but never with a fabricated or partially-computed result — output fields remain `NULL` on failure, never a best-guess value.
+- Determinism verified directly by test (`test_engine_determinism.py`) — the same inputs against the same stored data produce byte-identical Decimal output across 3 consecutive runs, directly satisfying the Founder Specification's "non-negotiable" determinism requirement (2.14.12).
+
+**Remaining Risks**: KI-016 (split-consistency assumption unverified against live data) is carried forward as the single most important open item before this design should be trusted with real user-facing simulations — a concrete manual verification runbook is documented, not just flagged. KI-020 (Dividend Contribution metric not yet exposed) is a scope gap, not a security risk.
+
+**Threats Deferred**: "Incorrect Simulation Results" (Founder Specification's #1-ranked threat) is directly mitigated by this milestone's known-answer and determinism tests, but full closure depends on KI-016's live verification. No new threats introduced — the Simulation Engine has no external network calls, no user-facing endpoint yet (M4), and reads only already-validated data.

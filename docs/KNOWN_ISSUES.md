@@ -129,24 +129,42 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 
 ### KI-016
 
-- **Description**: The Simulation Engine's design (`docs/simulation_formulas.md` §3, Founder Decision 001) depends on an empirical assumption — that raw `close_price` from yfinance is already retroactively split-adjusted within a single ingestion fetch — that has not been verified against live data (no network access was available when the design note was drafted).
+- **Description**: The Simulation Engine's design (`docs/simulation_formulas.md` §3, Founder Decision 001) depends on an empirical assumption — that raw `close_price` from yfinance is already retroactively split-adjusted within a single ingestion fetch — that has not been verified against live data (no network access was available when the design note was drafted, nor during M3 implementation).
 - **Severity**: High (this is the single largest financial-correctness risk in the M3 design — if false, historical returns spanning a stock split would be silently wrong).
-- **Status**: Open
-- **Planned Resolution**: M3 must include a known-answer test against a real, well-documented historical stock split (e.g., a split with independently verifiable pre/post prices) confirming this assumption before the Simulation Engine is considered production-ready. Treated as a blocking pre-launch gate item, not optional coverage.
+- **Status**: Partially Verified — code behavior confirmed, live-data empirical claim still open
+- **What M3 verified**: `tests/simulation/test_split_disclosure.py` confirms the *code* correctly treats `stock_splits` as disclosure-only and never multiplies share counts by `split_ratio`, given synthetic price data constructed to already look split-consistent.
+- **What remains unverified — manual verification runbook**: before this design is treated as fully closed for production use, run the following against a live network connection: (1) pick a real, well-documented historical stock split (e.g., AAPL's 4-for-1 split on 2020-08-31, or NVDA's 10-for-1 split on 2024-06-10); (2) run `python -m app.ingestion.cli prices <SYMBOL> --provider yfinance --start <30 days before split> --end <30 days after split>`; (3) inspect the stored `historical_prices.close_price` values on both sides of the split date and confirm they already reflect the retroactive split adjustment (i.e., the pre-split-date prices are already scaled down by the split ratio relative to their original nominal trading price, consistent with today's fetch); (4) if confirmed, this KI can be marked fully Resolved; if not, `docs/simulation_formulas.md` §3 and Founder Decision 001 must be revisited before production use.
+- **Planned Resolution**: Execute the runbook above in an environment with network access; treat as a blocking pre-launch gate item.
 - **Resolution Date**: —
 
 ### KI-017
 
-- **Description**: No trading-day resolution policy exists for simulation `start_date`/`end_date` values that fall on a non-trading day (weekend, market holiday) — `docs/simulation_formulas.md` currently specifies requiring an exact `close_price` row for both dates and failing with "Missing Historical Data" otherwise, which is spec-compliant (Founder Specification Part 3.3.2) but may produce a worse user experience than resolving to the nearest trading day.
+- **Description**: No trading-day resolution policy exists for simulation `start_date`/`end_date` values that fall on a non-trading day (weekend, market holiday).
 - **Severity**: Low
-- **Status**: Open
-- **Planned Resolution**: Decide during M3 implementation whether to (a) keep the strict exact-date-required behavior, or (b) resolve to the nearest valid trading day with the resolved date disclosed in the result. Either is spec-compliant; this is a UX/product decision, not a compliance question.
-- **Resolution Date**: —
+- **Status**: Resolved
+- **Resolution**: M3 requires an exact `close_price` row for both `start_date` and `end_date`; absence raises `MissingHistoricalDataError` (spec-compliant per Founder Specification Part 3.3.2) rather than silently substituting a nearby date. Implemented in `app/simulation/repository.py` (`get_price_on_date`, exact-match only) and `app/simulation/engine.py`. A future milestone may choose to add nearest-trading-day resolution as a product/UX improvement — this is a deliberate, spec-compliant default, not an oversight.
+- **Resolution Date**: 2026-07-09
 
 ### KI-018
 
-- **Description**: `docs/simulation_formulas.md` specifies a scoped `decimal.localcontext()` with `prec=38` and `ROUND_HALF_EVEN` rounding at storage time, but this convention has not yet been implemented or tested (design-only at this stage).
+- **Description**: `docs/simulation_formulas.md` specifies a scoped `decimal.localcontext()` with `prec=38` and `ROUND_HALF_EVEN` rounding at storage time.
 - **Severity**: Medium
+- **Status**: Resolved
+- **Resolution**: Implemented in `app/simulation/precision.py` (`simulation_decimal_context`, `quantize_currency`, `quantize_percentage`) and used throughout `app/simulation/engine.py`. Verified by `tests/simulation/test_precision.py` (context scoping, rounding behavior at an exact midpoint) and `tests/simulation/test_engine_determinism.py` (same simulation run multiple times produces byte-identical Decimal output across every field, per Founder Specification Part 2.14.12's non-negotiable determinism requirement).
+- **Resolution Date**: 2026-07-09
+
+### KI-019
+
+- **Description**: Founder Specification Part 2.6.24's `CHECK(end_date >= start_date)` constraint on the `simulations` table permits a same-day range, while Part 3.3.2's functional requirement states "End date must be after start date" (strictly greater) — a same-day range would also make CAGR's `years` divisor zero, which is mathematically undefined.
+- **Severity**: Low
+- **Status**: Resolved
+- **Resolution**: The Simulation Engine enforces the stricter, spec-correct rule (`end_date` must be strictly after `start_date`) at the application/input-validation layer, raising `InvalidDateRangeError` for a same-day range — the DB-level `CHECK` constraint (unchanged from M1, more permissive) remains a backstop, not the authoritative rule. Verified by `tests/simulation/test_engine_errors.py::test_same_day_range_is_rejected`.
+- **Resolution Date**: 2026-07-09
+
+### KI-020
+
+- **Description**: Founder Specification Part 3.5.11 (Dividend Contribution) is an approved MVP financial metric, but the M1 `simulations` schema reserves no column for it, and it is not among the M3 Simulation Engine's required outputs per this milestone's explicit scope.
+- **Severity**: Low
 - **Status**: Open
-- **Planned Resolution**: Implement as specified during M3; add a test asserting the same simulation run twice produces byte-identical output (Founder Specification Part 2.14.12, determinism is "non-negotiable").
+- **Planned Resolution**: The per-event `cash_dividend` values computed inside the dividend-reinvestment loop (`app/simulation/formulas.py::apply_dividend_reinvestment`) are sufficient to derive this metric; expose it in a future milestone (Financial Analytics or API layer) without needing to alter the M3 calculation logic itself.
 - **Resolution Date**: —

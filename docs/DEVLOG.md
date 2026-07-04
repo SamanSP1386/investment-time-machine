@@ -191,3 +191,81 @@ Permanent engineering journal. One entry is appended per completed milestone. **
 **Production Readiness Score**: 5/10 — the pipeline mechanism is solid, tested, and idempotent, but has never ingested a real multi-year dataset, has no scheduler/automation, no retry/backoff, and one real data-fidelity compromise (CoinGecko OHLC) that a future Financial Analytics milestone must account for. Blocking items before this number moves: a real backfill run against production-scale date ranges, and resolution of KI-012 before any concurrent ingestion path is introduced.
 
 **Next Milestone**: M3 — Simulation Engine.
+
+---
+
+## 2026-07-08 — M3 Design Review & Founder Decision 001 (not a coding milestone)
+
+**Version**: 0.3.1
+
+**Objective**: Before implementing the Simulation Engine, re-validate the proposed calculation model directly against the Founder Specification (not memory), formalize the founder's decision to use `close_price` instead of the specification's own stated `adjusted_close_price` recommendation, and complete a design review (weaknesses, edge cases, risks, testing challenges) before any code was written.
+
+**Scope**: Documentation only — `docs/simulation_formulas.md` (rewritten to APPROVED status), `docs/FOUNDER_DECISIONS.md` (new, Founder Decision 001), ADR-015, `docs/KNOWN_ISSUES.md` (KI-016 through KI-018 added), `.claude/DATABASE_RULES.md` updated. No application code.
+
+**Implementation Summary**: Re-read Part 2.14 (Simulation Engine Architecture, full), Parts 2.6.7/2.6.20/2.6.21/2.6.22/2.6.24 (Database Architecture sections), Parts 3.3.2–3.3.4 (Functional Requirements), and Part 3.5 (Financial Analytics) directly from the extracted specification text. Discovered that the specification's own text recommends `adjusted_close_price` as the MVP default in three separate places (2.6.7, 2.6.20, 2.6.22) — a genuine, repeated deviation the founder's decision explicitly overrides. Recorded as Founder Decision 001, with the full citation trail, in `docs/FOUNDER_DECISIONS.md`; the engineering implementation rationale recorded separately as ADR-015. The design review surfaced three concrete open items, tracked as KI-016 (the split-consistency assumption underlying `close_price`-based calculation is empirically unverified — no network access was available), KI-017 (no trading-day resolution policy), and KI-018 (precision/rounding convention specified but not yet implemented or tested).
+
+**Files Created**: `docs/FOUNDER_DECISIONS.md`.
+
+**Files Modified**: `docs/simulation_formulas.md` (status DRAFT → APPROVED, every formula cross-referenced to its exact spec citation), `docs/ARCHITECTURE_DECISIONS.md` (ADR-015), `docs/KNOWN_ISSUES.md` (KI-008 resolved, KI-016/017/018 added), `.claude/DATABASE_RULES.md` (close_price vs. adjusted_close_price question marked resolved).
+
+**Architecture Decisions**: ADR-015 (`docs/ARCHITECTURE_DECISIONS.md`) — engineering rationale for building the Simulation Engine around `close_price` rather than `adjusted_close_price`, implementing Founder Decision 001.
+
+**Problems Encountered**: None — this was a research and documentation pass, not implementation.
+
+**Solutions**: N/A.
+
+**Lessons Learned**: Re-reading the actual specification text (rather than relying on the summarized understanding carried over from the M0 planning pass) surfaced a real, three-times-repeated deviation that a memory-based review would very likely have missed or under-weighted. "Always consult the source, never rely on memory" earned its keep here.
+
+**Security Review Summary**: Not applicable — no code changed.
+
+**Testing Summary**: Not applicable — no code changed.
+
+**Technical Debt Introduced**: None — KI-016/017/018 are pre-existing design gaps made explicit, not new debt created by this pass.
+
+**Performance Notes**: Not applicable.
+
+**Recruiter Value**: Medium — demonstrates the discipline of re-validating a design against its source of truth before writing code, and formally recording a founder-level specification override with full traceability (a real-world pattern: specs get amended, and the amendment itself needs to be as well-documented as the original).
+
+**Production Readiness Score**: Not applicable — documentation-only pass.
+
+**Next Milestone**: M3 — Simulation Engine (implementation).
+
+---
+
+## 2026-07-09 — M3: Simulation Engine (Implementation)
+
+**Version**: 0.4.0
+
+**Objective**: Implement the Simulation Engine per the approved design (Founder Decision 001, ADR-015, `docs/simulation_formulas.md`): `close_price` as the sole calculation input, explicit one-time dividend processing, `stock_splits` disclosure-only, `Decimal` precision with `prec=38`/`ROUND_HALF_EVEN`, exact-date historical data requirements, controlled error handling, determinism tests, known-answer tests, and a documented verification path for KI-016.
+
+**Scope**: `backend/app/simulation/` (exceptions, precision, formulas, repository, engine) and `backend/tests/simulation/` (36 tests). No API endpoints, no frontend, no portfolio simulation, no advanced analytics beyond the six MVP-required calculations.
+
+**Implementation Summary**: Built five focused modules. `exceptions.py` implements the exact error taxonomy from Founder Specification 2.14.14 plus the 3.3.2 investment-amount/date-range split. `precision.py` provides a scoped `decimal.localcontext()` (never mutating the global context) and explicit `ROUND_HALF_EVEN` quantization helpers matching the `NUMERIC(20,8)`/`NUMERIC(10,6)` column scales. `formulas.py` holds every calculation as a pure, DB-free function — shares purchased, final value, total return %, CAGR (with an independent `math`-module cross-check in tests), inflation adjustment, and the dividend-reinvestment loop (price lookup injected as a callable, keeping the function testable without a database). `repository.py` is read-only, deliberately separate from the M2 `IngestionRepository`, with exact-date price lookups (never nearest-trading-day), ordered dividend/split retrieval, and as-of (never interpolated) CPI lookups. `engine.py`'s `run_simulation` is the sole entry point, implementing a deliberate error-handling asymmetry discovered while writing it: pre-flight validation failures (asset not found, invalid date range, invalid investment amount) never persist a `Simulation` row, because there is no valid `asset_id` to reference and the Founder Specification's own error table classifies these as "Validation error"; mid-simulation failures (missing historical data) persist a failed `Simulation` row with a descriptive `error_message`, per Founder Specification 2.6.24's explicit instruction to store failed simulations for debugging.
+
+One design correction was made during test-writing, before it became a bug: `docs/simulation_formulas.md`'s original draft described dividends being "collected as uninvested cash" when `dividends_reinvested = false`. Re-reading Founder Specification 2.14.10/3.3.3 while writing the corresponding test showed the specification describes only two modes — reinvest, or ignore entirely — with no middle ground. Corrected in both the code and the design note before any test asserted the invented behavior.
+
+**Files Created**: `backend/app/simulation/__init__.py`, `exceptions.py`, `precision.py`, `formulas.py`, `repository.py`, `engine.py`; `backend/tests/simulation/__init__.py`, `conftest.py`, `test_formulas.py`, `test_precision.py`, `test_engine_known_answer.py`, `test_engine_errors.py`, `test_engine_determinism.py`, `test_split_disclosure.py`; `docs/MILESTONE_REPORTS/M3_REPORT.md`.
+
+**Files Modified**: `docs/simulation_formulas.md` (dividends-disabled correction, implementation status), `docs/KNOWN_ISSUES.md` (KI-016 updated with a concrete manual verification runbook, KI-017/018 resolved, KI-019/020 added).
+
+**Architecture Decisions**: No new ADR — this milestone implements ADR-015 and Founder Decision 001 exactly as designed, with one documented correction (dividends-disabled behavior) rather than a new architectural decision.
+
+**Problems Encountered**: (1) Postgres was unreachable at the start of this session — Docker Desktop's engine was not running (unlike prior sessions where it happened to already be up). (2) The dividends-disabled design imprecision described above. (3) The known M1/M2 full-suite-run behavior (KI-009: `test_migrations.py`'s upgrade/downgrade cycle leaves the dev database schema-less) recurred twice during this session's verification passes.
+
+**Solutions**: (1) Started Docker Desktop directly (`Start-Process`) and brought up the `postgres` service via `docker compose up -d postgres`, confirmed healthy, then ran all 36 new tests for real against a live database rather than relying solely on the (still fully passing) DB-independent pure-math suite. (2) Corrected before any test encoded the wrong behavior, per the Lessons Learned above. (3) Re-ran `alembic upgrade head` each time; DB left at `head` with zero residual rows (transaction-rollback isolation confirmed) at the end of the session.
+
+**Lessons Learned**: The pure-math formula tests (no DB required) and the DB-integration engine tests caught the same categories of correctness by design, but for genuinely different reasons — the pure tests are fast and always runnable regardless of environment state; the DB-integration tests are what actually prove the full stack (repository queries, precision context, persistence, error-path branching) works together. Neither layer alone would have been sufficient. Separately: attempting to bring up the actual database environment (rather than reporting "DB unavailable" and stopping) paid off directly — it upgraded the known-answer verification from "formulas are correct in isolation" to "the whole engine is correct end-to-end against a real Postgres instance."
+
+**Security Review Summary**: See `docs/SECURITY_LOG.md` M3 entry. No new attack surface; `adjusted_close_price`-never-read is verified by a dedicated test, not just documented; all queries parameterized.
+
+**Testing Summary**: See `docs/TESTING_REPORT.md` M3 entry. 36 new tests (18 non-DB, 18 DB-integration), all passing against a live Postgres instance. Full project suite: 129/129 passing.
+
+**Technical Debt Introduced**: None new. KI-016 (split-consistency empirical verification) remains the one substantive open item, now with a concrete, actionable manual runbook rather than a vague "should verify eventually" note. KI-020 (Dividend Contribution metric) explicitly deferred, matching this milestone's scope boundary.
+
+**Performance Notes**: See `docs/PERFORMANCE_LOG.md` M3 entry. Query shape (bounded, indexed point/range lookups) is designed to meet the <2s target by construction; not yet benchmarked against production-scale data.
+
+**Recruiter Value**: Very High. This is the platform's centerpiece: a deterministic financial calculation engine with formulas cited line-by-line to a founder specification, known-answer tests reproducing the specification's own worked examples, a caught-before-shipping design correction (dividends-disabled behavior), an explicit and tested error-handling asymmetry grounded in the spec's own error taxonomy, and a documented, honest boundary between "verified by test" and "verified against live data" (KI-016) — exactly the kind of nuanced, defensible engineering judgment that reads well in a technical interview.
+
+**Production Readiness Score**: 6/10 — the engine is correct against every known-answer test available, fully deterministic, and precisely scoped, but carries one unverified empirical dependency (KI-016) that should be closed before production use, and has no caller yet (no API layer exists until M4). Blocking items before this number moves: the KI-016 live-data verification runbook, and M4 (API Layer) actually exercising this engine end-to-end.
+
+**Next Milestone**: M4 — API Layer.

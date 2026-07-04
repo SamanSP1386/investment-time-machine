@@ -1,6 +1,6 @@
 # Simulation Engine — Financial Calculation Design Note
 
-**Status: APPROVED.** This design is now approved architecture — see [Founder Decision 001](FOUNDER_DECISIONS.md) and [ADR-015](ARCHITECTURE_DECISIONS.md). No application code has been written against this note yet; it remains the reference for M3 implementation.
+**Status: IMPLEMENTED (M3).** Approved as architecture via [Founder Decision 001](FOUNDER_DECISIONS.md) and [ADR-015](ARCHITECTURE_DECISIONS.md), and now implemented in `backend/app/simulation/` with 36 tests (formula known-answer, precision, DB-integration known-answer, determinism, error-handling, split-disclosure), all passing. One correction was made during implementation to §2 (dividends-disabled behavior) — see the note inline.
 
 Grounded directly in the Founder Specification — see the compliance report accompanying Founder Decision 001 for section-by-section citations, including the three places the specification's own text recommends `adjusted_close_price` as the MVP default (Parts 2.6.7, 2.6.20, 2.6.22) that this design deliberately departs from, with founder approval.
 
@@ -16,16 +16,19 @@ Grounded directly in the Founder Specification — see the compliance report acc
 
 Raw `close_price` (Yahoo/yfinance convention) is **never dividend-adjusted** — dividends must be modeled explicitly, exactly once, via the `dividends` table, matching Founder Specification Part 2.14.10's five-step dividend reinvestment sequence (retrieve → calculate cash → purchase shares → update count → continue) and Part 2.6.21's "Simulation Usage" section verbatim.
 
-Algorithm, walking the simulation's date range in chronological order:
+Algorithm when `dividends_reinvested = true` (walking the simulation's date range in chronological order):
 
 1. `shares_held` starts at `initial_investment_amount / close_price(start_date)` (Decimal division).
 2. For each `dividends` row with `ex_dividend_date` in `(start_date, end_date]`, in date order:
-   - `cash_dividend = shares_held × dividend_amount` (the per-share amount from the `dividends` table, at the share count held *at that point in the simulation timeline* — not the starting share count).
-   - If `dividends_reinvested = true`: `additional_shares = cash_dividend / close_price(ex_dividend_date)`; `shares_held += additional_shares`.
-   - If `dividends_reinvested = false`: `cumulative_cash_dividends += cash_dividend` (held as uninvested cash, not converted to shares).
-3. At `end_date`: `final_value = shares_held × close_price(end_date) + cumulative_cash_dividends`.
+   - `cash_dividend = shares_held × dividend_amount` (the per-share amount from the `dividends` table, at the share count held *at that point in the simulation timeline* — not the starting share count, so later dividends compound on earlier reinvestments).
+   - `additional_shares = cash_dividend / close_price(ex_dividend_date)`; `shares_held += additional_shares`.
+3. At `end_date`: `final_value = shares_held × close_price(end_date)`.
 
-`cumulative_cash_dividends` is `0` throughout when `dividends_reinvested = true` (every dividend is immediately converted to shares in step 2, so nothing accumulates as cash). This also gives a direct, natural definition for the approved MVP metric **Dividend Contribution** (Founder Specification Part 3.5.11, "supported through dividend reinvestment calculations") = the sum of every `cash_dividend` computed in step 2, reported as its own figure regardless of whether it was reinvested.
+**Corrected from an earlier draft of this note**: when `dividends_reinvested = false`, dividend events are not retrieved or processed *at all* — not even tracked as uninvested cash. Founder Specification Part 2.14.10 ("When disabled") and Part 3.3.3 are explicit: "Ignore dividend events. Use price appreciation only." There is no third "collect as cash but don't reinvest" mode in the specification; the engine implements exactly the two modes it describes. `shares_held` in that case simply equals `initial_investment_amount / close_price(start_date)` throughout, unchanged by any dividend.
+
+Fractional shares are assumed (standard for a DRIP-style reinvestment model and for an educational simulation platform) — this modeling assumption is stated explicitly since the Founder Specification does not address share fractionality directly.
+
+**Out of M3 scope**: a distinct, persisted "Dividend Contribution" metric (Founder Specification Part 3.5.11) is not implemented — the M1 `simulations` schema reserves no column for it, and it is not among the M3-required outputs. The underlying per-event `cash_dividend` values are computable from the same reinvestment loop if a future milestone needs to expose this metric.
 
 Fractional shares are assumed (standard for a DRIP-style reinvestment model and for an educational simulation platform) — this modeling assumption is stated explicitly since the Founder Specification does not address share fractionality directly.
 
