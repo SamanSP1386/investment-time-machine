@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     fred_api_key: str = ""
     ingestion_http_timeout_seconds: float = 10.0
 
+    # API Layer (Milestone 4) — Redis, deliberately excluded until a
+    # milestone actually needed caching or rate limiting (ADR-004); this is
+    # that milestone.
+    redis_url: str = "redis://localhost:6379/0"
+    rate_limit_simulation_per_minute: int = 60
+    rate_limit_read_per_minute: int = 100
+
 
 @lru_cache
 def get_settings() -> Settings:

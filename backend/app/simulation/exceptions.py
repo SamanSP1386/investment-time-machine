@@ -5,11 +5,25 @@ Date Range, Calculation Failure. No layer in this package catches a bare
 the engine can produce has its own named type here.
 """
 
+import uuid
 from datetime import date
 
 
 class SimulationError(Exception):
-    """Base for every controlled error the Simulation Engine can raise."""
+    """Base for every controlled error the Simulation Engine can raise.
+
+    `simulation_id` is `None` by default and populated (M4 addition) only for
+    error types where `run_simulation` has already persisted a failed
+    `Simulation` row before re-raising — letting the API layer include it in
+    the error response so a client/support engineer can reference the exact
+    stored record. Pre-flight validation errors (asset not found, invalid
+    date range, invalid investment amount) never populate this, since no row
+    is ever persisted for them (see `app/simulation/engine.py`).
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.simulation_id: uuid.UUID | None = None
 
 
 class AssetNotFoundError(SimulationError):

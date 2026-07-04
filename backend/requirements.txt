@@ -10,3 +10,6 @@ psycopg2-binary==2.9.9
 yfinance==0.2.44
 httpx==0.27.2
 requests==2.34.2
+
+# API Layer (Milestone 4)
+redis==5.0.8

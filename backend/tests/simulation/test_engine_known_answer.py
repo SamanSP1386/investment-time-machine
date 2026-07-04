@@ -150,3 +150,26 @@ def test_inflation_adjustment_left_null_when_cpi_data_missing(db_session) -> Non
     assert sim.status.value == "completed"
     assert sim.inflation_adjusted_final_value is None
     assert sim.final_value == Decimal("1100.00000000")
+
+
+def test_growth_series_populated_end_to_end_through_the_engine(db_session) -> None:
+    asset = make_asset(db_session, "KA7")
+    make_price(db_session, asset, date(2020, 1, 1), "100")
+    make_price(db_session, asset, date(2020, 6, 1), "100")
+    make_price(db_session, asset, date(2020, 12, 1), "120")
+    make_dividend(db_session, asset, date(2020, 6, 1), "1")
+
+    outcome = run_simulation(
+        db_session,
+        symbol="KA7",
+        investment_amount=Decimal("1000"),
+        start_date=date(2020, 1, 1),
+        end_date=date(2020, 12, 1),
+        dividends_reinvested=True,
+    )
+
+    series = outcome.growth_series
+    assert [p.point_date for p in series] == [date(2020, 1, 1), date(2020, 6, 1), date(2020, 12, 1)]
+    assert series[0].value == Decimal("1000")  # 10 shares * 100
+    assert series[1].value == Decimal("1010")  # 10.1 shares * 100, dividend applied
+    assert series[-1].value == outcome.simulation.final_value  # matches stored final_value

@@ -87,3 +87,48 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 **Remaining Risks**: KI-016 (split-consistency assumption unverified against live data) is carried forward as the single most important open item before this design should be trusted with real user-facing simulations — a concrete manual verification runbook is documented, not just flagged. KI-020 (Dividend Contribution metric not yet exposed) is a scope gap, not a security risk.
 
 **Threats Deferred**: "Incorrect Simulation Results" (Founder Specification's #1-ranked threat) is directly mitigated by this milestone's known-answer and determinism tests, but full closure depends on KI-016's live verification. No new threats introduced — the Simulation Engine has no external network calls, no user-facing endpoint yet (M4), and reads only already-validated data.
+
+---
+
+## M4 — API Layer (2026-07-10)
+
+**Risks Found**:
+- This is the platform's first HTTP-exposed attack surface — the first milestone where an external caller can send arbitrary input directly to backend code.
+- `POST /api/v1/simulations` is public and unauthenticated (founder-approved, KI-022), so it is available to anyone, including automated abuse, without an account.
+- A 500-class error (`CalculationError`, or the boundary-level catch-all) could, if implemented carelessly, leak internal detail (stack traces, SQL, file paths) to the client.
+- If the DB-session dependency auto-rolled-back on any exception (a common FastAPI default), a failed simulation's already-flushed audit-relevant `Simulation` row (Founder Specification Part 2.6.24) could be silently destroyed on its way out of the API layer.
+- `docs/api_design.md`'s stated audit-logging requirement for simulation creation was not implemented (KI-026) — a documentation-vs-implementation drift discovered during this milestone's own post-implementation review, not a newly introduced vulnerability, but a gap in the auditability the design intended.
+
+**Severity**: Medium for the unauthenticated public endpoint (mitigated by rate limiting, per explicit founder decision — see below); Low for the error-message-leak risk (mitigated, verified by test); Low for the transaction-boundary risk (mitigated by design, verified by test); Low for the missing audit-log write (no confidentiality/integrity impact — the simulation record itself is still stored — but a real gap in the intended audit trail).
+
+**Mitigations Implemented**:
+- Redis-backed fixed-window rate limiting (`app/core/rate_limit.py`): 60/min on `POST /api/v1/simulations`, 100/min on read endpoints, keyed by client IP — the founder-approved control substituting for authentication on the public simulation-creation endpoint (KI-022). Fails open (allows the request, logs a warning) if Redis is unreachable, a deliberate choice so a rate-limiter outage cannot take down the core simulation feature — mirrors the Founder Specification's own AI-failure-isolation philosophy (Part 3.4.4), applied here by analogy to a new dependency.
+- Every request body is validated by Pydantic before reaching a service function; `investment_amount` is accepted only as a string/Decimal-compatible token, never silently coerced through a JSON float, closing off the float-precision-loss risk at the API boundary the same way M3 closed it internally.
+- Every named exception type (`AssetNotFoundError`, `InvalidDateRangeError`, `InvalidInvestmentAmountError`, `MissingHistoricalDataError`, `CalculationError`, `SimulationNotFoundError`, `ForbiddenError`, `RateLimitExceededError`, Pydantic's `RequestValidationError`) maps to an explicit, reviewed HTTP status and error code in `app/api/v1/exception_handlers.py`. `CalculationError` and the one legitimate boundary-level `Exception` catch-all log full detail server-side (`exc_info=True`) but return only a generic message plus a `request_id` to the client — verified this doesn't leak by inspecting every handler's response body construction directly, not just by convention.
+- `app/api/v1/dependencies.py::get_db_session` deliberately never auto-commits or auto-rolls-back; `simulation_service.create_simulation` explicitly owns the commit/rollback decision per exception type, so a `MissingHistoricalDataError`/`CalculationError`'s already-persisted failed `Simulation` row survives (committed), while pre-flight validation errors correctly roll back (nothing was written) — see ADR-016. This is a correctness-and-integrity control, not just a code-quality one: getting it wrong would silently violate Founder Specification Part 2.6.24.
+- All database access in the new service layer uses parameterized SQLAlchemy Core/ORM constructs (`select`, `session.get`) — no string-interpolated SQL, no injection vector via `asset_symbol` or any other caller-supplied value.
+- No admin or authentication-requiring routes are implemented or exposed — Simulation History and Admin Import remain design-only (`docs/api_design.md`), per explicit founder instruction, closing off the "unprotected admin surface" risk entirely rather than partially.
+
+**Remaining Risks**: KI-026 (audit-logging requirement from the M4 design note, not implemented) should be closed in a follow-up pass or explicitly deferred with founder sign-off — currently open, tracked honestly rather than silently dropped. KI-016 (M3's split-consistency assumption) remains the platform's highest-severity open item, now with a real caller (this milestone) that makes closing it more urgent, not less. No load/abuse testing has been performed against the rate limiter's real-world effectiveness (only its logical correctness is unit-tested).
+
+**Threats Deferred**: Credential stuffing, token lifecycle, and session management remain fully owned by Auth (M5) — this milestone deliberately implements zero authentication, per founder instruction, so these threats are neither newly mitigated nor newly exposed. "Malicious/Automated Simulation Abuse" (a reasonable read of Founder Specification Part 2.8.13's rate-limiting requirement) is the one new threat this milestone directly owns and mitigates via rate limiting.
+
+---
+
+## M4 Follow-Up — Simulation Audit Logging, KI-026 (2026-07-10)
+
+**Risks Found**:
+- Prior to this fix, `POST /api/v1/simulations` left no audit trail at all — a gap against Founder Specification Part 2.8.14 and against this milestone's own design note. Without an audit trail, detecting and investigating abuse of the public, unauthenticated simulation-creation endpoint (e.g. a pattern of repeated `AssetNotFoundError` probes, or a burst of `CalculationError`s indicating a bug being actively triggered) would have depended entirely on the rate limiter and application logs, not a queryable, structured record.
+- A naively-implemented audit write (e.g. one that raises on failure) could turn a working simulation endpoint into a new single point of failure — an outage or bug in the audit-write path would otherwise take down a feature that has nothing to do with auditing.
+
+**Severity**: Medium for the original gap (mitigated now — see below); Low for the new-single-point-of-failure risk (mitigated by design, not just intent).
+
+**Mitigations Implemented**:
+- `app/api/v1/audit.py::record_simulation_audit` writes one row per attempt for every code path in `simulation_service.create_simulation` — success, all three pre-flight validation errors, and both mid-simulation errors — and `record_simulation_request_validation_audit` covers the one remaining category (Pydantic-level request validation failures) via a narrowly-scoped, path-checked handler.
+- The audit write is isolated in a SAVEPOINT (`session.begin_nested()`) and wrapped in a `try/except SQLAlchemyError` that logs and swallows rather than propagates — a broken or slow audit write cannot turn a correct simulation result, or an already-correctly-classified error response, into an unrelated 500. This mirrors the Redis rate-limiter's fail-open policy (`app/core/rate_limit.py`) and is a deliberate, tested design choice, not an afterthought.
+- `entity_id` is always populated (a real `Simulation.id` when one exists, a synthetic `uuid4()` correlation id otherwise) — every audit row is queryable and self-describing even for failure categories that never persist a `Simulation` row at all.
+- `user_id` is always `NULL` on every audit row (M4 has no authentication) — no risk of writing a fabricated or guessed user attribution.
+
+**Remaining Risks**: The audit trail currently has no consumer (no `GET /api/v1/admin/audit-logs` or equivalent exists — deliberately, per the founder's instruction not to build admin routes in this fix). It exists for future investigative/compliance use, not yet wired into any monitoring or alerting. No new `SIMULATION_FAILED` enum value was added (a deliberate, disclosed choice — see `docs/KNOWN_ISSUES.md` KI-026) — a future consumer querying `audit_logs` by `event_type` alone cannot distinguish a succeeded from a failed simulation attempt without also reading `details.status`; this is a documented query-ergonomics tradeoff, not a security gap.
+
+**Threats Deferred**: Unchanged from the M4 entry above — this follow-up closes one specific auditability gap and introduces no new deferred threat.

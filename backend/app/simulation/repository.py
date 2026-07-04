@@ -43,6 +43,29 @@ class SimulationRepository:
             )
         ).scalar_one_or_none()
 
+    def get_prices_ordered(
+        self, asset_id: uuid.UUID, start_date: date, end_date: date
+    ) -> list[HistoricalPrice]:
+        """All price rows in [start_date, end_date], ordered ascending.
+        Added in M4 to support `growth_series` (Founder Specification
+        Part 3.3.2's required "Growth Chart" output) — the core
+        shares/final_value calculation (M3) only ever needs the two exact
+        endpoint rows via `get_price_on_date`; this range query exists only
+        for the value-over-time series, a distinct, read-only concern."""
+        return list(
+            self._session.execute(
+                select(HistoricalPrice)
+                .where(
+                    HistoricalPrice.asset_id == asset_id,
+                    HistoricalPrice.price_date >= start_date,
+                    HistoricalPrice.price_date <= end_date,
+                )
+                .order_by(HistoricalPrice.price_date.asc())
+            )
+            .scalars()
+            .all()
+        )
+
     def get_dividends_ordered(
         self, asset_id: uuid.UUID, start_date: date, end_date: date
     ) -> list[Dividend]:

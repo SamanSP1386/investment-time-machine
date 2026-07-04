@@ -36,9 +36,12 @@ from app.simulation.exceptions import (
 )
 from app.simulation.formulas import (
     DividendEvent,
+    GrowthSeriesPoint,
+    PricePoint,
     apply_dividend_reinvestment,
     calculate_cagr,
     calculate_final_value,
+    calculate_growth_series,
     calculate_inflation_adjusted_value,
     calculate_shares_purchased,
     calculate_total_return_percent,
@@ -61,11 +64,15 @@ DEFAULT_CALCULATION_VERSION = "v1"
 class SimulationOutcome:
     """What `run_simulation` returns on success: the persisted `Simulation`
     row, plus any stock splits disclosed for audit/transparency (Founder
-    Decision 001) — the splits are never persisted themselves (no column
-    exists for them on `simulations`), only surfaced to the caller."""
+    Decision 001), plus the value-over-time `growth_series` (Founder
+    Specification Part 3.3.2's required "Growth Chart" output, added in M4 —
+    see docs/KNOWN_ISSUES.md KI-021). Neither is persisted to the
+    `simulations` table (no columns exist for them) — both are computed
+    fresh from already-stored data and surfaced only to the caller."""
 
     simulation: Simulation
     disclosed_splits: tuple[StockSplit, ...] = ()
+    growth_series: tuple[GrowthSeriesPoint, ...] = ()
 
 
 def _validate_inputs(investment_amount: Decimal, start_date: date, end_date: date) -> None:
@@ -117,6 +124,7 @@ def run_simulation(
             # close_price only — never adjusted_close_price (Founder Decision 001).
             shares_held = calculate_shares_purchased(investment_amount, initial_price)
 
+            events: list[DividendEvent] = []
             if dividends_reinvested:
                 dividend_rows = repo.get_dividends_ordered(asset.id, start_date, end_date)
                 events = [
@@ -138,6 +146,8 @@ def run_simulation(
             # retrieved or applied at all (Founder Specification 2.14.10/
             # 3.3.3: "ignore dividend events, use price appreciation only")
             # — not tracked as uninvested cash, simply not looked at.
+            # `events` stays [] in that case, which `calculate_growth_series`
+            # (below) treats identically to `apply_dividend_reinvestment`.
 
             final_value = calculate_final_value(shares_held, final_price)
             total_return_percentage = calculate_total_return_percent(final_value, investment_amount)
@@ -158,6 +168,23 @@ def run_simulation(
 
             # Audit/disclosure only (Founder Decision 001) -- never read above.
             splits = repo.get_splits_ordered(asset.id, start_date, end_date)
+
+            # Growth Chart (Founder Specification 3.3.2) -- a read-only
+            # replay of the same dividend logic above, at every stored price
+            # date rather than only the two endpoints. Never persisted (no
+            # `simulations` column exists for it); surfaced via
+            # SimulationOutcome only. See docs/KNOWN_ISSUES.md KI-021.
+            price_rows = repo.get_prices_ordered(asset.id, start_date, end_date)
+            price_points = [
+                PricePoint(price_date=row.price_date, close_price=row.close_price)
+                for row in price_rows
+            ]
+            growth_series = calculate_growth_series(
+                calculate_shares_purchased(investment_amount, initial_price),
+                price_points,
+                events,
+                symbol,
+            )
 
             simulation = Simulation(
                 user_id=user_id,
@@ -191,7 +218,11 @@ def run_simulation(
             end_date,
             simulation.final_value,
         )
-        return SimulationOutcome(simulation=simulation, disclosed_splits=tuple(splits))
+        return SimulationOutcome(
+            simulation=simulation,
+            disclosed_splits=tuple(splits),
+            growth_series=tuple(growth_series),
+        )
 
     except (MissingHistoricalDataError, CalculationError) as exc:
         failed_simulation = Simulation(
@@ -208,5 +239,6 @@ def run_simulation(
         )
         session.add(failed_simulation)
         session.flush()
+        exc.simulation_id = failed_simulation.id
         logger.warning("simulation failed: symbol=%s error=%s", symbol, exc)
         raise

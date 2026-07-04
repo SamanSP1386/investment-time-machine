@@ -168,3 +168,55 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Status**: Open
 - **Planned Resolution**: The per-event `cash_dividend` values computed inside the dividend-reinvestment loop (`app/simulation/formulas.py::apply_dividend_reinvestment`) are sufficient to derive this metric; expose it in a future milestone (Financial Analytics or API layer) without needing to alter the M3 calculation logic itself.
 - **Resolution Date**: —
+
+### KI-021
+
+- **Description**: Founder Specification Part 3.3.2 explicitly lists "Growth Chart" as a required output of the Historical Investment Simulation feature, but the M3 Simulation Engine computes and stores only point-in-time start/end values (`initial_price`, `final_price`, `shares_purchased`, `final_value`) — no value-over-time series. Discovered during the M4 API design review, not accounted for in M3's scope.
+- **Severity**: Medium
+- **Status**: Resolved — partially (see remaining gap below)
+- **Resolution (M4, 2026-07-10)**: Extended the Simulation Engine (not the API layer, per the founder-approved decision) with `app/simulation/formulas.py::calculate_growth_series` — a read-only replay of the same dividend-reinvestment event loop at every stored price date in range, rather than only the two endpoints. Wired into `run_simulation` via `SimulationOutcome.growth_series` and surfaced on `POST /api/v1/simulations`'s response. Verified by `tests/simulation/test_growth_series.py` (5 tests, including a cross-check that the series' final point exactly matches the independently-computed `apply_dividend_reinvestment` + `calculate_final_value` result) and one DB-integration test.
+- **Remaining gap**: `growth_series` (like `disclosed_splits`) is never persisted — no `simulations` column exists for it — so it is computed fresh only on the `POST` request path. A subsequent `GET /api/v1/simulations/{id}` returns it as an empty list, per the founder's own approved fallback ("if this is too large for M4, expose growth_series as an empty/deferred field and document the deferral"). See ADR-016.
+- **Resolution Date**: 2026-07-10
+
+### KI-022
+
+- **Description**: Founder Specification Part 2.8.8 states "sensitive endpoints... Create Simulation... should require authentication," while Part 2.6.24 explicitly designs `simulations.user_id` as nullable "to support a public simulator experience without requiring account creation" — a direct internal inconsistency. Discovered during the M4 API design review.
+- **Severity**: Medium
+- **Status**: Resolved — per explicit founder decision
+- **Resolution (M4, 2026-07-10)**: Founder approved `POST /api/v1/simulations` as public for MVP, optionally authenticated later: anonymous simulations allowed (`user_id = NULL`); rate limiting required instead of authentication as the MVP-appropriate control. Implemented in `app/api/v1/routers/simulations.py` (hardcoded `user_id: uuid.UUID | None = None` until M5 exists) plus a Redis-backed fixed-window rate limiter (`app/core/rate_limit.py`, 60 requests/min on this endpoint).
+- **Resolution Date**: 2026-07-10
+
+### KI-023
+
+- **Description**: Founder Specification Part 3.3.10 (Simulation History) and the Administrator-only endpoints implied by Part 2.8.6 (manage assets, trigger imports, review audit logs) both require real authentication/authorization to be meaningfully access-controlled, but M4 explicitly excludes implementing authentication (reserved for M5).
+- **Severity**: Low
+- **Status**: Resolved — per explicit founder decision, deferred to M5
+- **Resolution (M4, 2026-07-10)**: Founder confirmed both endpoint families may be designed (see `docs/api_design.md` §5–6) but must not be implemented until M5 (simulation history) and M5-or-later with admin authorization (import endpoints). Neither route exists in `app/api/v1/routers/` — only `POST`/`GET /api/v1/simulations/{id}` (single-record, not history) and asset read endpoints are implemented in M4. No unprotected admin surface is exposed.
+- **Resolution Date**: 2026-07-10
+
+### KI-024
+
+- **Description**: Founder Specification Part 2.6.24's literal column names are `include_dividends`/`adjust_for_inflation`, but the M1 `simulations` table (and M3 engine parameters) use `dividends_reinvested`/`inflation_adjusted` instead — a naming deviation from the spec's literal text, not caught during M1 or M3. Discovered during the M4 API design review.
+- **Severity**: Low
+- **Status**: Resolved — per explicit founder decision
+- **Resolution (M4, 2026-07-10)**: Founder confirmed the external API contract should use the Founder Specification's own vocabulary while internal names may remain unchanged. Implemented at the Pydantic-schema boundary: `app/api/v1/schemas/simulations.py::SimulationCreateRequest`/`SimulationResponse` use `include_dividends`/`adjust_for_inflation` externally; `app/api/v1/services/simulation_service.py::create_simulation` explicitly maps them to `dividends_reinvested`/`inflation_adjusted` when calling `run_simulation` (no Pydantic aliasing magic — a plain, readable parameter mapping). No schema/engine change made.
+- **Resolution Date**: 2026-07-10
+
+### KI-025
+
+- **Description**: Founder Specification Part 3.3.6 lists "Exchange" as an Asset Details output field, but the M1 `assets` table has no such column.
+- **Severity**: Low
+- **Status**: Open — Founder-approved non-blocking gap
+- **Update (M4, 2026-07-10)**: Founder confirmed this is not blocking for M4: `GET /api/v1/assets/{symbol}` returns `"exchange": null` explicitly (present in the contract, not omitted) rather than blocking on a schema change. Implemented in `app/api/v1/schemas/assets.py::AssetDetail`.
+- **Planned Resolution**: Add an `exchange` column to the `assets` table in a future schema-enhancement migration; update `AssetDetail`/`asset_service.get_asset_by_symbol` accordingly. Not scheduled to a specific milestone.
+- **Resolution Date**: —
+
+### KI-026
+
+- **Description**: `docs/api_design.md` (the M4 design review document, written and approved before implementation) specifies that `POST /api/v1/simulations` "writes an `audit_logs` row (`entity_type="simulation"`, `event_type=SIMULATION_CREATED`... for every request, success or failure." This was not implemented — `app/api/v1/services/simulation_service.py::create_simulation` does not write to `audit_logs` at all. Discovered during M4's own documentation-update pass, after implementation and full test verification were already complete.
+- **Severity**: Low (no security or correctness impact — the simulation itself is still stored, including failed attempts, per Founder Specification Part 2.6.24; only the separate `audit_logs` trail described in the design note is missing) — but a genuine design-vs-implementation drift, not a deliberate, founder-approved scope cut like KI-021/023.
+- **Status**: Resolved
+- **Resolution (M4 follow-up, 2026-07-10)**: Added `app/api/v1/audit.py::record_simulation_audit`, called from `simulation_service.create_simulation` on every outcome — success, the three pre-flight validation errors (`AssetNotFoundError`, `InvalidDateRangeError`, `InvalidInvestmentAmountError`), and the two mid-simulation errors (`MissingHistoricalDataError`, `CalculationError`) — plus `record_simulation_request_validation_audit`, called from the `RequestValidationError` handler (`app/api/v1/exception_handlers.py`) for Pydantic-level request validation failures that never reach the service layer at all (e.g. a non-positive `investment_amount`). Every audit row records: `event_type` (`SIMULATION_CREATED` — see design note below), `entity_id` (the real `Simulation.id` when one was persisted, otherwise a synthetic `uuid4()` correlation id, since `entity_id` is `NOT NULL` and this column is documented as FK-less/polymorphic), and inside `details` (JSONB): `status` (`"succeeded"`/`"failed"`), `asset_symbol`, `request_id`, `error_code` (`None` on success), and `simulation_id` (`None` when no row was persisted). `user_id` is always `NULL` (anonymous), per M4's no-authentication scope. The write is isolated in a SAVEPOINT (`session.begin_nested()`) and swallows `SQLAlchemyError` with a logged warning — a broken audit write can never turn a correct simulation result or a correctly-classified error response into an unrelated 500, mirroring the Redis rate-limiter's fail-open policy.
+- **Design note not followed literally**: no new `SIMULATION_FAILED` enum value was added — `AuditEventType`'s own docstring (`app/models/enums.py`) states "adding a value later is a migration... expand deliberately, not speculatively," and a schema migration was judged out of scope for this fix. The existing `SIMULATION_CREATED` value is reused for every attempt (success or failure); `details.status`/`details.error_code` carry the outcome instead. Every literal field the requirement asked for (event type, simulation id, asset symbol, request id, status, error code, timestamp via `created_at`, anonymous `user_id = NULL`) is present.
+- **Verified by**: `tests/api/test_simulation_audit.py` (4 tests) — one audit row is written for a successful simulation, an asset-not-found pre-flight failure, a missing-historical-data mid-simulation failure (with `entity_id`/`details.simulation_id` matching the persisted failed `Simulation` row), and a Pydantic-level request validation failure.
+- **Resolution Date**: 2026-07-10

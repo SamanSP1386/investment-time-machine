@@ -20,6 +20,18 @@ class DividendEvent:
     amount_per_share: Decimal
 
 
+@dataclass(frozen=True)
+class PricePoint:
+    price_date: date
+    close_price: Decimal
+
+
+@dataclass(frozen=True)
+class GrowthSeriesPoint:
+    point_date: date
+    value: Decimal
+
+
 def calculate_shares_purchased(investment_amount: Decimal, initial_price: Decimal) -> Decimal:
     """Founder Specification 2.14.7: shares_purchased = investment_amount / initial_price."""
     return investment_amount / initial_price
@@ -95,3 +107,51 @@ def apply_dividend_reinvestment(
             raise MissingHistoricalDataError(symbol, event.ex_dividend_date)
         shares_held += cash_dividend / price
     return shares_held
+
+
+def calculate_growth_series(
+    initial_shares: Decimal,
+    prices: list[PricePoint],
+    dividend_events: list[DividendEvent],
+    symbol: str,
+) -> list[GrowthSeriesPoint]:
+    """Founder Specification 3.3.2's required "Growth Chart" output — added
+    in M4 (not part of M3's original scope, discovered as a gap during the
+    M4 API design review; see docs/KNOWN_ISSUES.md KI-021).
+
+    Replays the same dividend-reinvestment logic as
+    `apply_dividend_reinvestment`, but incrementally at every stored price
+    date rather than only at the two endpoints, so the caller gets a full
+    value-over-time series instead of a single final number. `close_price`
+    only (Founder Decision 001) — never `adjusted_close_price` — and
+    `dividend_events` must be pre-sorted ascending, exactly as
+    `apply_dividend_reinvestment` requires. Pass an empty `dividend_events`
+    list when `dividends_reinvested=False`, matching that function's
+    contract exactly.
+
+    `prices` must include a row for every date a dividend event lands on
+    (guaranteed by the caller: `run_simulation` only reaches this function
+    after `apply_dividend_reinvestment` has already succeeded against the
+    same data) — `MissingHistoricalDataError` is still raised defensively if
+    that invariant is ever violated, rather than silently skipping a point.
+    """
+    shares_held = initial_shares
+    dividend_index = 0
+    series: list[GrowthSeriesPoint] = []
+
+    for point in prices:
+        while (
+            dividend_index < len(dividend_events)
+            and dividend_events[dividend_index].ex_dividend_date <= point.price_date
+        ):
+            event = dividend_events[dividend_index]
+            if event.ex_dividend_date != point.price_date:
+                raise MissingHistoricalDataError(symbol, event.ex_dividend_date)
+            cash_dividend = shares_held * event.amount_per_share
+            shares_held += cash_dividend / point.close_price
+            dividend_index += 1
+        series.append(
+            GrowthSeriesPoint(point_date=point.price_date, value=shares_held * point.close_price)
+        )
+
+    return series

@@ -5,6 +5,12 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's own dependency-injection idiom is `param=Depends(...)` /
+# `param=Query(...)` in a function default — not the mutable-default-value
+# bug B008 otherwise guards against.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
 [tool.black]
 line-length = 100
 target-version = ["py312"]
