@@ -41,3 +41,26 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 **Remaining Risks**: PII retention/redaction policy for `audit_logs.ip_address` is still undefined at the application layer (tracked in `.claude/SECURITY_POLICY.md`, not newly introduced by M1). No row-level security or database-level access control has been configured yet — all access control is deferred to the API layer (M4) and Auth (M5), consistent with the "Simple Security First" philosophy in `.claude/SECURITY_POLICY.md`.
 
 **Threats Deferred**: Unchanged from M0 — no new milestone-owned threats are mitigated or newly exposed by a schema-only milestone. Credential stuffing, secret exposure at runtime, and token lifecycle remain owned by Auth (M5) and API (M4).
+
+---
+
+## M2 — Historical Data Ingestion Pipeline (2026-07-07)
+
+**Risks Found**:
+- External providers (yfinance, CoinGecko, FRED) are, by definition, untrusted input sources — a compromised or buggy provider response could attempt to inject malformed, out-of-range, or malicious-looking data into the platform's historical record.
+- `FredProvider` sends `FRED_API_KEY` as a query parameter on every request — standard for the FRED API, but means the key appears in plaintext in the request URL (sent over HTTPS; not logged by this codebase, but visible to anything that can see the outbound request, e.g. a proxy).
+- The `get_or_create_asset`/`get_or_create_indicator` TOCTOU race (KI-012) is a data-integrity risk under concurrency, not currently an exploitable security risk (no concurrent ingestion paths exist).
+
+**Severity**: Medium for the untrusted-provider-input risk (mitigated, see below); Low for the FRED API key exposure (standard for the API, HTTPS-protected, not logged); Low for the TOCTOU race (no concurrent execution path exists yet to trigger it).
+
+**Mitigations Implemented**:
+- Every raw provider record passes through explicit validation (`app/ingestion/validation/rules.py`) before normalization or storage — malformed, out-of-range, non-positive, or future-dated values are rejected with an explicit reason, never silently repaired, coerced, or passed through.
+- No provider adapter (`app/ingestion/providers/`) imports `app.models` or `app.core.database` — a structural guarantee (not just a convention) that the Provider Layer cannot write to the database directly, enforced by module boundaries and verified by the fact that every provider test runs with zero database dependency.
+- All database writes use parameterized SQLAlchemy Core/ORM constructs (`sqlalchemy.dialects.postgresql.insert`, `select`) — no string-interpolated SQL anywhere in the ingestion pipeline, closing off SQL injection via a malicious symbol/indicator code.
+- `FRED_API_KEY` is sourced exclusively from `Settings` (environment variable), never hardcoded, never logged — verified by inspecting every `logger.*` call in the Provider Layer.
+- Idempotent upserts (`ON CONFLICT DO NOTHING`) plus per-record SAVEPOINTs (ADR-013) mean a malformed or adversarial record can, at worst, be rejected or fail to insert — it cannot corrupt or discard previously-stored legitimate data in the same batch.
+- CoinGecko's known OHLC data-fidelity limitation is disclosed (ADR-012), not hidden — a transparency measure directly serving the "Historical Truth Is Sacred" principle.
+
+**Remaining Risks**: The TOCTOU race in asset/indicator resolution (KI-012) should be closed before any concurrent/scheduled ingestion path is introduced. No rate-limiting or backoff exists for provider requests (KI-015) — not a security risk today (single-operator, manually-triggered imports) but would become an availability concern (self-inflicted rate-limit bans) under automated, frequent scheduling.
+
+**Threats Deferred**: "Malicious Data Import" and "Corrupted Historical Data" (Founder Specification threat model, Part 3.6) are the threats this milestone most directly addresses — validation and idempotent storage are the primary mitigations now in place. "Provider Outage" is partially mitigated (explicit `ProviderUnavailableError`/`NetworkTimeoutError` handling) but retry/backoff (KI-015) remains deferred to a future scheduler milestone.

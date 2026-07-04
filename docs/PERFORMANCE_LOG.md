@@ -37,3 +37,21 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: The `(asset_id, price_date)` composite index above; otherwise no optimization work needed at schema-only scale.
 
 **Future Improvements**: Real query performance can only be measured once the Data Ingestion (M2) and Simulation Engine (M3) milestones actually read/write through this schema at volume — this milestone only establishes the shapes and indexes that future performance work will measure against.
+
+---
+
+## M2 — Historical Data Ingestion Pipeline (2026-07-07)
+
+**API Response Time**: N/A — no API endpoints exist yet.
+
+**Database Query Time**: Not formally benchmarked. Qualitatively fast at test scale (a handful of rows per test, sub-second per DB-integration test — 14 integration tests completed in under 2 seconds total). Not representative of a real multi-year, multi-asset backfill.
+
+**Memory Usage**: Not measured. Known architectural note: each import currently holds its full fetched record list in memory (`list[RawPriceRecord]`) rather than streaming/batching — acceptable for MVP asset-catalog scale (single-symbol, bounded-date-range imports), flagged in `docs/KNOWN_ISSUES.md` KI-015 as a scale consideration, not a current problem.
+
+**Startup Time**: Not affected — the ingestion pipeline is a library + CLI, not a long-running service; no startup cost beyond normal Python import time (yfinance's import graph — pandas, numpy — is the heaviest addition, on the order of the same cost any data-science-adjacent dependency incurs).
+
+**Performance Bottlenecks**: None identified at test scale. Anticipated future bottleneck (not yet encountered): CoinGecko's free-tier rate limits under any automated/scheduled import frequency (KI-015) — a throttling/backoff concern, not a code-level performance issue.
+
+**Optimizations**: Per-record SAVEPOINT (ADR-013) trades a small amount of overhead per insert for correctness (preserving prior rows in a batch on a later failure) — a deliberate correctness-over-raw-throughput choice, consistent with "Accuracy is more important than speed" (Founder Specification, Part 2.13).
+
+**Future Improvements**: Once Data Ingestion runs against real multi-year historical ranges (thousands of rows per asset) rather than test fixtures, revisit: (1) whether the in-memory record list needs batching/streaming, (2) whether `historical_prices`' indexing (established in M1) holds up under real write volume, (3) whether CoinGecko rate limits require an explicit throttle before any scheduled/automated ingestion is introduced.

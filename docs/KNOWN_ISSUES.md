@@ -67,9 +67,9 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 
 - **Description**: `historical_prices` stores both `close_price` and `adjusted_close_price`, but the schema (M1) does not decide which one feeds the growth/return formula. Using `adjusted_close_price` while also manually reinvesting dividends (Founder Specification Part 2.14.10) would double-count dividends.
 - **Severity**: Medium
-- **Status**: Open
-- **Planned Resolution**: Resolve explicitly at the start of the Simulation Engine milestone (M3) — documented in `.claude/DATABASE_RULES.md`.
-- **Resolution Date**: —
+- **Status**: Resolved
+- **Resolution**: Founder Decision 001 (`docs/FOUNDER_DECISIONS.md`) — the Simulation Engine uses `close_price` exclusively; dividends and splits are processed explicitly from their own tables; `adjusted_close_price` is retained for validation/comparison/audit only. Full design in `docs/simulation_formulas.md`, engineering rationale in ADR-015 (`docs/ARCHITECTURE_DECISIONS.md`).
+- **Resolution Date**: 2026-07-08
 
 ### KI-009
 
@@ -94,3 +94,59 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Status**: Resolved
 - **Resolution**: Replaced the wrapper action with a direct `gitleaks detect --source . --redact --verbose` CLI invocation (`.github/workflows/ci.yml`), installed at the pinned version already used in `.pre-commit-config.yaml` (v8.18.4). `gitleaks detect` scans the full git history of the checked-out repository unconditionally rather than diffing two refs, so there is no commit range to resolve and this failure mode cannot recur. Scan strength is unchanged (full history, not weakened to a working-tree-only scan).
 - **Resolution Date**: 2026-07-07
+
+### KI-012
+
+- **Description**: `IngestionRepository.get_or_create_asset` / `get_or_create_indicator` (`app/ingestion/storage/repository.py`) are not race-safe: a SELECT-then-INSERT pattern has a TOCTOU window where two concurrent ingestion runs for the same symbol could both attempt to create it.
+- **Severity**: Low (no concurrent/background ingestion workers exist in MVP scope — ingestion runs as a single-process CLI invocation today).
+- **Status**: Open
+- **Planned Resolution**: Replace with an `ON CONFLICT DO NOTHING ... RETURNING` upsert (matching the pattern already used for price/dividend/split/indicator-value rows) before any scheduler or concurrent worker is introduced.
+- **Resolution Date**: —
+
+### KI-013
+
+- **Description**: CoinGecko's free-tier `/market_chart/range` endpoint (the only one supporting arbitrary historical date ranges) returns one price observation per day, not true OHLC. `CoinGeckoProvider` sets Open=High=Low=Close to that single observed value and discloses this via a warning on every import (see ADR-012) rather than fabricating intraday variance — but any future feature computing volatility from `high_price - low_price` will silently get zero for all CoinGecko-sourced rows.
+- **Severity**: Medium (data-fidelity limitation, not a bug — but consequential for any future feature relying on intraday price range for crypto assets).
+- **Status**: Open
+- **Planned Resolution**: Revisit if a paid CoinGecko tier or an alternative crypto data provider with genuine historical OHLC becomes available; until then, any Financial Analytics feature (future milestone) using high/low for volatility-style metrics must special-case or exclude CoinGecko-sourced rows.
+- **Resolution Date**: —
+
+### KI-014
+
+- **Description**: `CoinGeckoProvider` requires callers to supply CoinGecko's internal coin id (e.g. "bitcoin"), not a ticker symbol (e.g. "BTC") — there is no free-tier symbol-to-id resolution endpoint, so no such mapping is implemented.
+- **Severity**: Low (a real constraint of the free API surface, not a code defect; affects operator ergonomics, not correctness).
+- **Status**: Open
+- **Planned Resolution**: Add a small static ticker-to-CoinGecko-id lookup table (or a one-time cached call to CoinGecko's `/coins/list` endpoint) before crypto ingestion is exposed to non-technical operators or an API endpoint.
+- **Resolution Date**: —
+
+### KI-015
+
+- **Description**: The ingestion pipeline has no retry/backoff on transient provider failures (a single timeout or 5xx ends the import immediately with `status="failed"`) and no rate-limit awareness for CoinGecko's free-tier request limits.
+- **Severity**: Low (acceptable for manually-triggered, low-frequency imports; would become a real operational problem under a scheduled/high-frequency import workload).
+- **Status**: Open
+- **Planned Resolution**: Add a bounded retry (e.g. one retry after a timeout) and basic rate-limit-aware throttling when a scheduler/background worker milestone is built — out of scope for a pipeline-mechanism milestone.
+- **Resolution Date**: —
+
+### KI-016
+
+- **Description**: The Simulation Engine's design (`docs/simulation_formulas.md` §3, Founder Decision 001) depends on an empirical assumption — that raw `close_price` from yfinance is already retroactively split-adjusted within a single ingestion fetch — that has not been verified against live data (no network access was available when the design note was drafted).
+- **Severity**: High (this is the single largest financial-correctness risk in the M3 design — if false, historical returns spanning a stock split would be silently wrong).
+- **Status**: Open
+- **Planned Resolution**: M3 must include a known-answer test against a real, well-documented historical stock split (e.g., a split with independently verifiable pre/post prices) confirming this assumption before the Simulation Engine is considered production-ready. Treated as a blocking pre-launch gate item, not optional coverage.
+- **Resolution Date**: —
+
+### KI-017
+
+- **Description**: No trading-day resolution policy exists for simulation `start_date`/`end_date` values that fall on a non-trading day (weekend, market holiday) — `docs/simulation_formulas.md` currently specifies requiring an exact `close_price` row for both dates and failing with "Missing Historical Data" otherwise, which is spec-compliant (Founder Specification Part 3.3.2) but may produce a worse user experience than resolving to the nearest trading day.
+- **Severity**: Low
+- **Status**: Open
+- **Planned Resolution**: Decide during M3 implementation whether to (a) keep the strict exact-date-required behavior, or (b) resolve to the nearest valid trading day with the resolved date disclosed in the result. Either is spec-compliant; this is a UX/product decision, not a compliance question.
+- **Resolution Date**: —
+
+### KI-018
+
+- **Description**: `docs/simulation_formulas.md` specifies a scoped `decimal.localcontext()` with `prec=38` and `ROUND_HALF_EVEN` rounding at storage time, but this convention has not yet been implemented or tested (design-only at this stage).
+- **Severity**: Medium
+- **Status**: Open
+- **Planned Resolution**: Implement as specified during M3; add a test asserting the same simulation run twice produces byte-identical output (Founder Specification Part 2.14.12, determinism is "non-negotiable").
+- **Resolution Date**: —

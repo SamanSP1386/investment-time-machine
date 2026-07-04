@@ -141,3 +141,73 @@ Architecture Decision Records. Never edit a previous ADR — if a decision chang
 - **Rationale**: `.sh` files and `Dockerfile`s are interpreted by Linux shells inside containers — a CRLF there is a correctness bug, not a style issue. Python, Markdown, and YAML have no such hard requirement, but forcing LF keeps `git diff`/`git blame` clean across a Windows-primary, Linux-deployed project. `.bat`/`.ps1` are the inverse case: they only ever run on Windows, where CRLF is the native and expected convention, and forcing LF on them would be consistency for its own sake with no benefit.
 - **Tradeoffs**: Contributors whose local Git config normalizes differently will see `.gitattributes` override their local behavior for tracked files — this is the intended effect (repository policy beats individual config) but can surprise a contributor unfamiliar with `.gitattributes` the first time they see `git add --renormalize` touch files they didn't expect.
 - **Future Implications**: Any new source file type added to the project (e.g. `.json`, `.toml`, `.tsx` once the frontend milestone begins) should get an explicit `.gitattributes` entry at that time rather than falling back to the `* text=auto eol=lf` catch-all by accident — see `docs/KNOWN_ISSUES.md` for the tracked reminder.
+
+---
+
+## ADR-011 — Provider Capability Protocols Instead of One Uniform Interface
+
+- **Date**: 2026-07-07
+- **Status**: Accepted
+- **Context**: Milestone 2 (Data Ingestion Pipeline) needs a Provider Layer supporting yfinance (prices, dividends, splits), CoinGecko (prices only — crypto has no dividends or splits), and FRED (economic indicator observations only — no prices at all).
+- **Problem**: A single `Provider` interface requiring every adapter to implement `fetch_prices`/`fetch_dividends`/`fetch_splits`/`fetch_observations` would force CoinGecko and FRED to implement methods that make no domain sense for them (a `fetch_dividends` for crypto, a `fetch_prices` for an economic indicator), either raising `NotImplementedError` at call time or returning meaningless empty lists silently.
+- **Options Considered**: (1) One large `Provider` protocol all adapters implement fully, unsupported methods raising `NotImplementedError`. (2) Separate capability protocols (`PriceProvider`, `DividendProvider`, `SplitProvider`, `IndicatorProvider`) that a provider implements only the subset it genuinely supports, with callers checking capability via `isinstance()` before calling.
+- **Final Decision**: Option 2, implemented with `typing.Protocol` + `@runtime_checkable` (`app/ingestion/providers/base.py`).
+- **Rationale**: Matches the actual shape of the domain — not every provider supports every capability, and pretending otherwise (via `NotImplementedError`) just moves the failure from "doesn't compile" to "fails at runtime in a way that looks like a bug." `isinstance()` capability checks let the orchestrator (and any future caller) ask "can this provider do X?" before attempting X, which is also exactly how `import_asset()`'s convenience wrapper decides whether to attempt dividend/split imports.
+- **Tradeoffs**: Slightly more moving parts (four protocols instead of one) for a reader encountering the Provider Layer for the first time.
+- **Future Implications**: A future provider (Polygon, Alpha Vantage, IEX) that supports a different subset of capabilities (e.g. prices + dividends but not splits) requires zero changes to existing providers or the orchestrator — it simply implements the protocols it can satisfy.
+
+---
+
+## ADR-012 — CoinGecko OHLC Approximation Is Disclosed, Never Fabricated
+
+- **Date**: 2026-07-07
+- **Status**: Accepted
+- **Context**: CoinGecko's free-tier API endpoint that supports an arbitrary historical date range (`/market_chart/range`) returns one price observation per day, not true Open/High/Low/Close. The endpoint that does return real OHLC (`/ohlc`) is restricted to a fixed lookback window from "now" and cannot backfill arbitrary historical ranges — unusable for this platform's core use case (simulating decades-old investments).
+- **Problem**: The `historical_prices` schema (M1) requires non-null Open/High/Low/Close for every row. Without true OHLC data available from the free API for historical ranges, some value has to go in those columns.
+- **Options Considered**: (1) Silently set Open = High = Low = Close = the single observed price, with no indication anywhere that this differs from genuinely-observed OHLC. (2) Same substitution, but explicitly disclosed via a warning attached to every CoinGecko price import's Import Report, and documented prominently in code comments and this ADR.
+- **Final Decision**: Option 2 (`COINGECKO_OHLC_APPROXIMATION_WARNING` in `coingecko_provider.py`, attached by the orchestrator to every CoinGecko price import report).
+- **Rationale**: "Historical Truth Is Sacred" (Founder Specification, Part 2.1) does not forbid using an imperfect data source — it forbids *pretending* imperfect data is complete. Setting O=H=L=C is not fabrication in the sense of inventing a number that never existed (the single price point genuinely was CoinGecko's observation for that day); the fabrication risk would be in presenting it as if real intraday high/low variance had been captured when it wasn't. Disclosure closes that gap.
+- **Tradeoffs**: Crypto price data ingested via CoinGecko has permanently lower fidelity than stock/ETF data via yfinance — any future feature computing intraday volatility from `high_price - low_price` would silently get zero for all CoinGecko-sourced rows. This is now a known, documented constraint rather than a silent trap.
+- **Future Implications**: If a paid CoinGecko tier or an alternative crypto data provider with genuine historical OHLC becomes available, this adapter (or a replacement) should be updated — tracked in `docs/KNOWN_ISSUES.md`.
+
+---
+
+## ADR-013 — Per-Record SAVEPOINT in Storage Layer Upserts
+
+- **Date**: 2026-07-07
+- **Status**: Accepted
+- **Context**: The Storage Layer's idempotent upsert (`INSERT ... ON CONFLICT DO NOTHING ... RETURNING`) can still raise a genuine constraint violation distinct from the anticipated natural-key duplicate (e.g. a foreign key pointing at a row that doesn't exist). Postgres aborts an entire transaction on the first unhandled statement error.
+- **Problem**: Without isolating each record's insert attempt, one bad record partway through a multi-hundred-row import batch would silently discard every row already upserted earlier in the same transaction when the batch's outer transaction is later committed (or, if the error isn't caught at all, the whole transaction aborts).
+- **Options Considered**: (1) Let a constraint violation propagate and abort the whole import's transaction. (2) Wrap each individual upsert in a SAVEPOINT (`session.begin_nested()`), so a failure rolls back only that one insert attempt, and the transaction as a whole remains valid and committable with everything upserted so far intact.
+- **Final Decision**: Option 2 (`IngestionRepository._upsert`, `app/ingestion/storage/repository.py`).
+- **Rationale**: A single malformed record (a genuine bug, not an ordinary duplicate) should be reported and skipped, not allowed to silently erase legitimate work already done in the same import run — directly serving "accuracy is more important than speed" and the general principle that partial success should be visible and preserved, not hidden by an all-or-nothing rollback.
+- **Tradeoffs**: A SAVEPOINT per record adds minor overhead per insert; acceptable at MVP import volumes (per-asset historical backfills, not continuous high-frequency writes).
+- **Future Implications**: Verified directly by `test_upsert_price_constraint_violation_raises_and_preserves_prior_rows` (`tests/ingestion/test_storage.py`) — any future change to `_upsert` should keep this test green, since it's the one thing standing between "one bad row" and "silently lose an entire import."
+
+---
+
+## ADR-014 — One Audit Log Row Per Real Import Attempt, No Separate "Start" Event
+
+- **Date**: 2026-07-07
+- **Status**: Accepted
+- **Context**: The Founder Specification's audit requirements (as relayed in this milestone's brief) list "import start" and "import completion" as things to capture. `audit_logs.entity_id` (M1 schema) is NOT NULL, and dry runs must not write to the database at all.
+- **Problem**: There is no real entity to attach a "start" audit event to before the asset/indicator row is resolved (for a brand-new symbol, that resolution is itself the first write of the import). Writing a start-of-import audit row would also directly conflict with the dry-run "must not modify the database" requirement, since dry runs need to log a start signal without writing anything.
+- **Options Considered**: (1) Two audit rows per real import: one at start (against a synthetic, not-otherwise-referenced UUID) and one at completion. (2) One audit row per real import attempt, written at completion (success or failure), with the full structured Import Report (including `import_start`, `import_end`, `duration_seconds`) embedded in `details` — plus structured application logging (not persisted audit rows) for real-time start/progress visibility.
+- **Final Decision**: Option 2.
+- **Rationale**: The single completion row is a complete historical record — it contains the start timestamp and everything else needed for monitoring/debugging after the fact, without inventing a synthetic entity_id with no backing row (which would itself be an inconsistency with the platform's polymorphic-audit convention of `entity_id` pointing at something real). Application logs (see `app/core/logging.py`) cover the "is this import still running right now" concern that a persisted start-row would otherwise serve.
+- **Tradeoffs**: There is no queryable database record of imports that are currently in-progress (only completed ones, successful or failed) — acceptable given MVP-scale imports complete in seconds to low minutes, not hours.
+- **Future Implications**: If a future milestone introduces long-running or scheduled background imports where "is this stuck?" becomes an operational question, this design should be revisited — likely via a mutable in-progress audit row rather than the current write-once-at-completion shape. Tracked in `docs/KNOWN_ISSUES.md`.
+
+---
+
+## ADR-015 — Simulation Engine Calculation Model Built on `close_price`, Not `adjusted_close_price`
+
+- **Date**: 2026-07-08
+- **Status**: Accepted (implements Founder Decision 001 — see `docs/FOUNDER_DECISIONS.md`)
+- **Context**: The Founder Specification's own text (Parts 2.6.7, 2.6.20, 2.6.22) recommends `adjusted_close_price` as the MVP default for the Simulation Engine, with raw price fields and `stock_splits` described as existing "for transparency and future advanced simulations." The founder has explicitly decided to build the Simulation Engine (M3) around the "future advanced" model instead, from the start.
+- **Problem**: `adjusted_close_price` is a single number that bundles split adjustment and (per the specification's own description, "provider dependent") dividend adjustment together, opaquely. A calculation built on it cannot show its work — it cannot answer "how much of this return came from dividends versus price appreciation" without essentially re-deriving the raw event history anyway, undermining the auditability and explainability the Founder Specification names as top Simulation Engine priorities (Part 2.14.1).
+- **Options Considered**: (1) Use `adjusted_close_price` as the specification's own text recommends for MVP, deferring explicit event-based modeling to a genuinely future milestone. (2) Use `close_price` with explicit, stored-event dividend reinvestment and split disclosure, per Founder Decision 001.
+- **Final Decision**: Option 2, detailed in full in `docs/simulation_formulas.md`.
+- **Rationale**: See Founder Decision 001. In engineering terms: an explicit event-processing model is directly testable against known-answer references (a specific dividend, on a specific date, at a specific share count) in a way an opaque adjusted-price calculation is not — this materially serves Part 2.14.18's requirement that the Simulation Engine "requires the highest test coverage in the platform."
+- **Tradeoffs**: More implementation complexity in M3 (a per-event loop rather than a single price-ratio lookup); one unverified empirical assumption (raw `close_price` is already split-consistent within a single ingestion fetch) that must be confirmed by a known-answer test against a real historical split before this model is trusted in production — tracked as a blocking pre-launch item, not an optional nice-to-have.
+- **Future Implications**: A future "Advanced Corporate Actions Engine" (spin-offs, mergers, special dividends, incremental-reimport-safe split reconciliation) is explicitly reserved as a later milestone, not part of M3. Any new source file or calculation added to the Simulation Engine must continue to read `close_price`, never `adjusted_close_price`, unless a new Founder Decision supersedes this one.

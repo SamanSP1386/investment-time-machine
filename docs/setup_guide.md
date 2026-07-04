@@ -1,6 +1,6 @@
 # Setup Guide
 
-Covers M0 (repository/environment foundation) and M1 (database schema & migrations). No data ingestion, simulation logic, auth, or frontend exist yet — see [.claude/MVP_RULES.md](../.claude/MVP_RULES.md) for the full build order.
+Covers M0 (repository/environment foundation), M1 (database schema & migrations), and M2 (data ingestion pipeline). No simulation logic, auth, or frontend exist yet — see [.claude/MVP_RULES.md](../.claude/MVP_RULES.md) for the full build order.
 
 ## Prerequisites
 
@@ -81,6 +81,19 @@ Two options:
 
 CI already isolates this correctly (`.github/workflows/ci.yml` provisions a dedicated `itm_test` Postgres service) — this only affects local runs. Tracked as `docs/KNOWN_ISSUES.md` KI-008.
 
+## Data Ingestion (M2)
+
+Trigger an import manually via the CLI (not an API endpoint — no HTTP, no auth):
+
+```bash
+cd backend
+python -m app.ingestion.cli prices AAPL --provider yfinance --start 2020-01-01 --end 2024-01-01
+python -m app.ingestion.cli prices AAPL --provider yfinance --start 2020-01-01 --end 2024-01-01 --dry-run
+python -m app.ingestion.cli indicator CPIAUCSL --provider fred --name "CPI for All Urban Consumers" --unit index --start 2020-01-01 --end 2024-01-01
+```
+
+FRED requires a free API key (`FRED_API_KEY` in `.env`) — get one at https://fred.stlouisfed.org/docs/api/api_key.html. yfinance and CoinGecko need no key. `--dry-run` downloads, validates, and normalizes without writing to the database.
+
 ## Environment variables
 
-See `.env.example` for the full list. `JWT_SECRET`, `AI_PROVIDER_API_KEY`, and `REDIS_URL` are reserved names for future milestones (Auth, AI Explanations, and API/rate-limiting respectively) — do not set them yet, they're not read by anything through M1.
+See `.env.example` for the full list. `FRED_API_KEY` and `INGESTION_HTTP_TIMEOUT_SECONDS` are read starting at M2. `JWT_SECRET`, `AI_PROVIDER_API_KEY`, and `REDIS_URL` are reserved names for future milestones (Auth, AI Explanations, and API/rate-limiting respectively) — do not set them yet, they're not read by anything through M2.

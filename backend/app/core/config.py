@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://itm_user:itm_password@localhost:5432/itm_dev"
     cors_allowed_origins: str = "http://localhost:3000"
 
+    # Data Ingestion (Milestone 2)
+    fred_api_key: str = ""
+    ingestion_http_timeout_seconds: float = 10.0
+
 
 @lru_cache
 def get_settings() -> Settings:
