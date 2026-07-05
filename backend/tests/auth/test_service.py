@@ -8,6 +8,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import redis
 from sqlalchemy import select
 
 from app.auth import service as auth_service
@@ -24,13 +25,29 @@ from app.auth.lockout import AccountLockout
 from app.auth.tokens import decode_access_token, hash_refresh_token
 from app.core.rate_limit import get_redis_client
 from app.models import RefreshToken
-from tests.auth.conftest import make_user
+from tests.auth.conftest import FakeAccountLockout, make_user
 
 pytestmark = pytest.mark.integration
 
 
-def _lockout(max_attempts: int = 5) -> AccountLockout:
-    return AccountLockout(get_redis_client(), max_attempts=max_attempts, window_seconds=60)
+def _lockout(max_attempts: int = 5) -> FakeAccountLockout:
+    """Default lockout double for every test in this file that doesn't
+    specifically exercise Redis-backed enforcement — see
+    `tests.auth.conftest.FakeAccountLockout` for why this is preferred over
+    a real Redis dependency here. `authenticate()`'s own logic is what this
+    file tests; `AccountLockout`'s Redis mechanics (including fail-open) are
+    covered directly in `tests/auth/test_lockout.py`, and re-verified at the
+    `authenticate()` integration level by the two tests immediately below
+    `test_authenticate_locks_out_after_repeated_failures`."""
+    return FakeAccountLockout(max_attempts=max_attempts, window_seconds=60)
+
+
+def _real_redis_reachable() -> bool:
+    try:
+        get_redis_client().ping()
+        return True
+    except redis.RedisError:
+        return False
 
 
 def _unique_email() -> str:
@@ -168,6 +185,91 @@ def test_authenticate_locks_out_after_repeated_failures(db_session):
             user_agent=None,
             ip_address=None,
         )
+
+
+def test_authenticate_enforces_lockout_when_redis_available(db_session):
+    """Explicit `authenticate()`-level coverage for the "Redis available,
+    lockout enforced" case, using the real `AccountLockout`/Redis instead of
+    `FakeAccountLockout` — skips gracefully (matching
+    `tests/auth/test_lockout.py`'s and `tests/core/test_rate_limit.py`'s own
+    convention) rather than failing when Redis genuinely isn't reachable in
+    this environment (e.g. CI, which provisions Postgres but not Redis)."""
+    if not _real_redis_reachable():
+        pytest.skip("Redis not reachable in this environment — see docs/KNOWN_ISSUES.md")
+
+    user = make_user(db_session)
+    lockout = AccountLockout(get_redis_client(), max_attempts=3, window_seconds=60)
+
+    for _ in range(3):
+        with pytest.raises(InvalidCredentialsError):
+            auth_service.authenticate(
+                db_session,
+                email=user.email,
+                password="wrong",
+                lockout=lockout,
+                user_agent=None,
+                ip_address=None,
+            )
+
+    with pytest.raises(AccountLockedError):
+        auth_service.authenticate(
+            db_session,
+            email=user.email,
+            password="correct-horse",
+            lockout=lockout,
+            user_agent=None,
+            ip_address=None,
+        )
+
+
+def test_authenticate_fails_open_when_redis_unavailable(db_session, caplog):
+    """Explicit `authenticate()`-level coverage for the "Redis unavailable,
+    fail open" case (KI-035): a real `AccountLockout` pointed at an
+    unreachable address must never block a login — this is what CI's own
+    (Redis-less) environment actually exercises for every real
+    `AccountLockout` instance, so it is asserted directly rather than left
+    implicit. Mirrors `tests/auth/test_lockout.py::test_fails_open_when_redis_unreachable`'s
+    always-unreachable-address pattern, applied at the `authenticate()`
+    integration level instead of directly against `AccountLockout`.
+
+    `max_attempts=1` and a single wrong-password attempt (rather than
+    looping to a higher threshold) is deliberate: each call against an
+    unreachable Redis address costs real connection-timeout latency (~2s on
+    this environment, matching the existing `test_lockout.py` precedent),
+    and proving "fails open" only requires one failed attempt that *would*
+    have locked a real, reachable Redis-backed lockout at this threshold —
+    looping further would only add latency, not additional coverage.
+    """
+    unreachable_client = redis.from_url(
+        "redis://localhost:1/0", socket_connect_timeout=1, socket_timeout=1
+    )
+    lockout = AccountLockout(unreachable_client, max_attempts=1, window_seconds=60)
+    user = make_user(db_session)
+
+    with caplog.at_level("WARNING"):
+        with pytest.raises(InvalidCredentialsError):
+            auth_service.authenticate(
+                db_session,
+                email=user.email,
+                password="wrong",
+                lockout=lockout,
+                user_agent=None,
+                ip_address=None,
+            )
+
+        # Still not locked despite max_attempts=1 already being exceeded —
+        # Redis being unreachable must never be the reason a legitimate user
+        # can't log in.
+        issued = auth_service.authenticate(
+            db_session,
+            email=user.email,
+            password="correct-horse",
+            lockout=lockout,
+            user_agent=None,
+            ip_address=None,
+        )
+    assert issued is not None
+    assert any("failing open" in message for message in caplog.messages)
 
 
 def test_authenticate_rejects_inactive_account_only_after_correct_password(db_session):

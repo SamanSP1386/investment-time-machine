@@ -44,6 +44,41 @@ def db_session():
         connection.close()
 
 
+class FakeAccountLockout:
+    """In-memory test double for `app.auth.lockout.AccountLockout`, matching
+    its exact public interface (`is_locked`/`record_failed_attempt`/`reset`).
+
+    `auth_service.authenticate()`'s own logic (lockout-before-password-check,
+    reset-on-success) is what `tests/auth/test_service.py` needs to exercise
+    deterministically — it does not need to exercise Redis itself (that is
+    `tests/auth/test_lockout.py`'s job, against `AccountLockout` directly).
+    Requiring a real, reachable Redis instance for every DB-integration test
+    in that file made two of them silently depend on CI's Redis
+    availability: `AccountLockout` fails open (never locks) whenever Redis
+    is unreachable, which is correct production behavior, but meant a test
+    asserting real enforcement would incorrectly pass or fail depending on
+    an unrelated environment property rather than the code under test. This
+    fake has no such dependency, so `authenticate()`'s own lockout-handling
+    logic is verified the same way in every environment, CI included.
+    """
+
+    def __init__(self, max_attempts: int, window_seconds: int = 60) -> None:
+        self._max_attempts = max_attempts
+        self._window_seconds = window_seconds
+        self._counts: dict[str, int] = {}
+
+    def is_locked(self, email: str) -> tuple[bool, int]:
+        return self._counts.get(email, 0) >= self._max_attempts, (
+            self._window_seconds if self._counts.get(email, 0) >= self._max_attempts else 0
+        )
+
+    def record_failed_attempt(self, email: str) -> None:
+        self._counts[email] = self._counts.get(email, 0) + 1
+
+    def reset(self, email: str) -> None:
+        self._counts.pop(email, None)
+
+
 def make_user(
     session: Session,
     *,
