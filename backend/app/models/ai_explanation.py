@@ -1,12 +1,12 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
-from app.models.enums import AIGenerationStatus
+from app.models.enums import AIExplanationType, AIGenerationStatus
 
 if TYPE_CHECKING:
     from app.models.simulation import Simulation
@@ -19,8 +19,17 @@ class AIExplanation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     explanation_text is nullable for the same reason Simulation's output
     columns are nullable: AIGenerationStatus.PENDING/FAILED are valid states
-    with no text yet. simulation_id is NOT NULL — every explanation belongs to
-    exactly one simulation.
+    with no text yet — and, per the M6 design, a FAILED row's
+    explanation_text stays NULL forever: an explanation that failed a safety
+    check is never persisted, even partially (see app.ai.service). simulation_id
+    is NOT NULL — every explanation belongs to exactly one simulation.
+
+    M6 (Educational AI System) addition: explanation_type distinguishes the
+    Explanation Engine's single INITIAL explanation per (simulation,
+    prompt_version, model_name) from a Financial Tutor FOLLOW_UP
+    question-and-answer turn, which additionally populates question_text.
+    Both share this table rather than getting one of their own — an
+    extension of the existing AI Explanations domain, not a new one.
     """
 
     __tablename__ = "ai_explanations"
@@ -28,6 +37,12 @@ class AIExplanation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     simulation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("simulations.id"), nullable=False
     )
+    explanation_type: Mapped[AIExplanationType] = mapped_column(
+        pg_enum(AIExplanationType, "ai_explanation_type_enum"),
+        nullable=False,
+        server_default=AIExplanationType.INITIAL.value,
+    )
+    question_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     prompt_version: Mapped[str] = mapped_column(String(20), nullable=False)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
     input_summary: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -40,6 +55,10 @@ class AIExplanation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     simulation: Mapped["Simulation"] = relationship(back_populates="ai_explanations")
+
+    __table_args__ = (
+        Index("idx_ai_explanations_simulation_type", "simulation_id", "explanation_type"),
+    )
 
     def __repr__(self) -> str:
         return (

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import (
     get_db_session,
+    rate_limit_ai,
     rate_limit_auth,
     rate_limit_read,
     rate_limit_simulation,
@@ -67,6 +68,7 @@ def client(db_session):
     app.dependency_overrides[rate_limit_simulation] = lambda: None
     app.dependency_overrides[rate_limit_read] = lambda: None
     app.dependency_overrides[rate_limit_auth] = lambda: None
+    app.dependency_overrides[rate_limit_ai] = lambda: None
     try:
         yield TestClient(app)
     finally:

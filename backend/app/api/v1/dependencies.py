@@ -67,6 +67,17 @@ def rate_limit_auth(request: Request) -> None:
         raise RateLimitExceededError()
 
 
+def rate_limit_ai(request: Request) -> None:
+    """Founder Specification Part 2.8.13: "AI Endpoints: 20 requests per
+    minute." Keyed by IP, matching the existing general pattern (M6 design
+    review §13) — per-user keying is deferred until real abuse patterns
+    justify it, not built speculatively."""
+    settings = get_settings()
+    limiter = RateLimiter(get_redis_client(), limit=settings.rate_limit_ai_per_minute)
+    if not limiter.allow(f"ai:{_client_key(request)}"):
+        raise RateLimitExceededError()
+
+
 def get_current_user_optional(
     request: Request, session: Session = Depends(get_db_session)
 ) -> User | None:

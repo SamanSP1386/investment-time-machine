@@ -109,3 +109,21 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: None applied — matches this project's established position (Founder Specification Part 2.14.15, already invoked for M3/M4) that correctness and security properties (Argon2's deliberate cost, a fresh per-request authorization check) outrank marginal performance gains at MVP scale.
 
 **Future Improvements**: Benchmark login/register/refresh against `.claude/PERFORMANCE_BUDGET.md`'s <500ms Auth Request target once deployed; if the two-sequential-Redis-call-per-login pattern (rate limit + lockout) ever becomes measurable, consider pipelining them into a single round-trip.
+
+---
+
+## M6 — Educational AI System (2026-07-12)
+
+**API Response Time**: Not formally benchmarked against a real provider (no live Anthropic API key was available in this session). `.claude/PERFORMANCE_BUDGET.md`'s explicit AI explanation target (<15s) is structurally protected regardless of real provider latency: `ai_request_timeout_seconds` (default 12s) bounds the provider call itself, leaving margin inside the 15s budget for serialization/network overhead, and a cache hit or the default `NullProvider` path both return in the same sub-second range as every other endpoint (verified qualitatively — the full 17-test HTTP-integration suite, including every cache/cap/fallback scenario, completes in about a second).
+
+**Database Query Time**: A cache-lookup query (`_find_cached`) and a count query (`_count_attempts`) run before every generation attempt — both served by the new composite index (`idx_ai_explanations_simulation_type` on `(simulation_id, explanation_type)`, migration `0003_ai_explanation_type`) added specifically because this milestone introduced the first query pattern filtering `ai_explanations` by `simulation_id` + `explanation_type` together. `GET .../explanations` (list) is one ordered range read over the same small per-simulation row set — not expected to scale beyond a handful of rows per simulation given the regeneration/follow-up caps.
+
+**Memory Usage**: Not measured. Bounded by design: `input_summary`/`simulation_facts` is a small, fixed-shape dict of scalar fields (never a raw historical price series or unbounded collection) — the smallest request payload of any AI-adjacent design considered during the M6 design review, deliberately, for both cost and integrity-check-simplicity reasons.
+
+**Startup Time**: Not measured. `app.ai`'s import graph adds the `anthropic` SDK (plus its own transitive dependencies — `httpx`-based, already a project dependency via ingestion/auth, `distro`, `jiter`, `docstring-parser`) — lightweight compared to `app.ingestion`'s pandas/numpy/yfinance graph, and the SDK client itself is constructed lazily (only when `AI_PROVIDER != "none"` and a route actually calls `get_ai_provider`), matching the existing Redis-client lazy-construction pattern from M4.
+
+**Performance Bottlenecks**: None identified at test scale. The one bottleneck this milestone cannot yet measure: real Anthropic API latency under the `ai_max_output_tokens` (default 800) budget — the <15s target's actual margin depends on real provider response time, which requires a live API key to benchmark (tracked alongside KI-034's verification need, since both require the same missing prerequisite).
+
+**Optimizations**: Caching (ADR-022) is this milestone's primary performance *and* cost optimization simultaneously — an unchanged `simulation_id`/`prompt_version`/model never re-invokes the provider, which is both the fastest possible response (a single indexed row lookup) and the cheapest. The per-simulation regeneration/follow-up caps bound worst-case provider-call volume per simulation, independent of the generic per-minute rate limiter.
+
+**Future Improvements**: Benchmark real Anthropic API latency once a live key is available, to confirm the 12s internal timeout leaves adequate margin inside the 15s Founder Specification target under realistic network conditions; consider whether `ai_max_output_tokens`' default (800) needs tuning once real generated-explanation length/quality tradeoffs are observed.

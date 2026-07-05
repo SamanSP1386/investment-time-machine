@@ -4,6 +4,45 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.7.0] — 2026-07-12 — M6: Educational AI System
+
+### Added
+- `app/ai/` — the Educational AI domain module, HTTP/DB-blind (mirrors `app.auth`'s shape): `exceptions.py` (`AIProviderUnavailableError`, `AIOutputStructureError`, `AIIntegrityViolationError`, `AIUnsafeContentError`), `prompt.py` (fixed, versioned system prompts for the Explanation Engine and Financial Tutor — no user text ever concatenated into a system prompt), `safety.py` (three post-generation gates: six-section structure check, numeric-integrity check against the simulation's own structured output, advice-language check), `providers/` (`AIProvider` Protocol mirroring the ingestion milestone's capability-protocol precedent, `AnthropicProvider`, `NullProvider`, a `Settings`-driven factory), `service.py` (`generate_explanation`, `generate_followup_answer` — orchestrates prompt → provider → safety gates → the code-appended Educational Disclaimer).
+- Migration `0003_ai_explanation_type`: extends `ai_explanations` with `explanation_type` (`initial`/`follow_up`) and a nullable `question_text`, plus a composite index — no new table, no change to `simulations` or any other domain.
+- Three new endpoints: `POST /api/v1/simulations/{id}/explanations` (get-cached-or-generate; `regenerate: true` forces a fresh attempt, capped), `GET /api/v1/simulations/{id}/explanations` (list all attempts), `POST /api/v1/simulations/{id}/explanations/questions` (Financial Tutor follow-up, capped, cached by identical normalized question text).
+- `app/api/v1/services/explanation_service.py`: owns the simulation ownership/completion checks (reusing `simulations`' existing access rule), the PII-free `simulation_facts` allowlist construction, caching, regeneration/follow-up caps, and audit logging — the API-layer half of the `app.ai`/`explanation_service` split.
+- `app/api/v1/audit.py::record_ai_audit`: one `audit_logs` row per generation attempt, success or failure, using `AuditEventType.AI_EXPLANATION_GENERATED`/`_FAILED` (reserved in the schema since M1, unused until now) — mirrors the existing SAVEPOINT-isolated, fail-open pattern exactly; never includes the generated text, the raw question, or any offending fabricated value.
+- `app/api/v1/dependencies.py::rate_limit_ai` — 20/min (Founder Specification Part 2.8.13), reusing the existing Redis-backed `RateLimiter` unchanged.
+- `app/core/config.py`: `ai_provider` (default `"none"`), `ai_provider_api_key`, `ai_model_name`, `ai_max_output_tokens`, `ai_request_timeout_seconds`, `rate_limit_ai_per_minute`, `ai_max_explanation_regenerations`, `ai_max_followup_questions`, plus a `model_validator` rejecting a real provider configured with no API key (mirrors ADR-020's `JWT_SECRET` guard).
+- 55 new tests: `tests/ai/` (38, no network/DB — safety gates, prompt construction, service orchestration against a fake provider, the Anthropic adapter against a mocked SDK client), `tests/core/test_ai_config.py` (4), `tests/api/test_explanations.py` (17, HTTP-integration against the real DB — cache hits, regeneration/follow-up caps, ownership/completion checks, audit logging, and the safe-fallback path exercised for free via the default `NullProvider`).
+- ADR-021 through ADR-024 (`docs/ARCHITECTURE_DECISIONS.md`) and Founder Decision 003 (`docs/FOUNDER_DECISIONS.md`).
+- `docs/MILESTONE_REPORTS/M6_REPORT.md`, `docs/PROJECT_STATE.md`.
+
+### Changed
+- `requirements.txt`: added `anthropic`.
+- `.env.example`: added the eight M6 environment variables listed above.
+- `.claude/SECURITY_POLICY.md`: prompt-injection gap note updated — addressed at M6 (structural defense, not just a documented risk); residual heuristic gaps tracked as KI-032.
+- `.claude/DATABASE_RULES.md`: `ai_explanations` table description updated to reflect the M6 schema extension.
+- `docs/KNOWN_ISSUES.md`: KI-032, KI-033, KI-034 added (heuristic safety-check limitations, a low-severity cap-check TOCTOU race mirroring KI-012/KI-027's precedent, and an unverified provider-model-name caching assumption).
+
+### Fixed
+- N/A (no prior milestone code touched beyond the additive wiring noted above; the Simulation Engine was not modified in any way, per direct instruction).
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- AI never calculates, modifies, forecasts, recommends, or invents a financial fact — enforced structurally (`app.ai` has no import path to `app.simulation` or any write-capable session), not just by prompt wording.
+- Prompt-injection defense: the system prompt is a fixed, source-controlled string for every request; a follow-up question's raw text is placed only inside a clearly delimited data block in the user turn, never merged into the system prompt.
+- Privacy: the AI provider never receives email, display name, user ID, IP address, session ID, request ID, or auth information — verified by `_build_simulation_facts`' exhaustive allowlist and a dedicated audit-log test confirming the generated text itself never leaks into `audit_logs.details`.
+- AI availability: every generation failure returns a normal, successful HTTP response carrying the literal founder-approved safe message — the simulation itself, and every other endpoint, is entirely unaffected by an AI outage.
+- Three residual risks documented, not fully closed, as deliberate tracked debt: KI-032 (heuristic safety checks are not exhaustive), KI-033 (a low-severity cap-check race under genuine concurrency), KI-034 (an unverified provider-echoed-model-name assumption underlying the cache key).
+
+---
+
 ## [0.6.0] — 2026-07-11 — M5: Identity Management (Authentication)
 
 ### Added

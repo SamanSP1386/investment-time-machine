@@ -25,6 +25,19 @@ class AIGenerationStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class AIExplanationType(str, enum.Enum):
+    """M6 (Educational AI System). INITIAL is the single explanation the
+    Explanation Engine generates for a completed simulation; FOLLOW_UP is
+    one Financial Tutor question-and-answer turn about that same
+    simulation. Both share the ai_explanations table and its audit/caching
+    machinery rather than getting a new table — see .claude/DATABASE_RULES.md
+    (this is an extension of the existing AI Explanations domain, not a new
+    one, the same way refresh_tokens extended Users at M5)."""
+
+    INITIAL = "initial"
+    FOLLOW_UP = "follow_up"
+
+
 class AuthMethod(str, enum.Enum):
     """email_password is the only method implemented at MVP (Auth milestone);
     OAuth values exist now so users.password_hash can be correctly nullable

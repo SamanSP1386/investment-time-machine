@@ -262,3 +262,27 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Status**: Open — Deliberately deferred, not forgotten
 - **Planned Resolution**: Design and implement a standard email-based, time-limited, single-use reset-token flow before any production launch. Must not be built as part of a future milestone's "quick addition" — treat it as its own reviewable unit of work given it touches credential handling directly.
 - **Resolution Date**: —
+
+### KI-032
+
+- **Description**: `app.ai.safety`'s three post-generation gates (numeric-integrity, output-structure, advice-language) are heuristic, not exhaustive. Known gaps, each documented in the relevant function's own docstring: a fabricated number spelled out in words ("twelve hundred dollars") or abbreviated ("$1.2K") is not extracted by the numeric-token regex and so cannot be checked; advice-like language phrased in a way none of the ~8 regex patterns match (e.g. "this looks like a great opportunity") would pass `check_advice_language` uncaught. Identified during the M6 AI Safety Review as a residual limitation of a pattern-matching approach, not a defect in the patterns that do exist.
+- **Severity**: Medium (a genuine gap in the platform's only automated defense against a hallucinated fact or disallowed advice reaching a user — mitigated in practice by the prompt's own explicit instructions and Anthropic's general instruction-following behavior, but not backstopped by code for these specific phrasings).
+- **Status**: Open
+- **Planned Resolution**: Expand the advice-language pattern list and numeric-token extraction as real-world false negatives are observed (this is inherently an iterative, usage-driven process, not a one-time fix); consider a second-pass LLM-based self-critique step (the model checking its own output against the rules) if manual pattern expansion proves insufficient — not built now, to avoid doubling the cost/latency of every generation on a speculative improvement.
+- **Resolution Date**: —
+
+### KI-033
+
+- **Description**: `explanation_service.get_or_create_explanation`/`ask_followup_question`'s regeneration/follow-up cap check (`_count_attempts` then compare, then insert) has no row-level lock or atomic increment — the same class of TOCTOU race already tracked at KI-012 (ingestion) and KI-027 (refresh-token rotation). Two genuinely concurrent requests against the same simulation near the cap boundary could both read a count under the limit and both proceed, momentarily exceeding it by one. Identified during the M6 AI Safety Review.
+- **Severity**: Low (mirrors KI-012/KI-027's precedent and reasoning exactly: no realistic single-user client issues two concurrent regenerate/follow-up requests against the same simulation, and the worst outcome is one extra model call over the configured cap, not a security or correctness violation).
+- **Status**: Open
+- **Planned Resolution**: If genuinely concurrent AI-generation traffic is ever observed, add a `SELECT ... FOR UPDATE` on the count query or switch to an atomic Redis counter (matching the existing rate-limiter's mechanism) before the cap is relied upon as a hard cost ceiling rather than a best-effort one.
+- **Resolution Date**: —
+
+### KI-034
+
+- **Description**: The Explanation Engine's caching decision (`app.ai.providers.get_ai_provider`'s selected model vs. the historical row's stored `model_name`) assumes a real provider echoes back exactly the model identifier it was asked for. `AnthropicProvider.generate` stores `response.model` (the vendor's own reported value) rather than the requested `settings.ai_model_name` directly — for a model alias that resolves to a specific dated snapshot, these could in principle differ, which would cause the cache to treat every request as "model changed" (always regenerating, never over-caching) rather than the reverse. Identified during implementation, not observed against a real Anthropic response (no live API key was available to verify empirically).
+- **Severity**: Low (the failure mode is "cache never hits, more model calls than necessary," not "cache incorrectly returns a stale result for a genuinely different model" — a cost inefficiency, not a correctness or safety risk).
+- **Status**: Open
+- **Planned Resolution**: Verify against a real Anthropic API key whether `response.model` ever diverges from the requested model string for this project's configured model name; if it does, cache-match on the *requested* model name consistently (store it in a separate column) rather than the provider-echoed one.
+- **Resolution Date**: —

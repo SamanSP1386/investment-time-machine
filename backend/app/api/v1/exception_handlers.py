@@ -19,6 +19,8 @@ from app.api.v1.audit import record_simulation_request_validation_audit
 from app.api.v1.errors import (
     ForbiddenError,
     RateLimitExceededError,
+    RegenerationCapExceededError,
+    SimulationNotCompletedError,
     SimulationNotFoundError,
     UnauthorizedError,
 )
@@ -125,6 +127,29 @@ def register_exception_handlers(app: FastAPI) -> None:
             status.HTTP_429_TOO_MANY_REQUESTS,
             "RATE_LIMIT_EXCEEDED",
             "Too many requests. Please try again later.",
+        )
+
+    @app.exception_handler(SimulationNotCompletedError)
+    def handle_simulation_not_completed(
+        request: Request, exc: SimulationNotCompletedError
+    ) -> JSONResponse:
+        return _envelope(
+            request,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "SIMULATION_NOT_COMPLETED",
+            str(exc),
+            simulation_id=exc.simulation_id,
+        )
+
+    @app.exception_handler(RegenerationCapExceededError)
+    def handle_regeneration_cap_exceeded(
+        request: Request, exc: RegenerationCapExceededError
+    ) -> JSONResponse:
+        return _envelope(
+            request,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "REGENERATION_LIMIT_EXCEEDED",
+            str(exc),
         )
 
     @app.exception_handler(EmailAlreadyRegisteredError)

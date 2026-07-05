@@ -281,3 +281,59 @@ Architecture Decision Records. Never edit a previous ADR — if a decision chang
 - **Rationale**: A comment is advice; a startup failure is a guarantee. This mirrors the general principle that a security-critical misconfiguration should fail the deployment immediately and obviously, not silently degrade the platform's actual security posture in a way that produces no error anyone would ever see until it's exploited.
 - **Tradeoffs**: None material — the guard only fires when `environment` is deliberately set to something other than the three explicitly-exempted values, which any real deployment must already do correctly for other reasons (e.g. `.claude/PERFORMANCE_BUDGET.md`'s environment-specific behavior).
 - **Future Implications**: Any future secret with a development-only placeholder default (were one ever introduced) should get the same startup-time guard rather than relying on documentation alone.
+
+---
+
+## ADR-021 — AI Provider Abstraction: Protocol-Based, Anthropic First, `NullProvider` Fallback
+
+- **Date**: 2026-07-12
+- **Status**: Accepted (implements Founder Decision 003)
+- **Context**: Founder Specification Part 2.7.15 requires the AI layer to "communicate through an abstraction layer rather than directly depending on a specific vendor," naming OpenAI, Anthropic, Google, and Local Models as candidates without selecting one. This project already has a directly analogous precedent: `app/ingestion/providers/base.py`'s capability-`Protocol` design (ADR-013), adopted specifically because not every provider supports every capability.
+- **Problem**: A single hard-coded call to a vendor SDK anywhere in router or service code would violate Founder Specification Principle 3 (100% functional with AI removed) the moment that code ran without a configured key, and would make switching or adding a provider a cross-cutting change rather than a one-file one.
+- **Options Considered**: (1) Call the Anthropic SDK directly from `explanation_service.py`. (2) Define a single `AIProvider` Protocol (`app/ai/providers/base.py`) with one `generate()` method, implement `AnthropicProvider` and a `NullProvider`, and select between them via a `Settings.ai_provider` factory (`app/ai/providers/get_ai_provider`).
+- **Final Decision**: Option 2 — reusing the exact Protocol-based shape ADR-013 already validated for the ingestion providers.
+- **Rationale**: `NullProvider` (selected by default, `AI_PROVIDER=none`) makes "the platform must remain 100% functional with every AI component removed" (Principle 3) literally true rather than aspirational — no network call, no API key, and every caller already has a working failure path for a provider that cannot generate. No module outside `app/ai/providers/anthropic_provider.py` imports the `anthropic` package, so adding a second vendor later touches one new file, not the router or service layer.
+- **Tradeoffs**: The `Protocol`'s single `generate(system_prompt, user_content, max_tokens) -> ProviderResult` method is deliberately minimal (no streaming, no function/tool calling) — sufficient for M6's synchronous, single-turn explanation/follow-up generation, but would need extension for a future streaming-response or agentic-tool-use feature (neither in scope for M6, per Founder Decision 003).
+- **Future Implications**: A second provider (OpenAI, Google, a local model) is a new file implementing the same `Protocol` plus one new branch in the factory — no change to `app/ai/service.py`, `app/api/v1/services/explanation_service.py`, or any router.
+
+---
+
+## ADR-022 — Explanation/Follow-Up Caching Matches on (simulation, prompt_version, model_name[, question_text]), Not Filtered to `COMPLETED` for the Explanation Engine
+
+- **Date**: 2026-07-12
+- **Status**: Accepted (implements Founder Decision 003)
+- **Context**: The M6 founder decision requires that an unchanged `simulation_id` + `prompt_version` + model never re-spends a model call — "return the stored explanation instead of calling the model again." The Explanation Engine exposes an explicit `regenerate` flag for a deliberate retry; the Financial Tutor's follow-up-question endpoint does not.
+- **Problem**: A cache lookup filtered to `generation_status == COMPLETED` only would silently re-attempt generation on every single non-regenerate call after any failure (provider outage, integrity violation) — for the Explanation Engine, this defeats the entire purpose of a regeneration cap, since every "free" non-regenerate call would keep spending a real model call as long as the prior attempt failed. For the Financial Tutor, the opposite problem exists: a follow-up question has no `regenerate` override at all, so caching a `FAILED` answer against that exact question text forever would create a permanent dead end for a transient provider hiccup.
+- **Options Considered**: (1) Cache-match only `COMPLETED` rows for both features. (2) Cache-match regardless of status for both features. (3) Match regardless of status for the Explanation Engine (which has an explicit `regenerate` escape hatch), but `COMPLETED`-only for the Financial Tutor (which has none).
+- **Final Decision**: Option 3 — `_find_cached(..., only_completed: bool)` in `app/api/v1/services/explanation_service.py`, `False` (the default) for the Explanation Engine, `True` for the Financial Tutor.
+- **Rationale**: The regeneration cap, not the cache filter, is what should bound a retry-after-failure loop for the Explanation Engine — matching cache to "any status" makes the cap's count meaningful (an unbounded number of free non-regenerate calls would otherwise never touch the model at all after the first failure, silently defeating cost-control intent). The Financial Tutor has no equivalent override, so it needs the opposite default to remain usable after a transient failure; its own per-simulation follow-up cap (not the cache filter) is what bounds *its* cost exposure instead.
+- **Tradeoffs**: The two features now have asymmetric caching semantics, which is a genuine, if narrow, inconsistency a future maintainer must understand rather than assume uniform — documented directly in `_find_cached`'s docstring for exactly this reason.
+- **Future Implications**: If a future milestone adds an explicit "regenerate this follow-up answer" action, its cache lookup should switch to `only_completed=False` to match the Explanation Engine's semantics, consistent with the pattern established here (an explicit retry action pairs with any-status caching; no retry action pairs with completed-only caching).
+
+---
+
+## ADR-023 — Educational Disclaimer Is Code-Appended, Never Model-Generated
+
+- **Date**: 2026-07-12
+- **Status**: Accepted (implements Founder Decision 003)
+- **Context**: The M6 approved output structure lists "Educational Disclaimer" as the seventh required section, alongside six others (Summary, What Happened, Why It Happened, Financial Concepts, Key Takeaways, Limitations) that are naturally AI-generated content.
+- **Problem**: Asking the model to generate the disclaimer text itself means its presence depends on the model's compliance with a prompt instruction — a request, not a guarantee. A disclaimer is exactly the kind of compliance-relevant content where "the model usually includes it" is a materially weaker property than "the platform always includes it."
+- **Options Considered**: (1) Instruct the model to produce all seven sections, including the disclaimer, and verify its presence with the same structure check used for the other six. (2) Treat the disclaimer as a fixed, version-controlled string (`app.ai.service.EDUCATIONAL_DISCLAIMER`) that application code appends after every successful generation, and explicitly instruct the model *not* to write one itself (to avoid a duplicate).
+- **Final Decision**: Option 2.
+- **Rationale**: A fixed string is deterministic, cannot be worded inconsistently across generations, cannot be omitted by an off-distribution model response, and needs no safety-check coverage of its own (the six-section structure check in `app.ai.safety.check_output_structure` deliberately excludes it, per that module's own docstring). This is one place M6's implementation goes beyond the letter of the approved instruction, for a documented, narrow safety reason — not a silent deviation.
+- **Tradeoffs**: None material — the disclaimer's wording cannot vary per-simulation (e.g., it cannot reference the specific asset or figures involved) since it is not generated per-request; judged acceptable since a disclaimer's purpose is a fixed compliance statement, not simulation-specific content.
+- **Future Implications**: Any future addition to the required output structure that is itself a fixed, compliance-relevant statement (not simulation-specific content) should default to this same code-appended pattern rather than a prompt instruction.
+
+---
+
+## ADR-024 — `ai_explanations` Extended with `explanation_type`/`question_text` Rather Than a New Table
+
+- **Date**: 2026-07-12
+- **Status**: Accepted (implements Founder Decision 003)
+- **Context**: The Financial Tutor's follow-up question-and-answer needs to be persisted, audited, and cached the same way the Explanation Engine's initial explanation already is. `.claude/DATABASE_RULES.md` prohibits adding a new table/domain beyond the nine listed without approval, but has an established precedent for extending an existing domain instead (`refresh_tokens` extending Users at M5, ADR-017).
+- **Problem**: A follow-up answer is structurally very close to an initial explanation (same `simulation_id` FK, same `model_name`/`prompt_version`/`input_summary`/`explanation_text`/`generation_status`/`error_message` shape) but additionally needs to record which question was asked, and the two need to be distinguishable for caching, capping, and listing.
+- **Options Considered**: (1) A new `ai_followup_questions` table, duplicating most of `ai_explanations`' columns. (2) Extend `ai_explanations` with `explanation_type` (`initial` | `follow_up`) and a nullable `question_text`, plus a composite index on `(simulation_id, explanation_type)` supporting the new cache/cap lookup pattern.
+- **Final Decision**: Option 2 (migration `0003_ai_explanation_type`).
+- **Rationale**: The two record types share every column except one (`question_text`, already nullable-by-necessity the same way `explanation_text` is), and `ai_explanations` already supports "multiple explanations per simulation" (Founder Specification Part 2.6.26) — a follow-up answer is not a new logical domain, it is another row in the domain that already exists. This mirrors the exact reasoning ADR-017 used for `refresh_tokens` extending Users rather than standing alone.
+- **Tradeoffs**: `ai_explanations` now serves two logically distinct purposes from one table, requiring every query to filter by `explanation_type` explicitly (enforced by the new composite index, not by a separate physical table boundary) — a minor query-ergonomics cost, accepted the same way ADR-008 accepted a comparable tradeoff for Economic Indicators' two-table split in the opposite direction.
+- **Future Implications**: A hypothetical third AI-generated content type (e.g., a full multi-simulation comparison report, if Report Generation is ever built per Part 3.3.12) should evaluate this same question fresh — this ADR is not a blanket license to keep extending `ai_explanations` indefinitely, only a specific, justified precedent for the two types M6 actually needs.

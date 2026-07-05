@@ -117,6 +117,50 @@ def record_simulation_audit(
         logger.warning("failed to record simulation audit log: %s", exc)
 
 
+def record_ai_audit(
+    session: Session,
+    *,
+    event_type: AuditEventType,
+    explanation_id: uuid.UUID,
+    simulation_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+    request_id: str,
+    details: dict,
+) -> None:
+    """One row per AI generation attempt (Explanation Engine or Financial
+    Tutor follow-up), success or failure — Founder Specification Part
+    2.7.12/2.8.14, `AuditEventType.AI_EXPLANATION_GENERATED`/`_FAILED`
+    (reserved in `app/models/enums.py` since M1, unused until M6). Mirrors
+    `record_simulation_audit`'s SAVEPOINT-isolated, fail-open pattern
+    exactly: a broken audit write must never turn a real AI outcome (success
+    or the safe "unavailable" fallback) into an unrelated 500.
+
+    `details` never includes the generated explanation/answer text, the raw
+    follow-up question text, or any offending fabricated value — only
+    identifiers and outcome metadata. The durable content record is
+    `ai_explanations` itself, not the audit trail (see
+    app/models/ai_explanation.py); this keeps `audit_logs.details` small and
+    avoids persisting rejected/unsafe AI text anywhere at all.
+    """
+    try:
+        with session.begin_nested():
+            session.add(
+                AuditLog(
+                    entity_type="ai_explanation",
+                    entity_id=explanation_id,
+                    event_type=event_type,
+                    user_id=user_id,
+                    details={
+                        "request_id": request_id,
+                        "simulation_id": str(simulation_id),
+                        **details,
+                    },
+                )
+            )
+    except SQLAlchemyError as exc:
+        logger.warning("failed to record AI audit log: %s", exc)
+
+
 def record_simulation_request_validation_audit(
     request: Request, exc: RequestValidationError
 ) -> None:

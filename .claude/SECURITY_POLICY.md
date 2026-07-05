@@ -20,7 +20,7 @@ Distilled from Founder Specification Part 2.8 (Security Architecture) and Part 3
 | Provider outage | Medium | Medium | Local data ownership, provider abstraction, failure isolation |
 | Documentation drift | Medium | High | Documentation-first workflow, review requirement, Definition of Done |
 
-**Explicitly named future threats with NO mitigation defined yet** (do not assume these are handled): prompt injection, data poisoning, model manipulation, supply chain attacks, social engineering, advanced credential theft. Prompt injection in particular is live risk *now* — the AI explanation feature ships in MVP and ingests user-influenced text (asset names, historical event context). Treat any user-influenced text reaching the AI service as untrusted input requiring sanitization, even though the spec doesn't say so explicitly.
+**Explicitly named future threats with NO mitigation defined yet** (do not assume these are handled): data poisoning, model manipulation, supply chain attacks, social engineering, advanced credential theft. ~~Prompt injection~~ — **addressed at M6**: the Educational AI System's follow-up-question feature is the first place user-authored free text reaches the AI service; it is never concatenated into the system prompt, only placed in a clearly delimited data block within the user turn (see `app/ai/prompt.py`). Residual gaps in the numeric-integrity/advice-language safety checks are tracked as `docs/KNOWN_ISSUES.md` KI-032, not assumed solved. Data poisoning and model manipulation remain correctly deferred, since they only become live risks once a RAG knowledge corpus exists (Founder Specification Part 2.7.14, explicitly future work, not built at M6).
 
 ## Mandatory controls
 

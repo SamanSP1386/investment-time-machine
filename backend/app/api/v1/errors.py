@@ -33,3 +33,25 @@ class UnauthorizedError(Exception):
     (which are about credential/token *content*): this is purely "this route
     requires an authenticated caller and none was presented," an API-layer
     access-control concern, not an Identity Management domain error."""
+
+
+class SimulationNotCompletedError(Exception):
+    """M6: Founder Specification Part 3.3.7's Explanation Engine validation
+    rule ("Simulation must be completed") — an API-layer precondition
+    concern, not an `app.ai` domain error, since it's checked before `app.ai`
+    is ever invoked."""
+
+    def __init__(self, simulation_id: uuid.UUID) -> None:
+        self.simulation_id = simulation_id
+        super().__init__(f"Simulation is not completed: '{simulation_id}'")
+
+
+class RegenerationCapExceededError(Exception):
+    """M6 design review §13/14 (cost control): bounds how many times an
+    explanation may be regenerated, or how many Financial Tutor follow-up
+    questions may be asked, for a single simulation. A cache hit never
+    counts against this — see `app.api.v1.services.explanation_service`."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        super().__init__(f"Limit of {limit} reached for this simulation")

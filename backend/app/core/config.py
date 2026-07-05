@@ -45,6 +45,47 @@ class Settings(BaseSettings):
     # never set this to false (see .env.example).
     cookie_secure: bool = True
 
+    # Educational AI System (Milestone 6) — every value below traces to the
+    # M6 design review's approved Founder Decisions, not the Founder
+    # Specification itself (which names AI_PROVIDER_API_KEY as a required
+    # env var and Anthropic as an acceptable provider, Part 2.7.15, but
+    # specifies no model, token budget, cache/regeneration policy, or rate
+    # limit beyond the generic "AI Endpoints: 20/min" in Part 2.8.13).
+    # "none" is the default outside explicit configuration — selects
+    # NullProvider, so the platform is 100% functional with AI unconfigured
+    # (Founder Specification Principle 3), not just with it "removed" after
+    # the fact.
+    ai_provider: str = "none"  # "anthropic" | "none"
+    ai_provider_api_key: str = ""
+    ai_model_name: str = "claude-3-5-haiku-20241022"
+    ai_max_output_tokens: int = 800
+    ai_request_timeout_seconds: float = 12.0
+    rate_limit_ai_per_minute: int = 20
+    # Cost control (M6 design review §13/14): bounds how many times the
+    # Explanation Engine's explanation may be regenerated, and how many
+    # Financial Tutor follow-up questions may be asked, per simulation. A
+    # cache hit (identical simulation_id + prompt_version + model_name, or
+    # identical follow-up question text) never counts against either limit.
+    ai_max_explanation_regenerations: int = 3
+    ai_max_followup_questions: int = 10
+
+    @model_validator(mode="after")
+    def _reject_ai_provider_configured_without_api_key(self) -> "Settings":
+        """Mirrors the JWT-secret startup guard below: a real provider
+        selected with no API key would fail on the first request, in
+        production, with no warning anyone would see until a user hits it.
+        Fail loudly at startup instead."""
+        if self.ai_provider not in {"none", "anthropic"}:
+            raise ValueError(
+                f"AI_PROVIDER must be one of 'none' or 'anthropic', got {self.ai_provider!r}."
+            )
+        if self.ai_provider != "none" and not self.ai_provider_api_key:
+            raise ValueError(
+                f"AI_PROVIDER is set to {self.ai_provider!r} but AI_PROVIDER_API_KEY is empty — "
+                "refusing to start with a provider that cannot authenticate."
+            )
+        return self
+
     @model_validator(mode="after")
     def _reject_default_jwt_secret_outside_development(self) -> "Settings":
         """Red-team finding (M5): the placeholder `jwt_secret` default exists
