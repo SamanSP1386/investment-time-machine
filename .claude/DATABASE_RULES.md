@@ -22,6 +22,8 @@ Distilled from Founder Specification Part 2.6 (Database Architecture, 2.6.1–2.
 
 Asset Catalog (`assets`), Historical Prices (`historical_prices`), Dividends (`dividends`), Stock Splits (`stock_splits`), Economic Indicators (`economic_indicators` + `economic_indicator_values`), Users (`users`), Simulations (`simulations`), Audit Logs (`audit_logs`), AI Explanations (`ai_explanations`). Ten physical tables for nine logical domains — Economic Indicators is a catalog + time-series pair, mirroring `assets`/`historical_prices` (see [docs/ARCHITECTURE_DECISIONS.md](../docs/ARCHITECTURE_DECISIONS.md) ADR-008). Full ERD: [docs/erd.md](../docs/erd.md) (derived, pending founder review per KI-004/KI-005).
 
+**M5 addition**: `refresh_tokens` (migration `0002_refresh_tokens`) is a session-management table supporting the existing Users domain — not a tenth logical domain requiring separate founder approval, the same way `historical_prices` supports Asset Catalog rather than standing alone. See ADR-017 (`docs/ARCHITECTURE_DECISIONS.md`).
+
 ## Table-specific rules (as implemented)
 
 - `assets`: `UNIQUE(symbol)`. Known fragility (spec-acknowledged): global symbol uniqueness will not survive multi-exchange/international listings — treat as an MVP-only assumption, do not build features that assume it's permanent.
@@ -32,6 +34,7 @@ Asset Catalog (`assets`), Historical Prices (`historical_prices`), Dividends (`d
 - `simulations`: single-asset only. `user_id` is nullable (anonymous simulations allowed). Output columns (`final_value`, `shares_purchased`, etc.) are nullable — `simulation_status_enum` includes `pending`/`failed` states where no output exists yet. `calculation_version` (`VARCHAR(20)`, default `'v1'`) is present from migration 1, not deferred.
 - `audit_logs`: polymorphic `entity_type` (string) / `entity_id` with **no FK** — a documented, intentional exception, not a precedent for other tables. `user_id` **is** a real FK to `users.id` with `ON DELETE SET NULL`, so the audit trail survives a user deletion. `details JSONB`, immutable by convention (no `updated_at`). Redact sensitive values before writing to `details` — this is currently a policy with no enforced mechanism; enforce it in a service-layer helper, not ad hoc at each call site.
 - `ai_explanations`: FK to `simulations` is NOT NULL (every explanation belongs to exactly one simulation). `explanation_text` is nullable for the same reason as `simulations`' output columns — `ai_generation_status_enum` includes `pending`/`failed`.
+- `refresh_tokens` (M5): FK to `users.id` (plain, no special delete behavior — unlike `audit_logs.user_id`, since a hard user delete never happens per this project's soft-deactivation policy). `token_hash` is `UNIQUE`, stores only a SHA-256 digest — the raw refresh token is never persisted anywhere. `replaced_by_id` is a self-referential FK chaining each rotation (supports reuse detection — see ADR-017). No uniqueness constraint on `user_id`: multiple concurrent rows per user are intentional, supporting a future multi-device session model without a further migration.
 
 ## Reproducibility vs. reimport — resolved
 

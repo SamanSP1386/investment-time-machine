@@ -35,10 +35,10 @@ Distilled from Founder Specification Part 2.8 (Security Architecture) and Part 3
 
 ## Known gaps — resolve before the relevant milestone starts, do not silently default
 
-- **Token/session lifecycle is completely unspecified** (JWT vs. cookie, expiry, refresh, revocation on logout/password change). Resolve before the Auth milestone. Recommended default: short-lived JWT access token + httpOnly, `SameSite=strict` cookie, explicit revocation list for logout — but this is a filled gap, not a founder decision; flag it as such.
+- ~~**Token/session lifecycle is completely unspecified**~~ — **Resolved at M5** via Founder Decision 002 (`docs/FOUNDER_DECISIONS.md`): 15-minute JWT access token, 30-day rotating opaque refresh token with reuse detection, both in httpOnly/`SameSite=Strict` cookies. See ADR-017/ADR-018 (`docs/ARCHITECTURE_DECISIONS.md`) and `docs/KNOWN_ISSUES.md` KI-006.
 - **No CORS policy, CSP, or security headers specified.** Set explicit allow-listed origins via `CORS_ALLOWED_ORIGINS`; add baseline security headers (CSP, HSTS, X-Content-Type-Options) even though the spec doesn't mention them — omission is a spec gap, not permission to skip.
 - **No secret-scanning tool named.** Add a pre-commit/CI secret scanner (e.g. gitleaks) before the first real credential exists in the repo — Part 2.18 defers CI/CD but a secret scanner is cheap enough to add immediately regardless.
-- **No password reset/account recovery flow specified.** Design one before Auth milestone completion; do not ship auth without it.
+- **No password reset/account recovery flow specified.** **Superseded at M5 by explicit founder instruction** (Founder Decision 002): password reset is deliberately deferred past M5, not built alongside registration/login/refresh/logout — this overrides this file's prior "before Auth milestone completion" recommendation for M5's scope specifically. It must still ship before any production launch — tracked in `docs/KNOWN_ISSUES.md` — just not as part of Identity Management's first milestone.
 - **No backup encryption or backup-access-control policy specified.** Encrypt backups at rest and restrict access equivalently to production DB credentials.
 - **Rate limiting is numbers-only, no enforcement layer named.** Implement via ASGI middleware + Redis; if Redis is skipped at MVP (it's optional per infra spec), you have no rate limiting — treat this as a blocking dependency, not an independent "optional" choice (see [PERFORMANCE_BUDGET.md](PERFORMANCE_BUDGET.md) note on Redis).
 

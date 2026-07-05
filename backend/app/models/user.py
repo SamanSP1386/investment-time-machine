@@ -7,6 +7,7 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
 from app.models.enums import AuthMethod
 
 if TYPE_CHECKING:
+    from app.models.refresh_token import RefreshToken
     from app.models.simulation import Simulation
 
 
@@ -31,6 +32,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     simulations: Mapped[list["Simulation"]] = relationship(back_populates="user")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
 
     def __repr__(self) -> str:
         return f"User(email={self.email!r})"

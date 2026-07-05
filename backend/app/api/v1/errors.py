@@ -14,11 +14,22 @@ class SimulationNotFoundError(Exception):
 
 class ForbiddenError(Exception):
     """Raised when a simulation's `user_id` is set and the requester is not
-    that user. Since M4 does not implement authentication (M5), the
-    requester is always anonymous today — meaning any hypothetically
-    user-owned simulation is forbidden to everyone via the API right now,
-    which is the safe, fail-closed default until real auth exists."""
+    that user (M5: real authentication exists — the requester's identity
+    comes from `app.api.v1.dependencies.get_current_user_optional`), and
+    also raised by `get_current_admin_user` when an authenticated caller is
+    not an administrator. Anonymous-owned simulations (`user_id IS NULL`)
+    are never subject to this check — they remain readable by anyone with
+    the id, per the approved Founder Decision that anonymous users may view
+    and share simulation results."""
 
 
 class RateLimitExceededError(Exception):
     """Raised by the rate-limit dependencies (`app.api.v1.dependencies`)."""
+
+
+class UnauthorizedError(Exception):
+    """Raised by `app.api.v1.dependencies.get_current_user_required` when no
+    valid access token is present — distinct from `app.auth.exceptions`
+    (which are about credential/token *content*): this is purely "this route
+    requires an authenticated caller and none was presented," an API-layer
+    access-control concern, not an Identity Management domain error."""

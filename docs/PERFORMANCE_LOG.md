@@ -91,3 +91,21 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: None applied — Founder Specification Part 2.14.15's "correctness more important than speed" principle (already invoked for M3) continues to apply; the rate limiter's fail-open policy on Redis unreachability is itself a deliberate availability-over-strictness tradeoff (Founder Specification's own AI-failure-isolation philosophy applied by analogy), not a raw-performance optimization.
 
 **Future Improvements**: Load-test `POST /api/v1/simulations` and the asset-search endpoint against `.claude/PERFORMANCE_BUDGET.md`'s explicit targets once deployed to a real environment; consider a trigram or partial index on `assets.symbol`/`assets.name` if the catalog grows large enough for `ilike` search to become measurably slow; benchmark the Redis round-trip's real-world latency contribution under concurrent load.
+
+---
+
+## M5 — Identity Management (2026-07-11)
+
+**API Response Time**: Not formally benchmarked. Qualitatively fast against the test suite (62 new tests, including 15 HTTP-integration and 21 DB-integration, complete in well under a second alongside the rest of the 221-test suite). `.claude/PERFORMANCE_BUDGET.md`'s Auth Request target (<500ms) has not been measured against a real deployed instance.
+
+**Database Query Time**: Every authenticated request now performs one additional indexed point lookup (`session.get(User, user_id)` in `get_current_user_optional`) beyond whatever the route itself already queries — a deliberate choice (re-verify `is_active`/`is_admin` fresh rather than trust the JWT claim) accepted per this project's engineering priority order (Correctness over Performance). Login/register/refresh each perform one `SELECT` (by unique-indexed `email` or `token_hash`) plus one `INSERT`; refresh additionally performs one `UPDATE` (revoking the prior token). None benchmarked against `historical_prices`-scale volume, since `users`/`refresh_tokens` are both expected to stay orders of magnitude smaller than the market-data tables.
+
+**Memory Usage**: Not measured. Bounded by design — no unbounded collection is held anywhere in `app.auth`; Argon2's memory-hard hashing (its whole security property) is the one deliberately memory-costly operation per login/register call, using the library's default cost parameters (not tuned for this project specifically).
+
+**Startup Time**: Not measured. `app.auth`'s import graph adds `argon2-cffi` and `pyjwt`, both lightweight compared to `app.ingestion`'s pandas/numpy/yfinance graph — no heavyweight new dependency introduced.
+
+**Performance Bottlenecks**: None identified at test scale. Two anticipated future considerations, neither yet a measured problem: (1) Argon2's hashing cost (deliberately expensive — that's the security property) is now on the critical path of every login and registration, unlike the rest of the API's largely I/O-bound work; (2) the account-lockout check adds one Redis round-trip to every login attempt, on top of the existing rate-limiter's own round-trip for the same request — two sequential Redis calls per login, not yet measured under concurrent load.
+
+**Optimizations**: None applied — matches this project's established position (Founder Specification Part 2.14.15, already invoked for M3/M4) that correctness and security properties (Argon2's deliberate cost, a fresh per-request authorization check) outrank marginal performance gains at MVP scale.
+
+**Future Improvements**: Benchmark login/register/refresh against `.claude/PERFORMANCE_BUDGET.md`'s <500ms Auth Request target once deployed; if the two-sequential-Redis-call-per-login pattern (rate limit + lockout) ever becomes measurable, consider pipelining them into a single round-trip.

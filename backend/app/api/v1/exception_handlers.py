@@ -16,8 +16,21 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.v1.audit import record_simulation_request_validation_audit
-from app.api.v1.errors import ForbiddenError, RateLimitExceededError, SimulationNotFoundError
+from app.api.v1.errors import (
+    ForbiddenError,
+    RateLimitExceededError,
+    SimulationNotFoundError,
+    UnauthorizedError,
+)
 from app.api.v1.schemas.common import ErrorDetail, ErrorResponse
+from app.auth.exceptions import (
+    AccountInactiveError,
+    AccountLockedError,
+    EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
+    InvalidRefreshTokenError,
+    WeakPasswordError,
+)
 from app.core.request_id import get_request_id
 from app.simulation.exceptions import (
     AssetNotFoundError,
@@ -112,6 +125,52 @@ def register_exception_handlers(app: FastAPI) -> None:
             status.HTTP_429_TOO_MANY_REQUESTS,
             "RATE_LIMIT_EXCEEDED",
             "Too many requests. Please try again later.",
+        )
+
+    @app.exception_handler(EmailAlreadyRegisteredError)
+    def handle_email_already_registered(
+        request: Request, exc: EmailAlreadyRegisteredError
+    ) -> JSONResponse:
+        return _envelope(request, status.HTTP_409_CONFLICT, "EMAIL_ALREADY_REGISTERED", str(exc))
+
+    @app.exception_handler(WeakPasswordError)
+    def handle_weak_password(request: Request, exc: WeakPasswordError) -> JSONResponse:
+        return _envelope(request, status.HTTP_422_UNPROCESSABLE_ENTITY, "WEAK_PASSWORD", str(exc))
+
+    @app.exception_handler(InvalidCredentialsError)
+    def handle_invalid_credentials(request: Request, exc: InvalidCredentialsError) -> JSONResponse:
+        return _envelope(request, status.HTTP_401_UNAUTHORIZED, "INVALID_CREDENTIALS", str(exc))
+
+    @app.exception_handler(AccountLockedError)
+    def handle_account_locked(request: Request, exc: AccountLockedError) -> JSONResponse:
+        return _envelope(request, status.HTTP_429_TOO_MANY_REQUESTS, "ACCOUNT_LOCKED", str(exc))
+
+    @app.exception_handler(AccountInactiveError)
+    def handle_account_inactive(request: Request, exc: AccountInactiveError) -> JSONResponse:
+        return _envelope(
+            request,
+            status.HTTP_403_FORBIDDEN,
+            "ACCOUNT_INACTIVE",
+            "This account is inactive.",
+        )
+
+    @app.exception_handler(InvalidRefreshTokenError)
+    def handle_invalid_refresh_token(
+        request: Request, exc: InvalidRefreshTokenError
+    ) -> JSONResponse:
+        # Also covers RefreshTokenReuseDetectedError (a subclass) via
+        # Starlette's MRO-based handler lookup — deliberately the same
+        # generic response for both, so reuse detection is never disclosed
+        # to the caller (see app.auth.exceptions module docstring).
+        return _envelope(request, status.HTTP_401_UNAUTHORIZED, "INVALID_REFRESH_TOKEN", str(exc))
+
+    @app.exception_handler(UnauthorizedError)
+    def handle_unauthorized(request: Request, exc: UnauthorizedError) -> JSONResponse:
+        return _envelope(
+            request,
+            status.HTTP_401_UNAUTHORIZED,
+            "UNAUTHORIZED",
+            "Authentication is required to access this resource.",
         )
 
     @app.exception_handler(RequestValidationError)

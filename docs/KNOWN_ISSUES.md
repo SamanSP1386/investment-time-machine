@@ -51,9 +51,9 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 
 - **Description**: Token/session lifecycle (JWT vs. cookie, expiry, refresh, revocation) is entirely unspecified in the Founder Specification despite `JWT_SECRET` being named as a required env var.
 - **Severity**: Medium-High
-- **Status**: Open — Pending Founder Approval
-- **Planned Resolution**: Resolve explicitly before the Authentication milestone (M5) begins; recommended default documented in `.claude/SECURITY_POLICY.md`.
-- **Resolution Date**: —
+- **Status**: Resolved
+- **Resolution**: Founder Decision 002 (`docs/FOUNDER_DECISIONS.md`) — 15-minute stateless JWT access token; 30-day sliding, database-backed, rotating opaque refresh token with reuse detection; both delivered via httpOnly/Secure/SameSite=Strict cookies. Full design in ADR-017/ADR-018 (`docs/ARCHITECTURE_DECISIONS.md`), implemented in `app/auth/` and `app/api/v1/routers/auth.py`.
+- **Resolution Date**: 2026-07-11
 
 ### KI-007
 
@@ -86,6 +86,7 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Status**: Open
 - **Planned Resolution**: Add explicit `.gitattributes` entries for each new source file type as it's introduced, per ADR-010 (`docs/ARCHITECTURE_DECISIONS.md`), rather than relying on the catch-all indefinitely.
 - **Resolution Date**: —
+
 
 ### KI-011
 
@@ -192,6 +193,7 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Severity**: Low
 - **Status**: Resolved — per explicit founder decision, deferred to M5
 - **Resolution (M4, 2026-07-10)**: Founder confirmed both endpoint families may be designed (see `docs/api_design.md` §5–6) but must not be implemented until M5 (simulation history) and M5-or-later with admin authorization (import endpoints). Neither route exists in `app/api/v1/routers/` — only `POST`/`GET /api/v1/simulations/{id}` (single-record, not history) and asset read endpoints are implemented in M4. No unprotected admin surface is exposed.
+- **Update (M5, 2026-07-11)**: The authentication *middleware* this deferral was waiting on now exists (`app.api.v1.dependencies.get_current_user_required`/`get_current_admin_user`) and is already wired into `GET /api/v1/simulations/{id}`'s ownership check. Simulation History (`GET /api/v1/simulations`) and Admin Import (`GET`/`POST /api/v1/admin/imports`) themselves were not part of M5's explicit scope (Identity system only) and remain unbuilt — tracked forward as new follow-on work, not a reopening of this KI: building them is now a routes-and-schemas exercise, not an auth-infrastructure one.
 - **Resolution Date**: 2026-07-10
 
 ### KI-024
@@ -220,3 +222,43 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Design note not followed literally**: no new `SIMULATION_FAILED` enum value was added — `AuditEventType`'s own docstring (`app/models/enums.py`) states "adding a value later is a migration... expand deliberately, not speculatively," and a schema migration was judged out of scope for this fix. The existing `SIMULATION_CREATED` value is reused for every attempt (success or failure); `details.status`/`details.error_code` carry the outcome instead. Every literal field the requirement asked for (event type, simulation id, asset symbol, request id, status, error code, timestamp via `created_at`, anonymous `user_id = NULL`) is present.
 - **Verified by**: `tests/api/test_simulation_audit.py` (4 tests) — one audit row is written for a successful simulation, an asset-not-found pre-flight failure, a missing-historical-data mid-simulation failure (with `entity_id`/`details.simulation_id` matching the persisted failed `Simulation` row), and a Pydantic-level request validation failure.
 - **Resolution Date**: 2026-07-10
+
+### KI-027
+
+- **Description**: `app.auth.service.refresh_session`'s rotation step (read the presented token's row, then create a new row and mark the old one revoked) has no row-level lock (e.g. `SELECT ... FOR UPDATE`). Two concurrent refresh requests presenting the same still-valid refresh token could both read it as valid before either revokes it, each issuing its own new token — forking one session into two instead of enforcing exactly one successor per rotation. Discovered during the M5 red-team self-review.
+- **Severity**: Low (mirrors KI-012's TOCTOU race in ingestion asset/indicator resolution — same class of issue, same reasoning: no legitimate client issues two concurrent refreshes with the same token under normal use, and the resulting "fork" does not grant elevated privilege, only an extra valid session).
+- **Status**: Open
+- **Planned Resolution**: Add `with_for_update=True` (or an equivalent `SELECT ... FOR UPDATE`) to `AuthRepository.get_refresh_token_by_hash` when called from the rotation path, before any milestone introduces genuinely concurrent refresh traffic (e.g. multiple tabs/devices racing a near-simultaneous refresh).
+- **Resolution Date**: —
+
+### KI-028
+
+- **Description**: The access token is a stateless JWT by design (Founder Decision 002, ADR-017/018) — it cannot be revoked before its own 15-minute expiry. A stolen access token (e.g. exfiltrated via a compromised proxy or a server-side log that captured a raw `Authorization`/cookie header despite HTTPS) remains valid for up to 15 minutes after logout or password change, even though the corresponding refresh token is immediately revoked. Identified during the M5 red-team self-review as a residual, architecturally-inherent risk, not a bug.
+- **Severity**: Low-Medium (bounded by the short, deliberately-chosen 15-minute lifetime; cannot be used to obtain a *new* session once revoked, only to continue an already-stolen one until it naturally expires).
+- **Status**: Open — Accepted tradeoff of the approved stateless-access-token design
+- **Planned Resolution**: None planned at MVP scale — the 15-minute bound is the accepted mitigation. If this is ever judged insufficient (e.g. a future compliance requirement demands immediate access-token revocation), the fix is a short-TTL server-side denylist checked on every request, which reintroduces a per-request Redis round-trip similar to the existing rate limiter's — a deliberate cost this design avoided for M5.
+- **Resolution Date**: —
+
+### KI-029
+
+- **Description**: `AccountLockedError`'s `retry_after_seconds` value (how long until the lockout window clears) is computed by `AccountLockout.is_locked` but never surfaced to the API client — the `429 ACCOUNT_LOCKED` response carries only a generic message, no `Retry-After` header or `retry_after_seconds` field. Identified during the M5 red-team self-review.
+- **Severity**: Low (a product/UX gap, not a security issue — if anything, withholding the exact remaining duration very slightly reduces an attacker's ability to precisely time a retry).
+- **Status**: Open
+- **Planned Resolution**: Surface `retry_after_seconds` via a standard `Retry-After` response header when a future milestone's frontend needs to display a countdown; no backend logic change required, the value is already computed.
+- **Resolution Date**: —
+
+### KI-030
+
+- **Description**: `tests/api/test_auth.py` passes `cookies=...` explicitly on individual `TestClient`/httpx requests to work around a real transport quirk: `settings.cookie_secure` defaults to `True` (Secure cookies), but `TestClient` talks to the app over a plain-http scheme (`http://testserver`), so httpx's cookie jar correctly refuses to *resend* a Secure cookie automatically, exactly as a real browser would over non-TLS. The per-request `cookies=` parameter works around this but is flagged by httpx as deprecated (`DeprecationWarning: Setting per-request cookies=... is being deprecated`).
+- **Severity**: Low (test-infrastructure-only; does not affect production code or the actual cookie security attributes, which are verified directly by `test_register_sets_httponly_secure_strict_cookies`).
+- **Status**: Open
+- **Planned Resolution**: If a future httpx major version removes the per-request `cookies=` parameter, switch the affected tests to either an `httpx.Client` configured with `base_url="https://testserver"` (satisfying the Secure-cookie scheme check without the deprecated parameter) or a dedicated non-Secure-cookie test settings override — not yet done, since the current approach works and the warning is non-fatal.
+- **Resolution Date**: —
+
+### KI-031
+
+- **Description**: Password reset / account recovery has no implementation — explicitly excluded from M5's scope by direct instruction (Founder Decision 002). A user who forgets their password today has no way to regain access to their account.
+- **Severity**: Medium (a real, user-facing product gap — not a security vulnerability, since there is simply no reset flow to exploit — but `.claude/SECURITY_POLICY.md` is explicit that auth should not ship to production without one).
+- **Status**: Open — Deliberately deferred, not forgotten
+- **Planned Resolution**: Design and implement a standard email-based, time-limited, single-use reset-token flow before any production launch. Must not be built as part of a future milestone's "quick addition" — treat it as its own reviewable unit of work given it touches credential handling directly.
+- **Resolution Date**: —

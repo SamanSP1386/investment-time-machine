@@ -4,6 +4,46 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.6.0] — 2026-07-11 — M5: Identity Management (Authentication)
+
+### Added
+- `app/auth/` — the Identity Management domain module: `exceptions.py` (explicit error taxonomy — `EmailAlreadyRegisteredError`, `WeakPasswordError`, `InvalidCredentialsError`, `AccountLockedError`, `AccountInactiveError`, `InvalidRefreshTokenError`, `RefreshTokenReuseDetectedError`, `InvalidAccessTokenError`), `password.py` (Argon2 hashing, an 8-character minimum floor, timing-parity dummy-hash comparison against account enumeration), `tokens.py` (15-minute JWT access tokens, opaque 256-bit refresh tokens hashed with SHA-256 before storage), `lockout.py` (Redis-backed, per-account failure counter — 5 attempts / 15-minute window, distinct from IP-based rate limiting), `repository.py` and `service.py` (`register_user`, `authenticate`, `refresh_session`, `logout`, `issue_session_for_user` — the sole orchestration entry points).
+- `app/models/refresh_token.py` + migration `0002_refresh_tokens`: a new `refresh_tokens` table (opaque-token-hash storage, rotation chain via `replaced_by_id`, `user_agent`/`ip_address` captured for a future multi-device-session feature).
+- Four new endpoints: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` — all session state delivered via httpOnly, Secure, `SameSite=Strict` cookies, never in a JSON response body.
+- `app/api/v1/dependencies.py`: `get_current_user_optional`, `get_current_user_required`, `get_current_admin_user` — authentication/authorization middleware, re-verifying the user against the database on every request rather than trusting the JWT's `is_admin` claim blindly.
+- `app/core/config.py`: a `model_validator` rejecting the default `JWT_SECRET` placeholder outside `development`/`test` environments — a red-team-driven fix, not a design-review item.
+- 62 new tests across `tests/auth/`, `tests/api/test_auth.py`, `tests/api/test_dependencies.py`, `tests/core/test_config.py` — unit, DB-integration, and HTTP-integration, including a dedicated refresh-token-reuse multi-device scenario and an HTTP-level account-enumeration-resistance check.
+- ADR-017 through ADR-020 (`docs/ARCHITECTURE_DECISIONS.md`) and Founder Decision 002 (`docs/FOUNDER_DECISIONS.md`).
+- `docs/MILESTONE_REPORTS/M5_REPORT.md`, `docs/PROJECT_STATE.md`.
+
+### Changed
+- `app/api/v1/routers/simulations.py`: `POST /api/v1/simulations` now attaches `user_id` opportunistically when a valid session is present (anonymous creation remains fully supported); `GET /api/v1/simulations/{id}` now enforces real ownership via `get_current_user_optional` instead of M4's fail-closed placeholder.
+- `app/api/v1/audit.py`: added `record_auth_audit`, reusing `AuditEventType.USER_REGISTERED`/`USER_LOGIN_SUCCEEDED`/`USER_LOGIN_FAILED`/`USER_LOGOUT` (all already present in the M1 schema, ahead of this milestone).
+- `app/api/v1/exception_handlers.py`: seven new exception-to-envelope mappings (`EMAIL_ALREADY_REGISTERED` 409, `WEAK_PASSWORD` 422, `INVALID_CREDENTIALS` 401, `ACCOUNT_LOCKED` 429, `ACCOUNT_INACTIVE` 403, `INVALID_REFRESH_TOKEN` 401, `UNAUTHORIZED` 401).
+- `app/models/user.py`: added the `refresh_tokens` relationship.
+- `requirements.txt`: added `argon2-cffi`, `pyjwt`, `email-validator`.
+- `.claude/SECURITY_POLICY.md`, `.claude/DATABASE_RULES.md`: updated to reflect Founder Decision 002 and the new `refresh_tokens` table.
+- `docs/KNOWN_ISSUES.md`: KI-006 resolved, KI-023 updated (middleware now exists; endpoints themselves still deferred), KI-027–KI-031 added.
+
+### Fixed
+- N/A (no prior milestone code touched beyond the `simulations.py` router wiring noted above).
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- Argon2 password hashing (Founder Specification Part 2.8.5), never plaintext, never a hint or security question.
+- Account enumeration resistance: login returns the identical status/code/message whether the email is unknown or the password is wrong, verified at both the service layer and the HTTP layer; a wrong password against a suspended account still yields the generic error, never revealing suspension status to an unauthenticated guesser.
+- Refresh-token rotation with reuse detection: a replayed, already-rotated token revokes every active session for that user, not just the one presented.
+- httpOnly/Secure/SameSite=Strict cookies close off JS-readable token theft (XSS) and cross-site request forgery on the session cookies.
+- Fixed during self-review, not just documented: a forgotten `JWT_SECRET` env var in a real deployment would have allowed silent token forgery — now a hard startup failure outside development/test.
+- Four residual risks documented, not fixed, as deliberate tracked debt: KI-027 (low-severity concurrent-refresh race), KI-028 (inherent access-token non-revocability window), KI-029 (lockout retry-after not surfaced), KI-031 (password reset itself, deliberately out of scope per direct instruction).
+
+---
+
 ## [0.5.1] — 2026-07-10 — M4 Follow-Up: Simulation Audit Logging (KI-026)
 
 ### Added
