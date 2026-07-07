@@ -12,6 +12,14 @@ Examples:
     python -m app.ingestion.cli indicator CPIAUCSL --provider fred \\
         --name "CPI for All Urban Consumers" --unit index \\
         --start 2020-01-01 --end 2024-01-01
+
+    # --provider dev_seed: a small, deterministic, clearly-synthetic local
+    # fixture (never real market data — see providers/dev_seed_provider.py),
+    # for unblocking manual frontend testing when a real provider is
+    # unreachable/rate-limited. Refuses to run outside ENVIRONMENT=development
+    # or test. Only AAPL, SPY, and BTC-USD are defined in the fixture.
+    python -m app.ingestion.cli prices AAPL --provider dev_seed \\
+        --asset-type stock --start 2020-01-01 --end 2024-12-31
 """
 
 import argparse
@@ -43,7 +51,9 @@ def _build_parser() -> argparse.ArgumentParser:
     asset_parser.add_argument(
         "--asset-type", choices=[t.value for t in AssetType], default=AssetType.STOCK.value
     )
-    asset_parser.add_argument("--provider", required=True, choices=["yfinance", "coingecko"])
+    asset_parser.add_argument(
+        "--provider", required=True, choices=["yfinance", "coingecko", "dev_seed"]
+    )
     asset_parser.add_argument("--start", required=True, type=_parse_date)
     asset_parser.add_argument("--end", required=True, type=_parse_date)
     asset_parser.add_argument("--dry-run", action="store_true")
