@@ -127,3 +127,23 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: Caching (ADR-022) is this milestone's primary performance *and* cost optimization simultaneously — an unchanged `simulation_id`/`prompt_version`/model never re-invokes the provider, which is both the fastest possible response (a single indexed row lookup) and the cheapest. The per-simulation regeneration/follow-up caps bound worst-case provider-call volume per simulation, independent of the generic per-minute rate limiter.
 
 **Future Improvements**: Benchmark real Anthropic API latency once a live key is available, to confirm the 12s internal timeout leaves adequate margin inside the 15s Founder Specification target under realistic network conditions; consider whether `ai_max_output_tokens`' default (800) needs tuning once real generated-explanation length/quality tradeoffs are observed.
+
+---
+
+## M7 Phase 1 — Frontend Foundation (2026-07-15)
+
+**API Response Time**: Not applicable — no page calls the backend API yet; the foundation-verification placeholder (`frontend/src/app/page.tsx`) renders static, hardcoded values.
+
+**Database Query Time**: Not applicable to this phase.
+
+**Memory Usage**: Not measured.
+
+**Startup Time**: `npm run build` (Turbopack, production) completes in ~4-9s locally, including TypeScript checking and static-page generation for both routes (`/`, `/_not-found`); `npm run dev` is ready in ~1.3s. Neither is yet representative of a real page's compile cost.
+
+**Bundle size**: `.next/static/chunks` totals ~720KB uncompressed across all JS chunks for the current two-route app. `recharts` (installed per the required stack, for shared chart types in a future phase) is not imported anywhere in application code yet and therefore contributes zero bytes to this figure — bundling cost will need remeasuring the moment a chart component first imports it, since Recharts is a meaningfully sized dependency. `axios`, `@tanstack/react-query`, `react-hook-form`, and `zod` are all present in the dependency graph via the shared providers/API layer even though no screen exercises them yet (the QueryProvider wraps every page unconditionally).
+
+**Performance Bottlenecks**: None identified — there is no real page to bottleneck yet. The one forward-looking note: `.claude/PERFORMANCE_BUDGET.md`'s <3s frontend page-load target has not been measured against a real network condition or a page with an actual data fetch (React Query) and chart render (Recharts) in the loop — both are the two additions most likely to move this number once Phase 2 builds real screens.
+
+**Optimizations**: `next/font/google` (Inter, JetBrains Mono) self-hosts both fonts at build time rather than fetching from Google Fonts at runtime — eliminates a render-blocking third-party font request by construction, not as a later optimization pass. `React Query`'s `staleTime: 60_000`/`refetchOnWindowFocus: false` defaults (`query-provider.tsx`) avoid refetching Asset/Simulation data more often than this mostly-static, historical-data product actually needs.
+
+**Future Improvements**: Re-measure bundle size and Core Web Vitals once the Simulator → Results flow (the platform's first real page with a data fetch, a form, and a chart) is built in Phase 2 — this phase's placeholder page cannot meaningfully validate the <3s budget.

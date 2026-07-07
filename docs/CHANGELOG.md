@@ -4,6 +4,39 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.8.0] — 2026-07-15 — M7 Phase 1: Frontend Foundation
+
+### Added
+- `frontend/` — the platform's first frontend code, scaffolded with Next.js 16.2.10 (App Router, TypeScript, Tailwind v4).
+- Design token system: `src/styles/tokens/{primitives,semantic,components}.css` (three-layer, runtime-switchable CSS custom properties) bridged into Tailwind v4's `@theme inline` in `globals.css` — covers brand/neutral/chart/status/AI color families, type scale, spacing (Tailwind's default 4px scale, unmodified), radius, elevation, motion durations/easings, and a new six-tier z-index scale.
+- Theme system: `src/providers/{theme-provider,theme-script}.tsx` — `data-theme` attribute switching with a synchronous inline `<head>` script (this Next.js version's own documented flash-prevention pattern), a `useTheme()`/`setTheme()` hook, and no rendered toggle yet (deliberate, per `docs/BRAND_CONSTITUTION.md`).
+- Shared providers: `src/providers/{query-provider,toast-provider,app-providers}.tsx` (TanStack Query with sensible defaults, a calm toast/notification system, and one composition point), plus `src/app/{error,global-error,not-found}.tsx` (Next 16.2's `unstable_retry`-based error boundaries).
+- API layer: `src/lib/api/{client,errors,index}.ts` and `src/lib/api/endpoints/{assets,simulations}.ts` — one Axios instance (`withCredentials: true`), one `apiRequest<T>()` entry point, one pure `normalizeApiError()` function, one `ERROR_COPY` table covering every documented backend error code plus a client-only `NETWORK_ERROR`, and a Zod schema (`simulationCreateSchema`) matching the simulation-creation request contract. `src/types/api.ts` mirrors `docs/api_design.md`/`backend/app/models/enums.py` exactly, keeping every financial figure a `string` end-to-end.
+- Eight primitive components (`src/components/ui/`): Button, Input, Card, Badge, Skeleton, EmptyState, ErrorState, StatTile — each reviewed against `docs/BRAND_CONSTITUTION.md`'s Component Review Checklist (hairline-only dividers, icon+label badges, tabular numerals, a keyboard-operable `<details>`-based provenance disclosure on StatTile, `role="alert"`/`aria-invalid`/`aria-describedby` wiring).
+- The platform's first frontend test suite: 42 tests across 15 files (Vitest + React Testing Library + jsdom), 94.26% statement coverage — above `.claude/TESTING_GUIDELINES.md`'s 60%+ target.
+- ADR-025 through ADR-027 (`docs/ARCHITECTURE_DECISIONS.md`): the token-architecture/Tailwind-v4 bridge, the theme-switching strategy, and the centralized API client design.
+
+### Changed
+- `.gitattributes`: explicit LF rules added for frontend source file types (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.mts`, `.cjs`, `.json`, `.css`), resolving KI-010 now that frontend source genuinely exists.
+- `docs/PROJECT_STATE.md`: version bumped to 0.8.0; M7 Phase 1 marked complete; Next Milestone updated to M7 Phase 2 (product screens, starting with Simulator → Results).
+
+### Fixed
+- N/A (no prior milestone's code was touched; this is new, additive frontend scaffolding only).
+
+### Removed
+- The `create-next-app` default placeholder page and unused template SVG assets (`next.svg`, `vercel.svg`, `globe.svg`, `window.svg`, `file.svg`).
+
+### Deprecated
+- N/A.
+
+### Security
+- Session handling: `apiClient` sets `withCredentials: true` and never reads, stores, or attaches a token itself — no `localStorage`/`sessionStorage` token handling exists anywhere, by construction (Founder Decision 002's httpOnly-cookie design made a frontend token store unnecessary).
+- Exactly one `dangerouslySetInnerHTML` exists (the theme-flash-prevention script), injecting a fixed, source-controlled string with no interpolated user data.
+- `frontend/src/config/env.ts` validates its one environment variable with Zod at module load and fails fast on misconfiguration, mirroring the backend's own `Settings` validation philosophy.
+- KI-036 added (an inferred, unverified `growth_series` per-point type shape — low severity, data-modeling risk, not a security one).
+
+---
+
 ## [0.7.2] — 2026-07-14 — M7 Phase 0 Follow-up: Founder Decision 004 Formalized (Documentation Only)
 
 ### Added

@@ -1,0 +1,21 @@
+/*
+ * Component tokens — reference semantic.css only, never primitives.css
+ * directly. One block per primitive component (src/components/ui).
+ */
+
+:root {
+  --button-radius: var(--radius-sm);
+  --input-radius: var(--radius-sm);
+  --card-radius: var(--radius-md);
+  --badge-radius: var(--radius-sm);
+  --skeleton-radius: var(--radius-sm);
+
+  --card-border: var(--color-border-hairline);
+  --card-padding: 1.5rem; /* 24px, matches the 24-step of the spacing scale */
+
+  --input-border: var(--color-border-hairline);
+  --input-border-focus: var(--color-primary);
+
+  --focus-ring-width: 2px;
+  --focus-ring-color: var(--color-primary);
+}

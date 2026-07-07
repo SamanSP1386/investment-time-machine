@@ -193,3 +193,25 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 **Remaining Risks**: KI-032 (heuristic safety-check coverage gaps — the most consequential open item from this milestone), KI-033 (low-severity cap-check race), KI-034 (unverified provider-echoed-model-name assumption underlying the cache key, cost-inefficiency-only if wrong). KI-016 (carried from M3) remains the platform's single highest-priority open item, unrelated to this milestone.
 
 **Threats Deferred**: Data poisoning and model manipulation remain the Founder Specification's own named-but-unmitigated future threats — correctly still deferred, since both only become live risks once a RAG knowledge corpus exists (Part 2.7.14), explicitly out of scope for M6 (Founder Decision 003). Supply chain risk is narrowed, not eliminated, by adding exactly one new pinned dependency (`anthropic==0.116.0`) reviewed before inclusion, not eliminated by policy alone.
+
+---
+
+## M7 Phase 1 — Frontend Foundation (2026-07-15)
+
+**Risks Found**: This is the platform's first frontend code — the first milestone where an end user's browser, not just the backend, is part of the trust boundary. No auth UI, form submission, or AI-rendered content exists yet, so the highest-severity risks named in prior design reviews (unsanitized AI Markdown, CSRF/XSS around session cookies) are not yet live attack surface, but the foundation choices made here determine whether they're preventable later.
+
+**Severity**: Low for this phase specifically (no user input reaches a mutation yet) — the review below is forward-looking: verifying the foundation doesn't foreclose the security properties later phases depend on.
+
+**Findings**:
+
+1. **Session cookie handling matches Founder Decision 002 exactly.** `apiClient` (`frontend/src/lib/api/client.ts`) sets `withCredentials: true` and never reads, stores, or attaches a token itself — there is no `localStorage`/`sessionStorage` token handling anywhere in the codebase to audit, because the design (httpOnly, Secure, `SameSite=Strict` cookies set directly by the backend) makes a frontend-side token store unnecessary by construction. Verified by `client.test.ts`'s explicit assertion on `apiClient.defaults.withCredentials`.
+2. **Exactly one `dangerouslySetInnerHTML` exists in the codebase**, and it is inert with respect to user data: the theme-flash-prevention inline script (`layout.tsx`), which injects a fixed, source-controlled string (`THEME_INIT_SCRIPT`) with no interpolated user input of any kind. This is a clean starting point for the AI-Markdown-sanitization risk flagged in `docs/frontend_design_system.md` §14 risk 4 — there is no existing raw-HTML-rendering pattern a future AI panel could carelessly copy.
+3. **Environment configuration fails fast on misconfiguration**, mirroring the backend's own `Settings` validation philosophy (`.claude/CODING_STANDARDS.md`): `frontend/src/config/env.ts` validates `NEXT_PUBLIC_API_BASE_URL` with Zod at module load and throws immediately if it is missing or not a valid URL, rather than silently falling through to a broken runtime request later.
+4. **The error-code-to-copy table cannot silently drift from the backend's error contract.** `ERROR_COPY: Record<ApiErrorCode, ErrorCopy>` (`frontend/src/lib/api/errors.ts`) is a TypeScript `Record` over the full `ApiErrorCode` union — adding a new backend error code without a corresponding copy entry (or vice versa) fails `tsc --noEmit`, not just a runtime `undefined`. Verified passing via `npx tsc --noEmit` (zero errors) as part of this phase's own verification pass.
+5. **No secrets or credentials were introduced.** `.env.local` (real, gitignored) and `.env.example` (committed, placeholder-only) both contain only a public API base URL — nothing that requires secrecy. `frontend/.gitignore` (inherited from `create-next-app`) already excludes `.env*`.
+
+**Mitigations Implemented**: All five items above are already-correct-by-construction outcomes of the architecture chosen in this phase, not reactive fixes — no vulnerability was found and patched, because no user-input-handling surface exists yet to have a vulnerability in.
+
+**Remaining Risks**: Everything named as a risk in `docs/frontend_design_system.md` §14 (AI-Markdown sanitization, the nullable-field dual-meaning problem, rate-limit UX) remains exactly as open as it was at the end of M7 Phase 0 — this phase does not resolve any of them, since none of the screens they apply to are built yet. KI-036 (this phase's own new finding — an unverified `growth_series` per-point shape) is a data-modeling risk, not a security one.
+
+**Threats Deferred**: A full CSRF/XSS review is deferred to the milestone that actually builds a form (Simulator) or renders AI-generated content (Results/AI panel) — reviewing controls for attack surfaces that don't exist yet would be speculative rather than verifiable. Content Security Policy configuration (Next.js 16 ships first-party guidance for this, `node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`) is likewise deferred to whichever phase first needs to render third-party or dynamic content.

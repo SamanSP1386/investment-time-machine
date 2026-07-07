@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+@import '../styles/tokens/primitives.css';
+@import '../styles/tokens/semantic.css';
+@import '../styles/tokens/components.css';
+
+/*
+ * Bridges semantic.css's runtime-switchable CSS variables into Tailwind's
+ * theme namespace ("@theme inline" re-reads the var at utility-use time
+ * rather than baking in today's value), so utilities like `bg-background`
+ * or `text-ink-primary` stay correct across the light/dark toggle without
+ * needing dark: variants sprinkled through every component.
+ */
+@theme inline {
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-ink-primary: var(--color-ink-primary);
+  --color-ink-secondary: var(--color-ink-secondary);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-border-hairline: var(--color-border-hairline);
+  --color-border-gridline: var(--color-border-gridline);
+
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-foreground: var(--color-primary-foreground);
+
+  --color-chart-portfolio: var(--color-chart-portfolio);
+  --color-chart-real: var(--color-chart-real);
+  --color-chart-negative: var(--color-chart-negative);
+
+  --color-status-good: var(--color-status-good);
+  --color-status-warning: var(--color-status-warning);
+  --color-status-serious: var(--color-status-serious);
+  --color-status-critical: var(--color-status-critical);
+
+  --color-ai-surface: var(--color-ai-surface);
+  --color-ai-border: var(--color-ai-border);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'JetBrains Mono', monospace;
+
+  /* Three-tier breakpoints matching frontend_design_system.md §12 exactly
+     (mobile <640, tablet 640-1024, desktop 1024-1440, wide >=1440) rather
+     than Tailwind's default five-tier scale. */
+  --breakpoint-sm: 40rem; /* 640px */
+  --breakpoint-md: 64rem; /* 1024px */
+  --breakpoint-lg: 90rem; /* 1440px */
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-ink-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Every currency/percentage/date figure uses tabular numerals by default
+ * (BRAND_CONSTITUTION.md §6) — a correctness rule, not a style preference.
+ */
+.figure {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible focus ring everywhere, never `outline: none` with no replacement. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+/*
+ * prefers-reduced-motion degrades every animation to an instant state
+ * change with no information loss (BRAND_CONSTITUTION.md §8) — enforced
+ * globally rather than per-component so it can never be forgotten.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

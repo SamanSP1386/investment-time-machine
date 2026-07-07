@@ -1,0 +1,74 @@
+/*
+ * Primitive tokens — raw values only, no semantic meaning attached.
+ * Never reference these directly from a component; go through semantic.css.
+ * Source of truth for these values: docs/frontend_design_system.md §3-6,
+ * docs/BRAND_CONSTITUTION.md §6-7.
+ */
+
+:root {
+  /* Neutrals — shared by UI chrome and chart canvas (frontend_design_system.md §3) */
+  --color-paper-light: #f9f9f7;
+  --color-paper-dark: #0d0d0d;
+  --color-surface-light: #fcfcfb;
+  --color-surface-dark: #1a1a19;
+  --color-ink-primary-light: #0b0b0b;
+  --color-ink-primary-dark: #ffffff;
+  --color-ink-secondary-light: #52514e;
+  --color-ink-secondary-dark: #c3c2b7;
+  --color-ink-muted: #898781;
+  --color-hairline-light: rgb(11 11 11 / 10%);
+  --color-hairline-dark: rgb(255 255 255 / 10%);
+  --color-gridline-light: #e1e0d9;
+  --color-gridline-dark: #2c2c2a;
+
+  /* Brand — "Ledger Navy" (interactive chrome only, never data or status) */
+  --color-navy-light: #1b3a6b;
+  --color-navy-light-hover: #152c52;
+  --color-navy-dark: #3e6bb0;
+  --color-navy-dark-hover: #5580c4;
+
+  /* Chart data palette — CVD-validated, one hue per meaning, never reused as UI chrome */
+  --color-chart-portfolio-light: #2a78d6;
+  --color-chart-portfolio-dark: #3987e5;
+  --color-chart-real-light: #1baf7a;
+  --color-chart-real-dark: #199e70;
+  --color-chart-negative-light: #e34948;
+  --color-chart-negative-dark: #e66767;
+
+  /* Status — fixed vocabulary, shared by chart annotations and ordinary UI state */
+  --color-status-good: #0ca30c;
+  --color-status-warning: #fab219;
+  --color-status-serious: #ec835a;
+  --color-status-critical: #d03b3b;
+
+  /* AI — a warm neutral tint, deliberately NOT a new hue (BRAND_CONSTITUTION.md §7) */
+  --color-ai-surface-light: #faf6ee;
+  --color-ai-border-light: #efe7d6;
+  --color-ai-surface-dark: #221d16;
+  --color-ai-border-dark: #3a3226;
+
+  /* Radius scale (frontend_design_system.md §6) */
+  --radius-sm: 0.375rem; /* 6px */
+  --radius-md: 0.625rem; /* 10px */
+  --radius-lg: 1rem; /* 16px */
+
+  /* Elevation — border-first, shadow-second (frontend_design_system.md §6) */
+  --shadow-raised: 0 2px 8px rgb(0 0 0 / 6%);
+  --shadow-overlay: 0 12px 32px rgb(0 0 0 / 16%);
+
+  /* Motion (frontend_design_system.md §9, BRAND_CONSTITUTION.md §8) */
+  --duration-micro: 140ms;
+  --duration-reveal: 500ms;
+  --duration-skeleton: 180ms;
+  --duration-transition: 220ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Z-index scale — not previously specified; documented here, see ADR-025 */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+  --z-tooltip: 60;
+}

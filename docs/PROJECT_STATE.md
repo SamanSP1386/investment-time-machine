@@ -8,19 +8,19 @@ not history. History lives in the other required documents; this one just points
 
 ## Current Version
 
-**0.7.2** (per `docs/CHANGELOG.md` — M7 Phase 0 Follow-up: Founder Decision 004 Formalized)
+**0.8.0** (per `docs/CHANGELOG.md` — M7 Phase 1: Frontend Foundation)
 
 ## Current Milestone
 
-**M7 Phase 0 — Design Foundation: Complete.** A three-part design review (initial design system, skill-validated pressure test, brand identity deep-dive) produced `docs/BRAND_CONSTITUTION.md` — the authoritative source of truth for the product's visual identity and brand philosophy, approved under Founder Decision 004 (`docs/FOUNDER_DECISIONS.md`). `docs/frontend_design_system.md` remains the implementation-level design system (tokens, component specs, page inventory) and is now subordinate to the constitution. No frontend code, React components, or Tailwind exist yet — this milestone is documentation only, per the established design-review-then-implement precedent (M3/M5/M6). M6 (Educational AI System) remains the most recent coding milestone; see its entry below for that summary.
+**M7 Phase 1 — Frontend Foundation: Complete.** The platform's first frontend code: a Next.js 16 (App Router, TypeScript, Tailwind v4) application scaffolded at `frontend/`, implementing the three-layer design token architecture, light/dark theme switching, the shared provider stack (Theme, TanStack Query, Toast, error boundaries), a centralized Axios API client with typed models and one error-code-to-copy table, and eight primitive components (Button, Input, Card, Badge, Skeleton, EmptyState, ErrorState, StatTile) — all reviewed against `docs/BRAND_CONSTITUTION.md`'s Component Review Checklist. No product pages (Simulator, Results, Auth, Account) exist yet; the root page is a foundation-verification placeholder only, per this phase's own explicit scope boundary.
 
 ## Repository Health Score
 
-**8/10** — unchanged from the M5 assessment; M6's implementation reinforced rather than changed this score (the milestone reused three already-proven codebase patterns — the ingestion Protocol abstraction, the auth domain-module split, the fail-open Redis/SAVEPOINT-audit conventions — rather than inventing new ones, a positive maintainability signal).
+**8/10** — unchanged. M7 Phase 1 reused the backend's own established discipline (fail-fast config validation, one central error-normalization point, documentation-as-code) rather than inventing new patterns, extending the same positive maintainability signal to the frontend.
 
 ## Production Readiness Score
 
-**~5/10 for the platform overall** (up slightly from ~4.5/10 pre-M6). The Educational AI System itself is scored 6/10 (see `docs/MILESTONE_REPORTS/M6_REPORT.md`) — fully tested against the default `NullProvider` and a fake-provider success path, structurally safe against every named prohibited behavior, but never verified against a real Anthropic API call (no live key available this session). Platform-wide, still held back primarily by KI-016 (unverified split-consistency assumption, unrelated to M6, still the single highest-priority open item) and the still-unbuilt Frontend/Deployment milestones.
+**~5/10 for the platform overall**, unchanged by this phase — the frontend foundation has no product-facing surface yet to move this number; it exists to make Phase 2's screens faster and more consistent to build, not to add readiness on its own. Still held back primarily by KI-016 (unverified split-consistency assumption, the single highest-priority open item) and the still-unbuilt frontend product screens and Deployment milestone. The Educational AI System (M6) remains scored 6/10 (see `docs/MILESTONE_REPORTS/M6_REPORT.md`) — unchanged, not touched by this phase.
 
 ## Completed Milestones
 
@@ -41,12 +41,13 @@ not history. History lives in the other required documents; this one just points
 | M6 | 0.7.0 | 2026-07-12 | Educational AI System (Explanation Engine + Financial Tutor) |
 | M7 Phase 0 | 0.7.1 | 2026-07-13 | Design Foundation — Brand Constitution (`docs/BRAND_CONSTITUTION.md`) |
 | M7 Phase 0 follow-up | 0.7.2 | 2026-07-14 | Founder Decision 004 formalized in `docs/FOUNDER_DECISIONS.md` |
+| M7 Phase 1 | 0.8.0 | 2026-07-15 | Frontend Foundation — tokens, theme, providers, API client, primitives |
 
 *(Milestone dates as recorded in `docs/DEVLOG.md`; note these predate the current system date and reflect the project's own internal timeline.)*
 
 ## Next Milestone
 
-**M7 Phase 1 — Design Token & Primitive Implementation**, per `docs/BRAND_CONSTITUTION.md`'s closing recommendation — the Simulation Engine, API, Identity Management, and Educational AI System are all stable and tested, satisfying the standing "backend before frontend" rule, and the design foundation (Phase 0) is now approved. Phase 1 implements only the Tailwind/CSS token layer (both themes) and the shared primitive components (Button, Input, Card, StatTile, Badge, EmptyState, ErrorState, Skeleton) against the Brand Constitution's Component Review Checklist — no page (Simulator, Results, Auth, etc.) is built until that checkpoint passes review. Simulation History and Admin Import (`docs/api_design.md`, gated on auth per KI-023) remain unbuilt and are candidates for a near-term follow-on increment.
+**M7 Phase 2 — Product Screens**, building on the now-complete frontend foundation: the Simulator → Results flow first (this platform's core "simulate-and-explain loop"), then Asset Explorer, Simulation History, and Auth screens, per `docs/frontend_design_system.md`'s suggested sequencing. Two prerequisites flagged during Phase 1, not yet resolved: (1) `growth_series`/`disclosed_splits` persistence (KI-021/FD-008) should land before or alongside the Results screen specifically; (2) the anonymous-AI rate-limit specifics (FD-009/010) should be confirmed before the AI panel's limit-reached state is designed. Simulation History and Admin Import (`docs/api_design.md`, gated on auth per KI-023) remain unbuilt and are candidates for a near-term follow-on increment.
 
 ## Open Founder Decisions
 
@@ -59,7 +60,7 @@ No Founder Decisions currently awaiting approval.
 
 ## Open ADRs
 
-All of ADR-001 through ADR-024 are **Accepted**. One carries a pending-review qualifier:
+All of ADR-001 through ADR-027 are **Accepted**. One carries a pending-review qualifier:
 - **ADR-008** (Economic Indicators two-table design) — Accepted, but flagged "Pending Founder Review" per KI-005.
 
 No ADR is currently in Proposed/Draft state.
@@ -84,9 +85,9 @@ Full list (34 entries, most resolved) in `docs/KNOWN_ISSUES.md`.
 - KI-030 — A deprecated httpx test-only parameter used to work around Secure-cookie/TestClient scheme behavior.
 - KI-012 — TOCTOU race in ingestion asset/indicator get-or-create (fine at MVP single-process scale).
 - KI-013/014/015 — CoinGecko OHLC fidelity, no ticker→id mapping, no retry/backoff.
-- KI-021 — `growth_series`/`disclosed_splits` not persisted (empty on retrieval-after-creation).
+- KI-021 — `growth_series`/`disclosed_splits` not persisted (empty on retrieval-after-creation); now a blocking prerequisite for the Results screen per FD-008, not a permanent design-around.
 - KI-025 — `assets.exchange` returns `null` (no schema column yet).
-- KI-010 — `.gitattributes` needs explicit entries for new file types (e.g. `.tsx`) once M7 (Frontend) begins.
+- KI-036 — Frontend `GrowthSeriesPoint` type's per-point shape is inferred, not confirmed against a real (always-empty-today) response — verify once KI-021 is resolved, before the growth chart is built.
 
 None of these are undocumented shortcuts — all tracked per the Technical Debt Policy in `.claude/REVIEW_CHECKLIST.md`.
 
@@ -96,4 +97,4 @@ None of these are undocumented shortcuts — all tracked per the Technical Debt 
 
 ## Last Updated
 
-2026-07-14 — after the M7 Phase 0 follow-up: the nine brand/scope decisions in `docs/BRAND_CONSTITUTION.md` §3 were formalized as Founder Decision 004 in `docs/FOUNDER_DECISIONS.md`, closing the documentation-consistency gap the Phase 0 entry itself disclosed. No application code changed.
+2026-07-15 — after M7 Phase 1 (Frontend Foundation): the platform's first frontend code — tokens, theming, shared providers, API client, and eight primitive components — implemented, tested (42 tests, 94%+ coverage), linted, type-checked, and built successfully. `.gitattributes` also updated to resolve KI-010 now that frontend source files genuinely exist.

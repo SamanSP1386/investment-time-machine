@@ -1,0 +1,76 @@
+/*
+ * Semantic tokens — purpose-based aliases over primitives.css.
+ * Light values live on :root; dark values are layered in two ways so the
+ * correct theme is visible before any JavaScript runs:
+ *   1. [data-theme="dark"] — set synchronously by the inline script in
+ *      layout.tsx once a stored/system preference is known.
+ *   2. prefers-color-scheme: dark, guarded by :not([data-theme="light"]) so
+ *      an explicit user override always wins over the OS preference.
+ * See src/providers/theme-provider.tsx and BRAND_CONSTITUTION.md §4 (FD-005).
+ */
+
+:root {
+  --color-background: var(--color-paper-light);
+  --color-surface: var(--color-surface-light);
+  --color-ink-primary: var(--color-ink-primary-light);
+  --color-ink-secondary: var(--color-ink-secondary-light);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-border-hairline: var(--color-hairline-light);
+  --color-border-gridline: var(--color-gridline-light);
+
+  --color-primary: var(--color-navy-light);
+  --color-primary-hover: var(--color-navy-light-hover);
+  --color-primary-foreground: #ffffff;
+
+  --color-chart-portfolio: var(--color-chart-portfolio-light);
+  --color-chart-real: var(--color-chart-real-light);
+  --color-chart-negative: var(--color-chart-negative-light);
+
+  --color-status-good: var(--color-status-good);
+  --color-status-warning: var(--color-status-warning);
+  --color-status-serious: var(--color-status-serious);
+  --color-status-critical: var(--color-status-critical);
+
+  --color-ai-surface: var(--color-ai-surface-light);
+  --color-ai-border: var(--color-ai-border-light);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-background: var(--color-paper-dark);
+    --color-surface: var(--color-surface-dark);
+    --color-ink-primary: var(--color-ink-primary-dark);
+    --color-ink-secondary: var(--color-ink-secondary-dark);
+    --color-border-hairline: var(--color-hairline-dark);
+    --color-border-gridline: var(--color-gridline-dark);
+
+    --color-primary: var(--color-navy-dark);
+    --color-primary-hover: var(--color-navy-dark-hover);
+
+    --color-chart-portfolio: var(--color-chart-portfolio-dark);
+    --color-chart-real: var(--color-chart-real-dark);
+    --color-chart-negative: var(--color-chart-negative-dark);
+
+    --color-ai-surface: var(--color-ai-surface-dark);
+    --color-ai-border: var(--color-ai-border-dark);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-background: var(--color-paper-dark);
+  --color-surface: var(--color-surface-dark);
+  --color-ink-primary: var(--color-ink-primary-dark);
+  --color-ink-secondary: var(--color-ink-secondary-dark);
+  --color-border-hairline: var(--color-hairline-dark);
+  --color-border-gridline: var(--color-gridline-dark);
+
+  --color-primary: var(--color-navy-dark);
+  --color-primary-hover: var(--color-navy-dark-hover);
+
+  --color-chart-portfolio: var(--color-chart-portfolio-dark);
+  --color-chart-real: var(--color-chart-real-dark);
+  --color-chart-negative: var(--color-chart-negative-dark);
+
+  --color-ai-surface: var(--color-ai-surface-dark);
+  --color-ai-border: var(--color-ai-border-dark);
+}

@@ -11,6 +11,17 @@
 Dockerfile text eol=lf
 *.sh     text eol=lf
 
+# --- Frontend (M7) — added when frontend/ was first scaffolded, resolving KI-010 ---
+*.ts     text eol=lf
+*.tsx    text eol=lf
+*.js     text eol=lf
+*.jsx    text eol=lf
+*.mjs    text eol=lf
+*.mts    text eol=lf
+*.cjs    text eol=lf
+*.json   text eol=lf
+*.css    text eol=lf
+
 # --- Explicit CRLF (Windows-only scripts) ---
 *.bat text eol=crlf
 *.ps1 text eol=crlf

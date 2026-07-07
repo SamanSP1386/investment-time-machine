@@ -83,9 +83,9 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 
 - **Description**: `.gitattributes` (added during the Repository Hygiene pass) explicitly sets line-ending rules only for the file types that exist in the repository today (`.py`, `.md`, `.yml`/`.yaml`, `Dockerfile`, `.sh`, `.bat`, `.ps1`). New source file types introduced by future milestones (e.g. `.json`, `.toml`, `.tsx`/`.ts` at the Frontend milestone) will fall back to the `* text=auto eol=lf` catch-all rather than an explicit rule.
 - **Severity**: Low
-- **Status**: Open
-- **Planned Resolution**: Add explicit `.gitattributes` entries for each new source file type as it's introduced, per ADR-010 (`docs/ARCHITECTURE_DECISIONS.md`), rather than relying on the catch-all indefinitely.
-- **Resolution Date**: —
+- **Status**: Resolved
+- **Resolution**: M7 Phase 1 added explicit LF rules for every frontend source file type actually introduced (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.mts`, `.cjs`, `.json`, `.css`) to `.gitattributes`, matching ADR-010's planned resolution exactly. `.toml` remains unaddressed since no `.toml` file exists in the repository yet — the same "add it when it's introduced" policy applies, not a gap in this fix.
+- **Resolution Date**: 2026-07-15
 
 
 ### KI-011
@@ -295,3 +295,11 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Resolution**: `tests/auth/test_service.py`'s default `_lockout()` helper now returns `tests.auth.conftest.FakeAccountLockout` — an in-memory test double matching `AccountLockout`'s exact interface (`is_locked`/`record_failed_attempt`/`reset`) — for every test in the file that doesn't specifically exercise Redis itself, removing that file's implicit Redis dependency entirely. Two new, explicit tests were added immediately alongside the fixed test: `test_authenticate_enforces_lockout_when_redis_available` (a real, Redis-backed `AccountLockout`, skipping gracefully if Redis is unreachable — matching `tests/auth/test_lockout.py`'s own convention) and `test_authenticate_fails_open_when_redis_unavailable` (a real `AccountLockout` pointed at an always-unreachable address, asserting both that `authenticate()` never raises `AccountLockedError` and that the expected `"failing open"` warning is actually logged, via `caplog`). No production code changed — `app/auth/lockout.py`'s fail-open behavior is unchanged and, for the first time, directly verified at the `authenticate()` integration level, not just at the `AccountLockout` unit level.
 - **Verified by**: `tests/auth/test_service.py::test_authenticate_locks_out_after_repeated_failures` (now deterministic, no Redis dependency), `test_authenticate_enforces_lockout_when_redis_available`, `test_authenticate_fails_open_when_redis_unavailable` — full suite (278 tests) passing locally; CI no longer requires Redis for any test in this file.
 - **Resolution Date**: 2026-07-12
+
+### KI-036
+
+- **Description**: `frontend/src/types/api.ts`'s `GrowthSeriesPoint` interface (`{date, value}`) is an inferred shape, not one directly confirmed by `docs/api_design.md`, which documents that `growth_series` is present on `POST /api/v1/simulations`'s response but never specifies its per-point field names. This could not be verified against a real response during M7 Phase 1 because `growth_series` is always an empty array in practice today (KI-021 — not yet persisted).
+- **Severity**: Low (foundation-phase typing risk only — no chart or screen consumes this type yet; would become a real bug only if Phase 2 builds the growth chart against an unverified assumption).
+- **Status**: Open
+- **Planned Resolution**: Confirm the exact per-point shape against a real, non-empty `growth_series` response once FD-008's persistence work lands, before the growth chart component (M7 Phase 2) is built against this type.
+- **Resolution Date**: —
