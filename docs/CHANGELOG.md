@@ -4,6 +4,28 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.7.2] — 2026-07-14 — M7 Phase 0 Follow-up: Founder Decision 004 Formalized (Documentation Only)
+
+### Added
+- `docs/FOUNDER_DECISIONS.md`: **Founder Decision 004** — consolidates the nine brand/scope decisions from `docs/BRAND_CONSTITUTION.md` §3 (visual design system approval, theme architecture, M7 feature scope exclusions, minimal Account/Settings scope, growth-chart consistency as a backend precondition, anonymous educational AI access and its rate-limit-not-access-gate principle, trust/education over excitement, confidence without ego) into the project's own append-only Founder Decision ledger, following the exact structure of Decisions 001–003. Decisions 001–003 are unchanged.
+
+### Changed
+- `docs/PROJECT_STATE.md`: version bumped to 0.7.2; Current Milestone and Open Founder Decisions now cite "Founder Decision 004" directly rather than the constitution's informal `FD-00N` labels.
+
+### Fixed
+- Closed the documentation-consistency gap the 0.7.1 entry explicitly disclosed (brand decisions recorded only inside `docs/BRAND_CONSTITUTION.md`, not yet mirrored into `docs/FOUNDER_DECISIONS.md`'s own numbering).
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — no code or infrastructure changed.
+
+---
+
 ## [0.7.1] — 2026-07-13 — M7 Phase 0: Design Foundation (Documentation Only)
 
 ### Added

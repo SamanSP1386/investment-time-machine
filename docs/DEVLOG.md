@@ -459,3 +459,41 @@ One design correction was made during test-writing, before it became a bug: `doc
 **Production Readiness Score**: Not applicable — documentation-only pass. Frontend production readiness remains at 0% built (the `frontend/` directory is still empty); this milestone closes out the design-foundation prerequisite for Phase 1, not any implementation progress.
 
 **Next Milestone**: M7 Phase 1 — Design Token & Primitive Implementation (Tailwind/CSS token layer, both themes, and the shared primitive component set only — no page-level work until that checkpoint is reviewed and approved).
+
+---
+
+## 2026-07-14 — M7 Phase 0 Follow-up: Founder Decision 004 Formalized (not a coding milestone)
+
+**Version**: 0.7.2
+
+**Objective**: Close a documentation-consistency gap the prior M7 Phase 0 entry disclosed rather than hid: the nine brand/scope decisions recorded inside `docs/BRAND_CONSTITUTION.md` §3 (labeled FD-004 through FD-012 in that document's own local notation) had not yet been mirrored into `docs/FOUNDER_DECISIONS.md`'s own append-only "Founder Decision 00N" ledger, the project's established single place every founder-level decision must be traceable to.
+
+**Scope**: Documentation only — `docs/FOUNDER_DECISIONS.md` (new Founder Decision 004, appended; Decisions 001–003 untouched), `docs/PROJECT_STATE.md` (version bump, cross-references updated to point at the new formal entry). No frontend code, no application code, no change to `docs/BRAND_CONSTITUTION.md`'s content.
+
+**Implementation Summary**: Appended **Founder Decision 004** to `docs/FOUNDER_DECISIONS.md`, following the exact Context/Decision/Rationale/Scope/Deferred/Related structure established by Decisions 001–003, consolidating all nine brand-constitution decisions (visual design system approval, theme architecture, M7 feature scope exclusions, minimal Account/Settings scope, growth-chart consistency as a backend precondition, anonymous educational AI access, the anonymous-AI rate-limit-not-access-gate principle, trust/education over excitement, and confidence without ego) into one dated, numbered entry rather than nine separate ones — matching Founder Decision 003's own precedent of consolidating a milestone's several sub-decisions under one entry. `docs/PROJECT_STATE.md`'s "Open Founder Decisions" list and Current Milestone summary were updated to cite "Founder Decision 004" directly rather than the constitution's informal `FD-00N` labels, since `PROJECT_STATE.md` is overwritten (not append-only) and should always reflect the current, correct state rather than a historical snapshot.
+
+**Files Created**: None.
+
+**Files Modified**: `docs/FOUNDER_DECISIONS.md` (Founder Decision 004 appended), `docs/PROJECT_STATE.md` (version bump to 0.7.2; Current Milestone, Completed Milestones table, and Open Founder Decisions updated to reference Founder Decision 004).
+
+**Architecture Decisions**: None — no engineering-implementation choice was made in this pass, only a documentation-ledger formalization of decisions already approved.
+
+**Problems Encountered**: None.
+
+**Solutions**: N/A.
+
+**Lessons Learned**: The prior M7 Phase 0 entry's decision to explicitly disclose this gap ("noted as a recommended near-term follow-up rather than done unprompted") rather than silently leaving it implicit is what made this follow-up straightforward to schedule and execute correctly — an undisclosed gap would likely have been discovered later, if at all, only when someone went looking for "Founder Decision 004" in the ledger and didn't find it.
+
+**Security Review Summary**: Not applicable — no code changed.
+
+**Testing Summary**: Not applicable — no code changed.
+
+**Technical Debt Introduced**: None.
+
+**Performance Notes**: Not applicable.
+
+**Recruiter Value**: Low-Medium — a small, honest housekeeping pass, but one that demonstrates the discipline of actually closing a self-identified documentation gap on a short follow-up rather than letting a disclosed "recommended follow-up" quietly go stale.
+
+**Production Readiness Score**: Not applicable — documentation-only pass; no change to frontend build status (`frontend/` remains empty).
+
+**Next Milestone**: M7 Phase 1 — Design Token & Primitive Implementation, unchanged from the prior entry — this follow-up does not itself unblock or change Phase 1's scope, since Founder Decision 004's content was already in effect via `docs/BRAND_CONSTITUTION.md` before this formalization.
