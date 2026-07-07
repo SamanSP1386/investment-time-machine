@@ -26,13 +26,14 @@ export function asDecimalString(value: string): DecimalString {
   return value as DecimalString;
 }
 
-interface DecimalParts {
+export interface DecimalParts {
   negative: boolean;
   integerPart: string;
   fractionalPart: string;
 }
 
-function splitDecimal(value: DecimalString): DecimalParts {
+/** Exported for compare-decimal-string.ts — the one other module allowed to operate on a DecimalString's raw digit parts. */
+export function splitDecimal(value: DecimalString): DecimalParts {
   const trimmed = value.trim();
   const negative = trimmed.startsWith('-');
   const unsigned = negative ? trimmed.slice(1) : trimmed;

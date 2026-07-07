@@ -50,7 +50,7 @@ export default function GlobalError({ error, unstable_retry }: RouteErrorBoundar
               style={{
                 marginTop: 16,
                 fontSize: 12,
-                color: '#898781',
+                color: '#6b6963',
                 fontFamily: 'ui-monospace, monospace',
               }}
             >

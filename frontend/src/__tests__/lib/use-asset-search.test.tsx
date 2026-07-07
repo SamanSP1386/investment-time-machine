@@ -34,7 +34,17 @@ describe('useAssetSearch', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.total).toBe(1);
-    expect(searchAssets).toHaveBeenCalledWith({ query: 'AAPL' });
+    expect(searchAssets).toHaveBeenCalledWith({ query: 'AAPL' }, expect.any(AbortSignal));
+  });
+
+  it('forwards TanStack Query’s per-request AbortSignal so a stale search can be cancelled (A6)', async () => {
+    vi.mocked(searchAssets).mockResolvedValueOnce({ assets: [], total: 0 });
+
+    renderHook(() => useAssetSearch({ query: 'AAPL' }), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(searchAssets).toHaveBeenCalled());
+    const [, signal] = vi.mocked(searchAssets).mock.calls[0];
+    expect(signal).toBeInstanceOf(AbortSignal);
   });
 
   it('surfaces a thrown ApiError through the query result, per the documented error convention', async () => {

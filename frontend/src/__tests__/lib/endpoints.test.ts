@@ -15,7 +15,14 @@ describe('asset endpoints', () => {
       method: 'GET',
       url: '/api/v1/assets',
       params: { query: 'AAPL', asset_type: undefined, limit: 10, offset: undefined },
+      signal: undefined,
     });
+  });
+
+  it('searchAssets forwards an AbortSignal through to apiRequest (A6)', async () => {
+    const controller = new AbortController();
+    await searchAssets({ query: 'AAPL' }, controller.signal);
+    expect(apiRequestMock).toHaveBeenCalledWith(expect.objectContaining({ signal: controller.signal }));
   });
 
   it('getAssetDetail URL-encodes the symbol', async () => {

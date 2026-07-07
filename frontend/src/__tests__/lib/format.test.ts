@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { asDecimalString, groupDecimalString, roundDecimalString } from '@/lib/format/decimal-string';
+import { compareDecimalStrings } from '@/lib/format/compare-decimal-string';
 import { formatCurrency } from '@/lib/format/currency';
 import { formatPercentage } from '@/lib/format/percentage';
 import { formatDate, formatDateRange } from '@/lib/format/date';
@@ -100,13 +101,57 @@ describe('nullable formatters', () => {
   });
 });
 
+describe('compareDecimalStrings', () => {
+  it('orders positive values by magnitude, not lexicographically', () => {
+    expect(compareDecimalStrings(asDecimalString('9'), asDecimalString('10'))).toBe(-1);
+    expect(compareDecimalStrings(asDecimalString('10'), asDecimalString('9'))).toBe(1);
+  });
+
+  it('treats equal values (including differing trailing zeros) as equal', () => {
+    expect(compareDecimalStrings(asDecimalString('100.00'), asDecimalString('100'))).toBe(0);
+    expect(compareDecimalStrings(asDecimalString('2500.5'), asDecimalString('2500.50'))).toBe(0);
+  });
+
+  it('handles negative values correctly, including magnitude inversion', () => {
+    expect(compareDecimalStrings(asDecimalString('-5'), asDecimalString('-10'))).toBe(1);
+    expect(compareDecimalStrings(asDecimalString('-10'), asDecimalString('-5'))).toBe(-1);
+    expect(compareDecimalStrings(asDecimalString('-1'), asDecimalString('1'))).toBe(-1);
+  });
+
+  it('treats signed zero as equal regardless of sign', () => {
+    expect(compareDecimalStrings(asDecimalString('-0.00'), asDecimalString('0'))).toBe(0);
+    expect(compareDecimalStrings(asDecimalString('0'), asDecimalString('-5'))).toBe(1);
+  });
+
+  it('compares fractional-only differences correctly', () => {
+    expect(compareDecimalStrings(asDecimalString('1.5'), asDecimalString('1.499'))).toBe(1);
+    expect(compareDecimalStrings(asDecimalString('1.49'), asDecimalString('1.5'))).toBe(-1);
+  });
+
+  it('preserves ordering for values far beyond Number.MAX_SAFE_INTEGER', () => {
+    expect(
+      compareDecimalStrings(
+        asDecimalString('12345678901234567890.13'),
+        asDecimalString('12345678901234567890.12')
+      )
+    ).toBe(1);
+  });
+});
+
 describe('guardrail: the format module never touches numeric coercion', () => {
   const formatDir = join(dirname(fileURLToPath(import.meta.url)), '../../lib/format');
   const sourceFiles = readdirSync(formatDir).filter((f) => f.endsWith('.ts'));
 
   it('scanned at least the expected formatter modules', () => {
     expect(sourceFiles).toEqual(
-      expect.arrayContaining(['currency.ts', 'percentage.ts', 'date.ts', 'nullable.ts', 'decimal-string.ts'])
+      expect.arrayContaining([
+        'currency.ts',
+        'percentage.ts',
+        'date.ts',
+        'nullable.ts',
+        'decimal-string.ts',
+        'compare-decimal-string.ts',
+      ])
     );
   });
 

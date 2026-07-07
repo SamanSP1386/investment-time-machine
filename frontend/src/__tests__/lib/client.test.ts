@@ -23,6 +23,10 @@ describe('apiRequest', () => {
   it('is instantiated with credentials enabled for httpOnly session cookies', () => {
     expect(apiClient.defaults.withCredentials).toBe(true);
   });
+
+  it('has a bounded request timeout so a hung connection cannot wait forever (A6)', () => {
+    expect(apiClient.defaults.timeout).toBe(15_000);
+  });
 });
 
 describe('normalizeApiError', () => {

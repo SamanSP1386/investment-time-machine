@@ -167,3 +167,39 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: None specific to this phase beyond what M7 Phase 1 already established — this phase's additions are correctness/quality infrastructure (formatting, guardrails, conventions, accessibility evidence), not performance-sensitive code paths.
 
 **Future Improvements**: Unchanged from M7 Phase 1 — re-measure bundle size and Core Web Vitals once the Simulator → Results flow is built and there is a real page to measure.
+
+---
+
+## M7 Phase 2 (Increment 1) — Punch-List Fixes + Simulator (2026-07-18)
+
+**API Response Time**: Not measured — no live backend was running during this increment's build/verification; the Simulator's `POST /api/v1/simulations` call and asset-search `GET /api/v1/assets` calls were exercised only against mocked hooks in tests. The new 15s Axios `timeout` (A6) is a bound, not a measurement.
+
+**Database Query Time**: Not applicable — no backend changes this phase.
+
+**Memory Usage**: Not measured.
+
+**Startup Time**: `npm run build` completes in ~8-12s locally, comparable to M7 Phase 1.5's baseline (~3-9s) despite the additional Simulator routes/components. `npm run test:coverage` (144 tests) completes in ~25s, up from M7 Phase 1.5's ~10s (103 tests) — proportionate to the ~40% increase in test count, no per-test performance regression identified.
+
+**Bundle size**: Not measured in absolute terms this phase (no baseline bundle-analyzer run exists yet for this project). `/simulator` prerenders as fully static content per `npm run build`'s route output. No new runtime dependency was added — React Hook Form, `@hookform/resolvers`, Zod, and TanStack Query were already project dependencies before this phase; the Simulator's weight is limited to its own new component/hook code (`asset-search-combobox.tsx`, `simulation-form.tsx`, two small hooks), all of which is real product code (unlike the dev-only `axe-core` dependency M7 Phase 1.5 added).
+
+**Performance Bottlenecks**: None identified. `compareDecimalStrings` (`compare-decimal-string.ts`) is O(n) in the number of digits, the same complexity class as the existing `roundDecimalString`/`groupDecimalString` — negligible for realistic financial figures and not a concern for the same reason those already weren't (correctness, not speed, is the deciding factor for a code path that runs at most a few dozen times per render). The asset-search combobox's 300ms debounce plus TanStack Query's default caching (`staleTime: 60_000`) keeps repeated identical searches from re-hitting the network.
+
+**Optimizations**: `AbortSignal` threading through `searchAssets` (A6) means a stale in-flight asset-search request is cancelled the moment a newer keystroke supersedes it, rather than letting superseded requests complete and race with the latest one — a real (if modest) reduction in wasted network/render work during fast typing, not just a correctness nicety.
+
+**Future Improvements**: Unchanged from the prior entry — re-measure bundle size and Core Web Vitals once the Results screen exists and there is a page with real chart/data-visualization weight to measure against a budget.
+
+---
+
+## M7 Phase 2 Final UX Polish — Trading-Day Guidance + Educational Error Copy (2026-07-18)
+
+**API Response Time / Database Query Time / Memory Usage**: Not applicable — no backend or data-fetching change.
+
+**Startup Time**: `npm run build` unchanged (~4-9s); `npm run test:coverage` (145 tests) comparable to the prior entry's ~145-test runtime.
+
+**Bundle size**: No measurable change — one static `<p>` of copy text and one string constant in `ERROR_COPY`, both negligible.
+
+**Performance Bottlenecks**: None — no new logic, computation, or network call.
+
+**Optimizations**: None applicable this pass.
+
+**Future Improvements**: Unchanged from the prior entry.

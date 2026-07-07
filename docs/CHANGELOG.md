@@ -4,6 +4,91 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.9.2] — 2026-07-18 — M7 Phase 2 Final UX Polish: Trading-Day Guidance + Educational Error Copy
+
+### Added
+- Calm, educational trading-day guidance text in `SimulationForm` (`frontend/src/components/simulator/simulation-form.tsx`), directly under the start/end date inputs: explains that stocks and ETFs have no price data on weekends or market holidays, encourages (never enforces) choosing a trading day, and states plainly that Investment Time Machine never moves a user's dates automatically, since historical accuracy matters more than convenience. Purely informational — no date adjustment, trading-calendar calculation, or nearest-trading-day guessing was added anywhere; the backend's existing `MISSING_HISTORICAL_DATA` rejection behavior is unchanged.
+- Two new/updated tests in `simulation-form.test.tsx` covering the new guidance text and the updated error copy.
+
+### Changed
+- `ERROR_COPY.MISSING_HISTORICAL_DATA` (`frontend/src/lib/api/errors.ts`): copy rewritten from a terse "This asset doesn't have price data for the selected date range" to an educational explanation — "Stocks and ETFs often do not have historical price data on weekends or market holidays. Please choose different dates and try again." — matching this product's standing rule that every error states cause and remedy in plain, calm language (`docs/BRAND_CONSTITUTION.md` §9) and never implies the backend itself failed.
+
+### Fixed
+- N/A.
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — pure UI copy/text change, no new input handling, no new data flow.
+
+---
+
+## [0.9.1] — 2026-07-18 — Ingestion Reliability: `dev_seed` Fixture Provider
+
+### Added
+- `backend/app/ingestion/providers/dev_seed_provider.py` (`DevSeedProvider`, `--provider dev_seed`) — a small, deterministic, clearly-synthetic local fixture provider (AAPL/SPY/BTC-USD at obviously round, fake price levels) for unblocking manual frontend/Simulator testing when a real provider is unreachable. Goes through the unmodified orchestrator/normalization/validation/repository/audit pipeline (ADR-035). Refuses to construct outside `ENVIRONMENT ∈ {development, test, testing}`, mirroring `Settings`'s existing `JWT_SECRET`/`AI_PROVIDER` production guards. Registered in `app/ingestion/providers/__init__.py` and `app/ingestion/cli.py`'s `--provider` choices.
+- `docs/setup_guide.md`: a new section documenting the yfinance rate-limit failure mode, the exact `dev_seed` seeding commands, and explicit rules that `dev_seed` data is development/test only and must never be treated as real provider data.
+- ADR-035 (`docs/ARCHITECTURE_DECISIONS.md`).
+- KI-044 (`docs/KNOWN_ISSUES.md`) — yfinance 0.2.44's crumb-negotiation endpoint getting rate-limited (429) by Yahoo, breaking all yfinance ingestion identically inside and outside Docker; root-caused via yfinance's own debug mode, not guessed.
+
+### Changed
+- N/A — no existing ingestion adapter (`yfinance_provider.py`, `coingecko_provider.py`, `fred_provider.py`), the orchestrator, or validation rules were modified.
+
+### Fixed
+- Local manual Simulator testing was blocked by yfinance's rate-limited crumb negotiation; `dev_seed` unblocks it. Note this is a mitigation, not a fix to the underlying cause (KI-044 remains Open, tracking the real fix — a `yfinance` version bump verified against a live, non-rate-limited window).
+- A data-hygiene bug found while applying this fix: three pre-existing `Asset` rows (AAPL/SPY/BTC-USD), created by earlier failed `--provider yfinance` attempts and left labeled `data_source="yfinance"` with zero price rows, silently kept that stale label when first reused by `dev_seed` (`get_or_create_asset` only sets `data_source` on creation, never on reuse — `app/ingestion/storage/repository.py:43`). Confirmed no real price data existed under those rows, then deleted them (with explicit sign-off, given the destructive cross-table delete) and re-seeded cleanly. See ADR-035's "Tradeoffs" for the general gap this surfaced.
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- `DevSeedProvider`'s environment guard (refuses to construct outside development/test) prevents fabricated data from ever being reachable in a production deployment, even via operator error (e.g. `--provider dev_seed` mistakenly run against a production `ENVIRONMENT`).
+
+---
+
+## [0.9.0] — 2026-07-18 — M7 Phase 2 (increment 1): Punch-List Fixes + Simulator
+
+### Added
+- `frontend/src/lib/format/compare-decimal-string.ts` — `compareDecimalStrings`, the one sanctioned way to order two `DecimalString` values (string-only digit comparison, never `Number()`); exported from `src/lib/format/index.ts` and documented in `README.md`. Closes the one financial-math guardrail gap ADR-029 didn't cover (comparison, not just coercion) — ADR-033.
+- An ESLint `no-restricted-syntax` selector banning bare `</>/<=/>=` relational operators in product/UI code, alongside ADR-029's existing `Number()`/`parseFloat()`/`parseInt()`/unary-`+` ban (ADR-033).
+- `frontend/src/__tests__/lib/theme-tokens.test.ts` — a static regression guard distinguishing `globals.css`'s intentional `@theme inline` namespace-bridging syntax from a genuine self-referencing custom property (ADR-028's actual bug), asserting `semantic.css`/`components.css`/`primitives.css` never contain one.
+- `frontend/src/__tests__/lib/breakpoints.test.ts` and a `--breakpoint-*: initial` reset in `globals.css` — locks the Tailwind breakpoint namespace to the three approved tiers (`sm`/`md`/`lg`) so `xl:`/`2xl:` utilities cannot silently exist (ADR-034).
+- `frontend/src/hooks/use-simulation.ts` (`useCreateSimulation`) and `frontend/src/hooks/use-asset-availability.ts` (`useAssetAvailability`) — the Simulator's mutation and pre-submit availability-check hooks, following `src/lib/query/README.md`'s established conventions.
+- `frontend/src/components/simulator/asset-search-combobox.tsx` — a full ARIA combobox (`role="combobox"` + `role="listbox"`), debounced, backed by `useAssetSearch`, with an informative empty state and central error-copy rendering.
+- `frontend/src/components/simulator/simulation-form.tsx` and `frontend/src/app/simulator/page.tsx` — the Simulator screen: asset search, investment amount, start/end date, dividend-reinvestment and inflation-adjustment toggles (behind a "More options" disclosure), full client-side validation (wire schema plus an end-after-start refinement), a pre-submit availability check, and a calm inline success card (simulation ID, status, echoed inputs) with a "Start a new simulation" reset — no navigation to an unbuilt Results page.
+- `frontend/src/__tests__/app/global-error.test.tsx`, `frontend/src/__tests__/lib/env.test.ts` — regression tests for A1/A2 below.
+- 34 new tests across hooks, the combobox, the form, and the punch-list fixes (144 total, 4 gracefully skipped without a live backend).
+
+### Changed
+- `frontend/src/app/global-error.tsx`: the crash-boundary digest color corrected from the old low-contrast `#898781` (already known-bad per ADR-028/KI-037) to the approved `#6b6963`.
+- `frontend/src/config/env.ts`: the `localhost:8000` development fallback no longer applies when `NODE_ENV === 'production'` — a production build with a missing/invalid `NEXT_PUBLIC_API_BASE_URL` now fails fast at module load instead of silently booting pointed at localhost.
+- `frontend/eslint.config.mjs`: the financial-math guardrail's `files` scope expanded from `src/app/**`/`src/components/**` to also cover `src/hooks/**`, `src/providers/**`, and `src/lib/**`; `src/lib/format/**` added to `ignores` (the one module legitimately allowed to operate on a `DecimalString`'s raw digits, including the comparisons `compareDecimalStrings` is built from).
+- `frontend/src/lib/api/client.ts`: `apiClient` now has a 15s request `timeout`.
+- `frontend/src/lib/api/endpoints/assets.ts`, `frontend/src/hooks/use-asset-search.ts`: `searchAssets`/`getAssetDetail`/`getAssetAvailability` accept an optional `AbortSignal`; `useAssetSearch` forwards TanStack Query's per-query signal automatically, so a stale in-flight asset search is cancelled the moment a newer keystroke supersedes it.
+- `frontend/src/lib/format/decimal-string.ts`: `splitDecimal`/`DecimalParts` exported (previously module-private) so `compare-decimal-string.ts` can reuse the same digit-parsing logic rather than duplicating it.
+- `frontend/src/lib/format/README.md`: the "NOT allowed" list amended to state `compareDecimalStrings` as the one sanctioned ordering exception to "never compare"; the enforcement-mechanism section updated to reflect the guardrail's expanded scope.
+
+### Fixed
+- KI-043: `AssetSearchCombobox`'s internal display text survived the Simulator's "Start a new simulation" reset (the underlying form value was correctly cleared; the combobox's own uncontrolled text was not) — found during this same phase's post-build review, fixed via a `key`-based remount in `SimulationForm`.
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- The production env-fallback fix (`config/env.ts`) closes a real, if narrow, deployment-safety gap: previously, a production build missing `NEXT_PUBLIC_API_BASE_URL` would have silently pointed at `localhost:8000` instead of failing to build — the exact "mysterious runtime network error later" this module's fail-fast design otherwise exists to prevent.
+
+---
+
 ## [0.8.1] — 2026-07-16 — M7 Phase 1.5: Frontend Foundation Hardening
 
 ### Added

@@ -32,10 +32,18 @@ export function normalizeApiError(error: AxiosError): ApiError {
  * withCredentials is required: session tokens are delivered exclusively via
  * httpOnly cookies (Founder Decision 002) — this client never reads or
  * attaches a token itself.
+ *
+ * `timeout` bounds every request, including `POST /api/v1/simulations` —
+ * a real calculation, not just a network round trip, but still not
+ * unbounded (a hung connection should surface as NETWORK_ERROR rather than
+ * leave a caller waiting forever). 15s is generous relative to any request
+ * this API currently serves; revisit if a future endpoint genuinely needs
+ * longer.
  */
 export const apiClient = axios.create({
   baseURL: env.NEXT_PUBLIC_API_BASE_URL,
   withCredentials: true,
+  timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
 });
 

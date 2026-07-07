@@ -46,8 +46,9 @@ export const ERROR_COPY: Record<ApiErrorCode, ErrorCopy> = {
     description: 'We couldn’t find that asset. Try a different symbol.',
   },
   MISSING_HISTORICAL_DATA: {
-    title: 'Historical data unavailable',
-    description: 'This asset doesn’t have price data for the selected date range.',
+    title: 'Historical data unavailable for these dates',
+    description:
+      'Stocks and ETFs often do not have historical price data on weekends or market holidays. Please choose different dates and try again.',
   },
   CALCULATION_ERROR: {
     title: 'Something went wrong',

@@ -260,3 +260,23 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 **Remaining Risks**: KI-039 (High, open, deadline before first staging/demo deployment), KI-042 (Low, open, deliberately deferred pending an authenticated-sharing feature actually being designed). Both are documentation-complete as of this entry, meaning a future reader will not need to rediscover them.
 
 **Threats Deferred**: Unchanged — a full CSRF/XSS review still waits on a real form or AI-rendered content existing to review.
+
+---
+
+## M7 Phase 2 (Increment 1) — Punch-List Fixes + Simulator (2026-07-18)
+
+**Risks Found**: One real, if narrow, deployment-safety gap, plus a routine review of the Simulator — the platform's first real form accepting user input and its first real POST-triggering user flow.
+
+**Severity**: Low — the deployment-safety gap is now fixed, not merely characterized; the Simulator itself introduces no new auth-sensitive surface (asset search and simulation creation are both public per `docs/api_design.md` §2/§4).
+
+**Findings**:
+
+1. **Production env fallback could have silently misconfigured a deployment (fixed, not just found)**: `frontend/src/config/env.ts` previously fell back to `http://localhost:8000` whenever `NEXT_PUBLIC_API_BASE_URL` was unset, in every environment including production. A production build missing that variable would have built successfully and shipped pointed at localhost, failing every API call at runtime with no build-time signal — a "mysterious runtime network error later" of exactly the kind this module's fail-fast design otherwise exists to prevent. Fixed: the fallback now only applies when `NODE_ENV !== 'production'`.
+2. **Simulator input handling reviewed for injection/coercion risk**: the investment-amount field is a text input validated by `simulationCreateSchema`'s existing regex (`^\d+(\.\d{1,8})?$`) and never rendered back as raw HTML; asset symbol and dates flow through the same schema and the typed `AssetSummary`/API-response shapes. No `dangerouslySetInnerHTML` or equivalent is used anywhere in the new Simulator code. Financial figures returned in the success card are formatted exclusively via `src/lib/format` (`formatCurrency`, `formatDateRange`), never parsed to a JS number — verified both by the expanded ESLint guardrail (ADR-033) now covering `hooks/**`/`lib/**` and by manual review.
+3. **`AssetSearchCombobox`'s search input** has no client-side rate limiting of its own beyond the 300ms debounce; the backend's documented 100/min general-read-endpoint limit (`docs/api_design.md`) is the actual control. A `RATE_LIMIT_EXCEEDED` response renders through the same central error-copy table as any other API error — no new gap introduced.
+
+**Mitigations Implemented**: The env-fallback fix (item 1) — a real code change, not a documentation-only finding. Items 2–3 are review findings with no defect requiring a fix.
+
+**Remaining Risks**: KI-016, KI-039, KI-042 — all unaffected by this phase's scope (no deployment configuration or cookie behavior was touched). No new open risk introduced.
+
+**Threats Deferred**: Unchanged — a full CSRF/XSS review still waits on AI-rendered content existing to review; the Simulator introduces a real form but no markdown/HTML rendering of untrusted content.

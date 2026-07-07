@@ -9,6 +9,18 @@
  * rather than baking in today's value), so utilities like `bg-background`
  * or `text-ink-primary` stay correct across the light/dark toggle without
  * needing dark: variants sprinkled through every component.
+ *
+ * Every `--x: var(--x)` line below looks identical to the ADR-028 bug
+ * (a genuinely self-referencing custom property in semantic.css that
+ * silently broke Badge's status colors) — but it is not the same thing.
+ * `@theme inline`'s own left-hand name lives in Tailwind's *theme*
+ * namespace; its right-hand `var(--x)` resolves against the *global*
+ * custom-property cascade, where `semantic.css` already declared a real,
+ * non-self-referencing value for that same name. This is Tailwind v4's
+ * documented bridging mechanism, not a bug — do not "fix" it by renaming
+ * or removing these lines. The actual regression guard (semantic.css
+ * itself must never contain a real self-reference) lives in
+ * `src/__tests__/lib/theme-tokens.test.ts`.
  */
 @theme inline {
   --color-background: var(--color-background);
@@ -47,7 +59,14 @@
 
   /* Three-tier breakpoints matching frontend_design_system.md §12 exactly
      (mobile <640, tablet 640-1024, desktop 1024-1440, wide >=1440) rather
-     than Tailwind's default five-tier scale. */
+     than Tailwind's default five-tier scale. Tailwind v4's built-in theme
+     still contributes --breakpoint-xl (1280px) and --breakpoint-2xl
+     (1536px) even after the three lines below redeclare sm/md/lg, since
+     @theme inline only overrides matching keys — it does not clear the
+     namespace. Reset the whole --breakpoint-* namespace first (ADR-034),
+     then redeclare only the three approved breakpoints, so an unapproved
+     xl:/2xl: utility can never silently exist in this codebase. */
+  --breakpoint-*: initial;
   --breakpoint-sm: 40rem; /* 640px */
   --breakpoint-md: 64rem; /* 1024px */
   --breakpoint-lg: 90rem; /* 1440px */

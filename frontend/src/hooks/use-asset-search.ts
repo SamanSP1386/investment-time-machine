@@ -11,7 +11,11 @@ import { queryKeys } from '@/lib/query/keys';
 export function useAssetSearch(params: SearchAssetsParams, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.assets.search(params),
-    queryFn: () => searchAssets(params),
+    // TanStack Query supplies `signal` to every queryFn automatically —
+    // forwarding it lets a stale in-flight search be aborted the moment a
+    // newer keystroke supersedes it (A6, docs/PROJECT_STATE.md punch list).
+    queryFn: ({ signal }) => searchAssets(params, signal),
+    // eslint-disable-next-line no-restricted-syntax -- query.length is a string length, not a DecimalString comparison (ADR-033).
     enabled: options.enabled ?? params.query.length > 0,
   });
 }

@@ -17,20 +17,22 @@ This is the frontend-specific instance of `.claude/CODING_STANDARDS.md`'s platfo
 - Attach a currency symbol, a percent sign, or an explicit `+`/`−` sign.
 - Render a date or date range in one fixed, locale-independent format.
 - Render an explicit, reason-coded placeholder for a `null` financial field (`formatNullableCurrency`/`formatNullablePercentage`) — never a blank space, never a bare `"0"`.
+- **Order** two `DecimalString` values via the one sanctioned helper, `compareDecimalStrings` (`compare-decimal-string.ts`, ADR-033) — e.g. sorting a table column, or deciding which of two already-fetched values is larger for a badge/icon choice. Comparing is an ordering operation on existing values, not a derivation of a new one, so it is a display/UI concern like rounding or grouping — the one narrow exception to "never compare" below, and it must never be used to compute or imply a new financial figure (a difference, a ratio, etc.).
 
 ## What this module is NOT allowed to do, ever
 
 - Compute a return, CAGR, inflation adjustment, dividend contribution, or any other derived financial metric. If a number isn't already a field the API returned, this module has no business producing it.
-- Combine two `DecimalString` values (add, subtract, multiply, divide, compare) for any reason, including "just for display."
-- Convert a `DecimalString` to a JS `number` at all — no `Number(...)`, `parseFloat(...)`, `parseInt(...)`, or unary `+`. Every function in `decimal-string.ts` operates on the string's characters directly.
+- Combine two `DecimalString` values via arithmetic (add, subtract, multiply, divide) for any reason, including "just for display." Ordering (see `compareDecimalStrings` above) is the one sanctioned exception; arithmetic combination is not.
+- Convert a `DecimalString` to a JS `number` at all — no `Number(...)`, `parseFloat(...)`, `parseInt(...)`, or unary `+`. Every function in `decimal-string.ts` and `compare-decimal-string.ts` operates on the string's characters directly.
+- Compare two `DecimalString` values with a raw `<`/`>`/`<=`/`>=` operator anywhere in `src/app/**`, `src/components/**`, `src/hooks/**`, `src/providers/**`, or `src/lib/**` — a bare relational operator on decimal strings compares lexicographically, which is wrong the moment integer-part lengths differ (`"9" > "10"` as strings). Always go through `compareDecimalStrings`; the ESLint rule in `eslint.config.mjs` (ADR-033) enforces this the same way ADR-029 enforces the `Number()` ban.
 
 ## How this supports "the frontend never calculates financial values"
 
 `.claude/CODING_STANDARDS.md` states the rule; this module is the concrete mechanism that makes it hard to violate by accident:
 
 1. **The `DecimalString` branded type** (`decimal-string.ts`) marks every backend-sourced financial field as "not a plain string" at the type level (see `src/types/api.ts`), so a component can't absent-mindedly pass one through a generic string-formatting helper that might coerce it to a number.
-2. **A lint rule** (`eslint.config.mjs`, ADR-029) bans `Number(`, `parseFloat(`, `parseInt(`, and unary `+` numeric coercion in `src/app/**` and `src/components/**` — the two places product code and UI live — so even a well-intentioned "quick calculation in a component" fails the lint step before it ships, rather than relying on code review alone.
-3. **A static-analysis test** (`src/__tests__/lib/format.test.ts`) scans this module's own source text for the same banned tokens, proving the formatters practice what the lint rule preaches, not just that the rule exists elsewhere.
+2. **A lint rule** (`eslint.config.mjs`, ADR-029/ADR-033) bans `Number(`, `parseFloat(`, `parseInt(`, unary `+` numeric coercion, and bare `<`/`>`/`<=`/`>=` relational comparisons in `src/app/**`, `src/components/**`, `src/hooks/**`, `src/providers/**`, and `src/lib/**` — everywhere product/UI code and shared logic live — so even a well-intentioned "quick calculation (or comparison) in a component" fails the lint step before it ships, rather than relying on code review alone.
+3. **A static-analysis test** (`src/__tests__/lib/format.test.ts`) scans this module's own source text for the same banned coercion tokens, proving the formatters practice what the lint rule preaches, not just that the rule exists elsewhere.
 
 ## Why string-based rounding instead of `Intl.NumberFormat`
 
