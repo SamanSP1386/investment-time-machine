@@ -2,6 +2,14 @@
 
 The canonical, and only sanctioned, place the frontend formats a financial value for display. Every product screen (M7 Phase 2 onward) must import from `src/lib/format` rather than formatting a value inline in a component.
 
+## The wire-format contract, stated plainly
+
+This is the single fact everything else in this document follows from:
+
+> **The API serializes every financial value as a string, specifically so its precision survives the trip to the browser exactly.** The frontend's job is to *format* that string for display. The frontend's job is never to *derive* one — not a return, not CAGR, not a final value, not a share count, not an inflation-adjusted figure, not any other number a human could compute from two or more fields. If a figure isn't already a field the API returned, this codebase has no business displaying it, because it would mean the frontend calculated it. A missing or `null` financial field is rendered as an honest, explicit statement of *why* it's missing (`formatNullableCurrency`/`formatNullablePercentage`, reason-coded `'not_requested'` vs. `'unavailable'`) — never guessed at, never silently shown as zero or blank space.
+
+This is the frontend-specific instance of `.claude/CODING_STANDARDS.md`'s platform-wide rule ("the frontend is presentation-only: it must never calculate returns, CAGR, dividend reinvestment, or inflation adjustment") and of Founder Specification Principle 3/4 (financial truth has exactly one source: the Simulation Engine). Every section below is a mechanism enforcing this one sentence, not a separate rule.
+
 ## What this module IS allowed to do
 
 - Round an already-correct value to a *display* precision (e.g. show `NUMERIC(20,8)` storage precision as 2 decimals for currency).

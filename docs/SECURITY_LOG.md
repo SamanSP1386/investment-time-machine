@@ -241,3 +241,22 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 ### KI-039 (new, opened this review)
 
 `SameSite=Strict` cookies are only sent on requests where the frontend and backend are **the same site** — same registrable domain (eTLD+1), regardless of port. `ADR-018` explicitly assumed "the frontend is same-origin-deployable via Vercel + a custom domain," but `.claude/SYSTEM.md`'s approved infra list (Vercel for frontend, Railway or Render for backend) names no requirement that a *shared, custom parent domain* actually be configured. Vercel's and Railway's/Render's own default subdomains (e.g. `*.vercel.app`, `*.up.railway.app`, `*.onrender.com`) do **not** share a registrable domain with each other — if the platform ships to production on those defaults, `SameSite=Strict` cookies will never be sent cross-site at all, and authentication will silently fail for every user, in a way none of this frontend's or backend's existing tests would catch (both test suites run same-origin/same-host). This is tracked as a known issue, not fixed here, since it is a deployment-configuration requirement, not a code change — full detail in `docs/KNOWN_ISSUES.md` KI-039.
+
+---
+
+## M7 Phase 1.5 Cleanup — Documentation and Deployment Risk Follow-Up (2026-07-17)
+
+**Risks Found**: A follow-up pass re-examined two items from the prior entry: whether KI-039's severity/deadline framing was actually correct, and whether `SameSite=Strict`'s other well-known behavioral quirk — its effect on the very first cross-site-originated navigation, distinct from the cross-site-forever problem KI-039 already covers — had ever been evaluated for this specific product.
+
+**Severity**: Medium — one severity upgrade (KI-039) reflecting that the affected scenario is nearer-term than originally framed, and one new Low-severity, deliberately-accepted tradeoff documented (KI-042) that was previously unstated rather than previously wrong.
+
+**Findings**:
+
+1. **KI-039 upgraded: Medium-High → High**, and its deadline restated as "before the first deployed staging or demo environment," not "before production." The underlying mechanism is unchanged (registrable-domain mismatch means `SameSite=Strict` cookies never attach), but the *first* environment where frontend and backend run on two different hosts is the realistic trigger, and that is a staging/preview deploy, typically well before a production launch decision is made. Full detail: `docs/KNOWN_ISSUES.md` KI-039.
+2. **A second, distinct `SameSite=Strict` consequence, not previously documented (KI-042, new)**: `Strict` also withholds a cookie on the *first* top-level navigation that arrives from a different site (e.g., a link opened from an email or a chat app), even when the destination is the correct site — a real behavioral difference from `SameSite=Lax`. ADR-018's own "Options Considered"/"Tradeoffs" text never discusses `Strict` vs. `Lax` on this point. Assessed against this product's actual features: anonymous shared-simulation links (Founder Decision 002's approved sharing mechanism) are entirely unaffected, since viewing one never requires a cookie. The only realistic affected case — an authenticated user opening their own saved simulation's link from an external referrer — is not a built feature yet (no Simulation History/sharing UI exists in M7 Phase 1/1.5). Judged an acceptable, deliberate tradeoff for now: `Strict`'s stronger CSRF guarantee is worth keeping given the affected feature doesn't exist yet, revisited explicitly (not silently) when it does. Full detail: `docs/KNOWN_ISSUES.md` KI-042.
+
+**Mitigations Implemented**: None required — both findings are risk-characterization and documentation corrections, not code defects. KI-039's underlying cause (no enforced custom-domain requirement) remains open, now with a more accurate deadline; KI-042 is a named, accepted tradeoff, not something this pass fixes.
+
+**Remaining Risks**: KI-039 (High, open, deadline before first staging/demo deployment), KI-042 (Low, open, deliberately deferred pending an authenticated-sharing feature actually being designed). Both are documentation-complete as of this entry, meaning a future reader will not need to rediscover them.
+
+**Threats Deferred**: Unchanged — a full CSRF/XSS review still waits on a real form or AI-rendered content existing to review.

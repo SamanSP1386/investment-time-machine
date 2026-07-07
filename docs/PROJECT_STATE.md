@@ -20,7 +20,7 @@ not history. History lives in the other required documents; this one just points
 
 ## Production Readiness Score
 
-**~5/10 for the platform overall**, unchanged by this phase — still no product-facing frontend surface. One new, real pre-launch item was surfaced: KI-039 (production custom-domain requirement for `SameSite=Strict` cookies to function at all is assumed by ADR-018 but never enforced or verified) — a genuine blocker for a real production launch, tracked, not yet resolved. Still held back primarily by KI-016 (unverified split-consistency assumption) and the still-unbuilt frontend product screens and Deployment milestone.
+**~5/10 for the platform overall**, unchanged by this phase — still no product-facing frontend surface. One new, real deployment-blocking item was surfaced and upgraded to High severity: KI-039 (custom-domain requirement for `SameSite=Strict` cookies to function at all is assumed by ADR-018 but never enforced or verified) — this breaks the first *staging or demo* environment, not only a final production launch, since it triggers the moment frontend and backend run on two different hosts without a shared parent domain. Tracked, not yet resolved. Still held back primarily by KI-016 (unverified split-consistency assumption) and the still-unbuilt frontend product screens and Deployment milestone.
 
 ## Completed Milestones
 
@@ -48,7 +48,7 @@ not history. History lives in the other required documents; this one just points
 
 ## Next Milestone
 
-**M7 Phase 2 — Product Screens**, building on the now-hardened frontend foundation: the Simulator → Results flow first (this platform's core "simulate-and-explain loop"), then Asset Explorer, Simulation History, and Auth screens, per `docs/frontend_design_system.md`'s suggested sequencing. Three prerequisites flagged so far, not yet resolved: (1) `growth_series`/`disclosed_splits` persistence (KI-021/FD-008) should land before or alongside the Results screen specifically, and the Results screen must handle `status !== 'completed'` (nullable fields, `error_message`) as a real, designed case per KI-038; (2) the anonymous-AI rate-limit specifics (FD-009/010) should be confirmed before the AI panel's limit-reached state is designed; (3) KI-039's production custom-domain requirement should be resolved before any production deployment, though it does not block further Phase 2 development work itself. Simulation History and Admin Import (`docs/api_design.md`, gated on auth per KI-023) remain unbuilt and are candidates for a near-term follow-on increment.
+**M7 Phase 2 — Product Screens**, building on the now-hardened frontend foundation: the Simulator → Results flow first (this platform's core "simulate-and-explain loop"), then Asset Explorer, Simulation History, and Auth screens, per `docs/frontend_design_system.md`'s suggested sequencing. Three prerequisites flagged so far, not yet resolved: (1) `growth_series`/`disclosed_splits` persistence (KI-021/FD-008) should land before or alongside the Results screen specifically, and the Results screen must handle `status !== 'completed'` (nullable fields, `error_message`) as a real, designed case per KI-038; (2) the anonymous-AI rate-limit specifics (FD-009/010) should be confirmed before the AI panel's limit-reached state is designed; (3) KI-039's custom-domain requirement must be resolved before the *first deployed staging or demo environment*, not only before production (High severity, upgraded 2026-07-17) — though it does not block further Phase 2 development work itself, which continues locally. Simulation History and Admin Import (`docs/api_design.md`, gated on auth per KI-023) remain unbuilt and are candidates for a near-term follow-on increment.
 
 ## Open Founder Decisions
 
@@ -69,7 +69,7 @@ No ADR is currently in Proposed/Draft state.
 ## Critical Known Issues
 
 - **KI-016 (High, Open)** — Split-consistency assumption underlying `close_price`-based calculation unverified against live data. The single highest-priority open item in the project, unrelated to M6.
-- **KI-039 (Medium-High, Open)** — Production custom-domain requirement for `SameSite=Strict` cookies to function at all (ADR-018's own assumption) is never enforced or verified anywhere — a real, launch-blocking gap if the platform ships on default Vercel/Railway/Render subdomains, found during M7 Phase 1.5.
+- **KI-039 (High, Open)** — Custom-domain requirement for `SameSite=Strict` cookies to function at all (ADR-018's own assumption) is never enforced or verified anywhere — breaks the first *staging/demo* deployment, not only production, if frontend and backend ship on default Vercel/Railway/Render subdomains. Deadline: before the first deployed staging/demo environment. Found during M7 Phase 1.5.
 - **KI-031 (Medium, Open)** — Password reset / account recovery not implemented — deliberately deferred past M5, but a real requirement before any production launch per `.claude/SECURITY_POLICY.md`.
 - **KI-032 (Medium, Open)** — M6's numeric-integrity/advice-language safety checks are heuristic, not exhaustive — the most consequential open item from the Educational AI System milestone.
 - **KI-003 (Medium, Open)** — API Architecture (`.claude/API_STANDARDS.md`) is provisional, pending founder approval.
@@ -89,7 +89,7 @@ Full list (40 entries, most resolved) in `docs/KNOWN_ISSUES.md`.
 - KI-013/014/015 — CoinGecko OHLC fidelity, no ticker→id mapping, no retry/backoff.
 - KI-021 — `growth_series`/`disclosed_splits` not persisted (empty on retrieval-after-creation); a blocking prerequisite for the Results screen per FD-008, not a permanent design-around.
 - KI-025 — `assets.exchange` returns `null` (no schema column yet).
-- KI-039 — Production custom-domain requirement for `SameSite=Strict` cookies, unverified (see Critical Known Issues above).
+- KI-039 — Custom-domain requirement for `SameSite=Strict` cookies, unverified, High severity, deadline before first staging/demo deployment (see Critical Known Issues above).
 - KI-040 — Theme-flash-prevention inline script's future CSP interaction (nonce vs. hash strategy) — deferred design note; no CSP exists yet.
 
 Resolved this phase (kept here briefly for continuity, full detail in `docs/KNOWN_ISSUES.md`): KI-036 (frontend `GrowthSeriesPoint`/`DisclosedSplit` field names were wrong — `point_date`/`split_date`, not `date` — confirmed against the real backend schema and fixed), KI-037 (a shipped WCAG contrast failure and a self-referencing CSS custom property in the status-color tokens, ADR-028), KI-038 (six `SimulationResponse` fields were wrongly typed as always-present instead of nullable, and `error_message` was missing entirely), KI-010 (resolved at M7 Phase 1).

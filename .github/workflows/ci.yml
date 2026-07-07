@@ -49,6 +49,40 @@ jobs:
       - name: Test (pytest)
         run: pytest --maxfail=1
 
+  frontend-lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npx eslint .
+
+      - name: Typecheck (tsc)
+        run: npx tsc --noEmit
+
+      # No backend service runs in this job — the live-schema branch of
+      # api-contract-drift.test.ts skips gracefully (ADR-030's documented
+      # tradeoff: this drift check is a local/manual safety net, not yet a
+      # CI-enforced one, since that would require provisioning a live
+      # backend service here too, KI-041).
+      - name: Test (vitest)
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:
