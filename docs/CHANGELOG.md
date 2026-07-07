@@ -4,6 +4,28 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.7.1] — 2026-07-13 — M7 Phase 0: Design Foundation (Documentation Only)
+
+### Added
+- `docs/BRAND_CONSTITUTION.md` — the authoritative source of truth for Investment Time Machine's visual identity and brand philosophy: brand philosophy/personality, Founder Decisions FD-004 through FD-012 (including new FD-012, "Confidence Without Ego"), visual/typography/color/motion/UX philosophy, writing style guide, a component review checklist, and an explicit "things we never do" list. Consolidates a three-part M7 Phase 0 design review (initial design system, a skill-validated pressure test using the `ui-ux-pro-max`/`design-system` skills, and a brand-identity deep-dive) into one single-authored standard, superseding those reviews' brand-level conclusions. `docs/frontend_design_system.md` remains the implementation-level design system (tokens, component specs, page inventory) and is now explicitly subordinate to this constitution.
+
+### Changed
+- `docs/PROJECT_STATE.md`: version bumped to 0.7.1; M7 Phase 0 marked complete; Next Milestone updated to M7 Phase 1 (design token and shared-primitive implementation only, no pages); FD-004–012 noted under Open Founder Decisions pending formal `FOUNDER_DECISIONS.md` numbering.
+
+### Fixed
+- N/A (no application code changed).
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — no code or infrastructure changed; brand/UX guidance reinforces existing product-level trust commitments (e.g., the AI panel must never visually imply greater authority than the Simulation Engine's calculated output) but introduces no new technical control.
+
+---
+
 ## [0.7.0] — 2026-07-12 — M6: Educational AI System
 
 ### Added

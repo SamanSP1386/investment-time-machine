@@ -421,3 +421,41 @@ One design correction was made during test-writing, before it became a bug: `doc
 **Production Readiness Score**: 6/10 for the Educational AI System specifically — fully tested against the default (`NullProvider`) and a fake-provider success path, structurally safe against every named prohibited behavior, but never verified against a real Anthropic API call (no live key available this session — this is the one meaningful gap before real-world confidence, not a design flaw) and carrying two low-severity, already-precedented residual risks (KI-033, KI-034). Platform-wide production readiness remains gated primarily on KI-016 (carried from M3, still the single highest-priority open item) and the still-unbuilt Frontend/Deployment milestones.
 
 **Recommended Next Milestone**: M7 — Frontend (Next.js), per the approved MVP build order — the Simulation Engine, API, Identity Management, and now the Educational AI System are all stable and tested, satisfying the standing "backend before frontend" rule. Before or alongside M7: verify the Educational AI System against a real Anthropic API key (closing KI-034 and this milestone's one open performance question) — a low-cost verification step, not a redesign.
+
+---
+
+## 2026-07-13 — M7 Phase 0: Design Foundation & Brand Constitution (not a coding milestone)
+
+**Version**: 0.7.1
+
+**Objective**: Before beginning any Next.js/React/Tailwind work, produce the design-review-then-implement precedent's equivalent for the frontend milestone (mirroring M3's design review): pressure-test the initially proposed frontend design system against the platform's own backend truth (`api_design.md`, `simulation_formulas.md`, `KNOWN_ISSUES.md`), validate it against installed frontend/UI/UX design skills, resolve the open brand-identity questions those passes surfaced, and consolidate everything into one authoritative brand/visual-identity document before any frontend code is written.
+
+**Scope**: Documentation only — `docs/BRAND_CONSTITUTION.md` (new), `docs/PROJECT_STATE.md` updated. No `frontend/` directory content, no React components, no Tailwind config, no packages installed. `docs/frontend_design_system.md` (the implementation-level design system produced earlier in this same design-review phase) is unchanged by this pass but is now explicitly subordinate to the new constitution.
+
+**Implementation Summary**: The review ran in three parts. Part one re-validated the originally proposed design system against this project's own backend contracts and installed design skills (`ui-ux-pro-max`, `design-system`), cross-checking chart-type and color choices against those skills' databases — the cross-check mostly validated the existing direction (e.g., a generic "fintech" keyword search in the skill's color/style database defaulted toward glassmorphism and gold/purple, confirming that this brand's Stripe/Linear-style restraint is a deliberate, load-bearing choice rather than a template default) while surfacing a few genuine gaps: no locked brand mark, an unresolved anonymous-AI-access ambiguity, and the growth-chart persistence gap (KI-021) needing to be reclassified from "design around it" to "blocking prerequisite." Part two developed the brand identity itself — personality, keywords, typography/color/motion reasoning, signature details, and a brutally honest recruiter-style critique of the (currently nonexistent) frontend. Part three consolidated all of it into `docs/BRAND_CONSTITUTION.md`, written as a single-authored standard rather than a concatenation of the three passes: overlapping or redundant guidance (e.g., near-duplicate anonymous-AI-access decisions) was merged into one clear statement, the open questions from parts one and two were resolved decisively rather than left as hedges (the wordmark is typographic, not iconographic; the AI palette is a neutral tint plus a label, never a dedicated hue; the time-axis motif's horizontal page-transition is adopted as the product's one standard transition), and nine new Founder Decisions (FD-004 through FD-012, including a new one — FD-012, "Confidence Without Ego" — added during this pass) were recorded in the constitution's §3.
+
+**Files Created**: `docs/BRAND_CONSTITUTION.md`.
+
+**Files Modified**: `docs/PROJECT_STATE.md` (version bump, M7 Phase 0 marked complete, Next Milestone updated to M7 Phase 1, FD-004–012 noted under Open Founder Decisions), `docs/DEVLOG.md` (this entry), `docs/CHANGELOG.md` (0.7.1 entry).
+
+**Architecture Decisions**: None — this pass produced Founder Decisions (brand/product-direction choices), not engineering-implementation decisions; no ADR is warranted until Phase 1 makes an actual implementation choice (e.g., a specific Tailwind token-generation approach) that would need one.
+
+**Problems Encountered**: None — a research, review, and consolidation pass, not implementation. The one genuine judgment call was scoping: FD-004 through FD-012 are fully recorded in `docs/BRAND_CONSTITUTION.md`, but were not also formalized into `docs/FOUNDER_DECISIONS.md`'s own "Founder Decision 00N" numbering convention, since doing so was outside this task's explicitly requested documentation scope (`PROJECT_STATE.md`/`DEVLOG.md`/`CHANGELOG.md` only) — noted as a recommended near-term follow-up rather than done unprompted.
+
+**Solutions**: N/A.
+
+**Lessons Learned**: Cross-checking a self-authored design proposal against an independent, keyword-driven design-recommendation tool produced a genuinely useful negative result — the tool's default "fintech" match (glassmorphism, gold, purple) is close to the exact aesthetic the brief explicitly rejects, which is stronger evidence for the chosen direction's deliberateness than either self-review alone would have produced. Separately: a "brand constitution" produced by literally merging three prior review documents would have read as three different authors' voices stitched together; the useful discipline was resolving each open hedge to a single decisive answer (wordmark, AI palette, page-transition motif) rather than preserving the earlier documents' "needs founder input" framing wherever a defensible answer was already implied by principles already agreed on.
+
+**Security Review Summary**: Not applicable — no code changed.
+
+**Testing Summary**: Not applicable — no code changed.
+
+**Technical Debt Introduced**: None — no new KI. One pre-existing item (KI-021) is reclassified in status/urgency by FD-008 (from an accepted design-around to a blocking prerequisite for the Results screen specifically) but not newly created by this pass.
+
+**Performance Notes**: Not applicable.
+
+**Recruiter Value**: Medium-High — demonstrates the same "validate against source, don't rely on memory" discipline the M3 design review established, applied here to brand/UX rather than financial formulas: an independent tool cross-check that produced a real, citable negative-validation finding; a consolidated, single-voice standard rather than a pile of review notes; and an honest, in-document acknowledgment of a documentation-formalization gap (FD-004–012 not yet mirrored into `FOUNDER_DECISIONS.md`'s numbering) rather than silently leaving it ambiguous.
+
+**Production Readiness Score**: Not applicable — documentation-only pass. Frontend production readiness remains at 0% built (the `frontend/` directory is still empty); this milestone closes out the design-foundation prerequisite for Phase 1, not any implementation progress.
+
+**Next Milestone**: M7 Phase 1 — Design Token & Primitive Implementation (Tailwind/CSS token layer, both themes, and the shared primitive component set only — no page-level work until that checkpoint is reviewed and approved).

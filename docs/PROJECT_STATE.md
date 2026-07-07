@@ -8,11 +8,11 @@ not history. History lives in the other required documents; this one just points
 
 ## Current Version
 
-**0.7.0** (per `docs/CHANGELOG.md` — M6: Educational AI System)
+**0.7.1** (per `docs/CHANGELOG.md` — M7 Phase 0: Design Foundation)
 
 ## Current Milestone
 
-**M6 — Educational AI System: Complete.** Explanation Engine (structured educational explanations for completed simulations) and Financial Tutor (scoped follow-up Q&A) are implemented and tested, behind a `Protocol`-based provider abstraction defaulting to `NullProvider` (Anthropic is the first configured real provider, per Founder Decision 003). Frontend, portfolio simulation, advanced analytics, RAG, and a Historical Event Database are explicitly excluded from this milestone; the Simulation Engine was not modified.
+**M7 Phase 0 — Design Foundation: Complete.** A three-part design review (initial design system, skill-validated pressure test, brand identity deep-dive) produced `docs/BRAND_CONSTITUTION.md` — the authoritative source of truth for the product's visual identity and brand philosophy, approved under Founder Decisions FD-004 through FD-012. `docs/frontend_design_system.md` remains the implementation-level design system (tokens, component specs, page inventory) and is now subordinate to the constitution. No frontend code, React components, or Tailwind exist yet — this milestone is documentation only, per the established design-review-then-implement precedent (M3/M5/M6). M6 (Educational AI System) remains the most recent coding milestone; see its entry below for that summary.
 
 ## Repository Health Score
 
@@ -39,18 +39,20 @@ not history. History lives in the other required documents; this one just points
 | M5 | 0.6.0 | 2026-07-11 | Identity Management (Authentication) |
 | M6 design review | — | 2026-07-04 | Educational AI System design review (approved, Founder Decision 003) |
 | M6 | 0.7.0 | 2026-07-12 | Educational AI System (Explanation Engine + Financial Tutor) |
+| M7 Phase 0 | 0.7.1 | 2026-07-13 | Design Foundation — Brand Constitution (`docs/BRAND_CONSTITUTION.md`, Founder Decisions FD-004–FD-012) |
 
 *(Milestone dates as recorded in `docs/DEVLOG.md`; note these predate the current system date and reflect the project's own internal timeline.)*
 
 ## Next Milestone
 
-**M7 — Frontend (Next.js)**, per the approved MVP build order — the Simulation Engine, API, Identity Management, and Educational AI System are all stable and tested, satisfying the standing "backend before frontend" rule. Simulation History and Admin Import (`docs/api_design.md`, gated on auth per KI-023) remain unbuilt and are candidates for a near-term follow-on increment.
+**M7 Phase 1 — Design Token & Primitive Implementation**, per `docs/BRAND_CONSTITUTION.md`'s closing recommendation — the Simulation Engine, API, Identity Management, and Educational AI System are all stable and tested, satisfying the standing "backend before frontend" rule, and the design foundation (Phase 0) is now approved. Phase 1 implements only the Tailwind/CSS token layer (both themes) and the shared primitive components (Button, Input, Card, StatTile, Badge, EmptyState, ErrorState, Skeleton) against the Brand Constitution's Component Review Checklist — no page (Simulator, Results, Auth, etc.) is built until that checkpoint passes review. Simulation History and Admin Import (`docs/api_design.md`, gated on auth per KI-023) remain unbuilt and are candidates for a near-term follow-on increment.
 
 ## Open Founder Decisions
 
 - **Founder Decision 001** (Approved, 2026-07-08) — Simulation Engine uses `close_price`, not `adjusted_close_price`. Closed.
 - **Founder Decision 002** (Approved, 2026-07-11) — Identity Management: token/cookie/lockout/role/lifecycle model. Closed — implemented in full at M5.
 - **Founder Decision 003** (Approved, 2026-07-12) — Educational AI System: renamed from "AI Analyst," scope (Explanation Engine + Financial Tutor only), provider (Anthropic first, `NullProvider` fallback), privacy allowlist, caching/cost-control rules, and the AI integrity check. Closed — implemented in full at M6.
+- **FD-004 through FD-012** (Approved, 2026-07-13) — visual direction, theme support, M7 scope boundaries, growth-chart persistence precondition, anonymous AI access, and brand-identity philosophy. Recorded in full in `docs/BRAND_CONSTITUTION.md` §3, not yet formalized into this file's own "Founder Decision 00N" numbering — recommended as a near-term documentation follow-up, not a content gap.
 
 No Founder Decisions currently awaiting approval.
 
@@ -93,4 +95,4 @@ None of these are undocumented shortcuts — all tracked per the Technical Debt 
 
 ## Last Updated
 
-2026-07-12 — after M6 (Educational AI System) implementation, testing, AI safety review, red-team review, and documentation.
+2026-07-13 — after M7 Phase 0 (Design Foundation): three-part design review consolidated into `docs/BRAND_CONSTITUTION.md`, the product's authoritative brand/visual-identity standard, approved under Founder Decisions FD-004–FD-012. No application code changed.
