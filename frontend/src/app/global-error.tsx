@@ -1,19 +1,16 @@
 'use client';
 
+import type { RouteErrorBoundaryProps } from '@/lib/next-error-boundary';
+
 /**
  * Root-level crash fallback — must define its own <html>/<body> and
  * intentionally does not import the token system, providers, or any other
  * app code: this is the "everything else failed" boundary, so it must have
  * nothing left to fail. See src/app/error.tsx for the normal, token-driven
- * route-segment boundary.
+ * route-segment boundary. (The type-only import above is erased at compile
+ * time and carries no runtime dependency, unlike a value import.)
  */
-export default function GlobalError({
-  error,
-  unstable_retry,
-}: {
-  error: Error & { digest?: string };
-  unstable_retry: () => void;
-}) {
+export default function GlobalError({ error, unstable_retry }: RouteErrorBoundaryProps) {
   return (
     <html lang="en">
       <body

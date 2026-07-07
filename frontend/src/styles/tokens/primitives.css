@@ -15,7 +15,11 @@
   --color-ink-primary-dark: #ffffff;
   --color-ink-secondary-light: #52514e;
   --color-ink-secondary-dark: #c3c2b7;
-  --color-ink-muted: #898781;
+  /* #898781 (the original single shared value) measures 3.41:1 against
+     --color-paper-light — below WCAG AA's 4.5:1 for normal text. Split
+     light/dark like every other ink token, per ADR-028. */
+  --color-ink-muted-light: #6b6963;
+  --color-ink-muted-dark: #898781;
   --color-hairline-light: rgb(11 11 11 / 10%);
   --color-hairline-dark: rgb(255 255 255 / 10%);
   --color-gridline-light: #e1e0d9;
@@ -35,11 +39,20 @@
   --color-chart-negative-light: #e34948;
   --color-chart-negative-dark: #e66767;
 
-  /* Status — fixed vocabulary, shared by chart annotations and ordinary UI state */
-  --color-status-good: #0ca30c;
-  --color-status-warning: #fab219;
-  --color-status-serious: #ec835a;
-  --color-status-critical: #d03b3b;
+  /* Status — fixed vocabulary, shared by chart annotations and ordinary UI
+     state. Split light/dark, like every other color family: a single
+     shared hex per status (the original design) cannot pass WCAG AA
+     (4.5:1) as text color against BOTH a near-white and a near-black
+     background simultaneously — verified by known-answer test
+     (src/__tests__/lib/contrast.test.ts) and documented in ADR-028. */
+  --color-status-good-light: #0b7d0b;
+  --color-status-good-dark: #0ca30c;
+  --color-status-warning-light: #8a5a00;
+  --color-status-warning-dark: #fab219;
+  --color-status-serious-light: #a8451f;
+  --color-status-serious-dark: #ec835a;
+  --color-status-critical-light: #c23434;
+  --color-status-critical-dark: #e8605f;
 
   /* AI — a warm neutral tint, deliberately NOT a new hue (BRAND_CONSTITUTION.md §7) */
   --color-ai-surface-light: #faf6ee;

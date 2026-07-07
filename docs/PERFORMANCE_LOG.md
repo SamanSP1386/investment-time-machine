@@ -147,3 +147,23 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: `next/font/google` (Inter, JetBrains Mono) self-hosts both fonts at build time rather than fetching from Google Fonts at runtime — eliminates a render-blocking third-party font request by construction, not as a later optimization pass. `React Query`'s `staleTime: 60_000`/`refetchOnWindowFocus: false` defaults (`query-provider.tsx`) avoid refetching Asset/Simulation data more often than this mostly-static, historical-data product actually needs.
 
 **Future Improvements**: Re-measure bundle size and Core Web Vitals once the Simulator → Results flow (the platform's first real page with a data fetch, a form, and a chart) is built in Phase 2 — this phase's placeholder page cannot meaningfully validate the <3s budget.
+
+---
+
+## M7 Phase 1.5 — Frontend Foundation Hardening (2026-07-16)
+
+**API Response Time**: Not applicable — no page calls the backend API yet. The API-contract-drift test does make a real HTTP call to a running backend's `/openapi.json` when one is reachable, but this is a test-time-only cost (skipped entirely when no backend is running), not a product-facing performance concern.
+
+**Database Query Time**: Not applicable.
+
+**Memory Usage**: Not measured.
+
+**Startup Time**: `npm run build` unchanged from M7 Phase 1 (~3-9s). `npm run test`/`test:coverage` grew from ~7s to ~10s total with 61 additional tests — proportionate, no test-suite performance regression identified.
+
+**Bundle size**: No measurable change to the shipped production bundle — every module added this phase (`src/lib/format/`, `src/lib/query/`, `src/lib/next-error-boundary.ts`) is small, dependency-free, pure logic, and `axe-core` (the one new dependency of any real size) is a dev/test-only dependency, never imported by application code that ships to the browser. `/dev/playground` is excluded from the production route entirely (verified: its prerendered static output is the not-found page, not the playground UI), so it adds no shipped weight either.
+
+**Performance Bottlenecks**: None identified. The string-based decimal rounding/grouping in `src/lib/format/decimal-string.ts` is O(n) in the number of digits, negligible for realistic financial figures (tens of digits at most) — not a concern even though it is less optimized than a native numeric operation would be, since correctness (no float precision loss) was the deciding factor, not speed, for a code path that will run at most a few dozen times per page render.
+
+**Optimizations**: None specific to this phase beyond what M7 Phase 1 already established — this phase's additions are correctness/quality infrastructure (formatting, guardrails, conventions, accessibility evidence), not performance-sensitive code paths.
+
+**Future Improvements**: Unchanged from M7 Phase 1 — re-measure bundle size and Core Web Vitals once the Simulator → Results flow is built and there is a real page to measure.

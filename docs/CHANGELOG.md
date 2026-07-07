@@ -4,6 +4,41 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.8.1] — 2026-07-16 — M7 Phase 1.5: Frontend Foundation Hardening
+
+### Added
+- `frontend/src/lib/format/` — the canonical financial-formatting layer: a branded `DecimalString` type, string-only (never `Number()`/`parseFloat()`/`parseInt()`) currency/percentage/date/date-range formatters, and explicit reason-coded nullable formatters (`formatNullableCurrency`/`formatNullablePercentage`) resolving the long-standing dual-meaning-null problem (`docs/frontend_design_system.md` §14 risk 7). Documented contract in `README.md`.
+- `frontend/eslint.config.mjs` — a `no-restricted-syntax` rule banning `Number(`, `parseFloat(`, `parseInt(`, and unary `+` numeric coercion in `src/app/**`/`src/components/**`, enforcing the formatting layer's contract structurally (ADR-029).
+- `frontend/src/lib/query/` — TanStack Query conventions fixed before any product page: a query-key factory (`keys.ts`) and a documented error-handling/invalidation convention (`README.md`), demonstrated end-to-end by `frontend/src/hooks/use-asset-search.ts`, a cross-cutting reference hook (ADR-032).
+- `frontend/src/app/dev/playground/` — a dev-only visual verification surface rendering every primitive component and variant in both themes, guarded by `notFound()` in production (verified against both the actual compiled static output and an automated test).
+- `frontend/src/lib/next-error-boundary.ts` — isolates Next.js's explicitly-unstable `unstable_retry` prop shape behind one shared type (ADR-031).
+- `frontend/src/__tests__/lib/api-contract-drift.test.ts` — fetches the backend's live `/openapi.json` and asserts the field names this frontend depends on are present, skipping gracefully when no backend is reachable (ADR-030).
+- 61 new tests: a known-answer WCAG contrast test, `axe-core` structural accessibility tests for every primitive, keyboard-operability tests, a reduced-motion mechanism check, format-module tests including a static-analysis guardrail, and query-key/hook tests. 103 tests total, 95%+ statement coverage.
+- ADR-028 through ADR-032 (`docs/ARCHITECTURE_DECISIONS.md`).
+
+### Changed
+- `frontend/src/styles/tokens/{primitives,semantic}.css`: split muted-ink and all four status colors into verified light/dark pairs (ADR-028) — the original single-shared-hex design failed WCAG AA (4.5:1) as text color in at least one theme for three of four status colors plus muted-ink, and separately contained a self-referencing CSS custom property that would have silently broken Badge's status-color differentiation.
+- `frontend/src/types/api.ts`: `GrowthSeriesPoint`/`DisclosedSplit`'s date fields corrected to `point_date`/`split_date` (were wrongly guessed as `date`); six `SimulationResponse` fields corrected to nullable (`DecimalString | null`, were wrongly typed as always-present); added the previously-missing `error_message` field. All financial fields now typed `DecimalString`, not `string`. Confirmed against the real backend schema, both by reading source and via a live, running backend (KI-036/KI-038, ADR-030).
+- `docs/frontend_design_system.md` §3: status/muted color table updated to match ADR-028's corrected values.
+- `frontend/next.config.ts`: `turbopack.root` pinned explicitly (unrelated build-warning fix noticed in passing).
+
+### Fixed
+- A shipped WCAG contrast failure and a self-referencing CSS bug in the status-color design tokens (KI-037, ADR-028) — found before any product page consumed them.
+- Real API-contract drift between the frontend's hand-written types and the actual backend response shape (KI-036, KI-038, ADR-030) — found before any product page consumed the affected types.
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- Verified (not changed): `SameSite` is evaluated by registrable site, not port, so local dev cross-port requests correctly carry session cookies; CORS/cookie configuration matches Founder Decision 002/ADR-018 exactly (`docs/SECURITY_LOG.md`'s M7 Phase 1.5 entry).
+- KI-039 added: the production custom-domain requirement `SameSite=Strict` depends on (per ADR-018) is assumed but never enforced or verified anywhere — a real pre-launch blocker if the platform ships on default hosting-provider subdomains.
+- KI-040 added: a forward-looking note on the theme-flash-prevention inline script's future CSP interaction (hash-based allow-listing preferred over nonces, to avoid forcing the app into dynamic rendering) — no CSP exists yet.
+
+---
+
 ## [0.8.0] — 2026-07-15 — M7 Phase 1: Frontend Foundation
 
 ### Added

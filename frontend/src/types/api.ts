@@ -1,10 +1,15 @@
 /**
  * Types mirror docs/api_design.md and backend/app/models/enums.py exactly.
- * Financial figures (investment_amount, prices, CAGR, etc.) stay `string`
- * end-to-end — they are Decimal-serialized by the backend and must never
- * be parsed into a JS number for arithmetic. The frontend only displays
- * what the API returns (`.claude/CODING_STANDARDS.md`: "presentation-only").
+ * Financial figures (investment_amount, prices, CAGR, etc.) are typed
+ * `DecimalString`, not plain `string` — they are Decimal-serialized by the
+ * backend and must never be parsed into a JS number for arithmetic. The
+ * frontend only displays what the API returns
+ * (`.claude/CODING_STANDARDS.md`: "presentation-only"); see
+ * src/lib/format/README.md for the formatting contract and ADR-029 for the
+ * lint-enforced guardrail this branding supports.
  */
+
+import type { DecimalString } from '@/lib/format/decimal-string';
 
 export type AssetType = 'stock' | 'etf' | 'crypto';
 
@@ -76,20 +81,21 @@ export interface AssetSearchResult {
 }
 
 /**
- * Per-point shape is inferred, not directly confirmed by docs/api_design.md
- * (which documents growth_series's presence but not its exact field names) —
- * it is always an empty array in practice today (KI-021). Verify this shape
- * against a real response once FD-008's persistence work lands, before any
- * chart component is built against it.
+ * Field names confirmed directly against `backend/app/api/v1/schemas/simulations.py::GrowthSeriesPoint`
+ * during M7 Phase 1.5's contract-drift review — the point's date field is
+ * `point_date`, not `date` (KI-036, resolved: Phase 1's original guess was
+ * wrong). Still always an empty array in practice today (KI-021 — not yet
+ * persisted between creation and retrieval).
  */
 export interface GrowthSeriesPoint {
-  date: string;
-  value: string;
+  point_date: string;
+  value: DecimalString;
 }
 
+/** Field name confirmed against `backend/app/api/v1/schemas/simulations.py::DisclosedSplit` — `split_date`, not `date`. */
 export interface DisclosedSplit {
-  date: string;
-  split_ratio: string;
+  split_date: string;
+  split_ratio: DecimalString;
 }
 
 export interface SimulationCreateInput {
@@ -101,24 +107,35 @@ export interface SimulationCreateInput {
   adjust_for_inflation: boolean;
 }
 
+/**
+ * Confirmed directly against `backend/app/api/v1/schemas/simulations.py::SimulationResponse`
+ * during M7 Phase 1.5 — six fields M7 Phase 1 had typed as always-present
+ * are actually nullable (`null` for a `pending`/`failed` simulation, which
+ * never completed the calculation), and `error_message` was missing
+ * entirely (KI-038). Any UI reading these fields must handle `status !==
+ * 'completed'` as a real, typed case, not an assumption.
+ */
 export interface SimulationResponse {
   id: string;
   status: SimulationStatus;
   asset_symbol: string;
-  investment_amount: string;
+  investment_amount: DecimalString;
   start_date: string;
   end_date: string;
   include_dividends: boolean;
   adjust_for_inflation: boolean;
-  initial_price: string;
-  final_price: string;
-  shares_purchased: string;
-  final_value: string;
-  total_return_percentage: string;
-  cagr_percentage: string;
-  inflation_adjusted_final_value: string | null;
+  initial_price: DecimalString | null;
+  final_price: DecimalString | null;
+  shares_purchased: DecimalString | null;
+  final_value: DecimalString | null;
+  total_return_percentage: DecimalString | null;
+  cagr_percentage: DecimalString | null;
+  /** null means "not requested" OR "CPI data gap" — see formatNullableCurrency/formatNullablePercentage in src/lib/format. */
+  inflation_adjusted_final_value: DecimalString | null;
   disclosed_splits: DisclosedSplit[];
   /** Empty on GET-after-creation until KI-021/FD-008 land — never assume populated. */
   growth_series: GrowthSeriesPoint[];
+  /** Non-null only when status is 'failed' — the descriptive message docs/api_design.md's MissingHistoricalDataError/CalculationError paths persist. */
+  error_message: string | null;
   created_at: string;
 }

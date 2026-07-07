@@ -38,13 +38,15 @@ Two related but distinct palettes: **UI chrome** (brand, navigation, buttons, su
 
 **Neutrals (shared across UI chrome and chart canvas — deliberately the same tokens, so a chart never looks like a different material than the page around it):**
 
+*Muted's light-mode value was corrected at M7 Phase 1.5 (ADR-028) — the original single shared `#898781` measured 3.41:1 against the light page plane, below WCAG AA's 4.5:1 for text.*
+
 | Role | Light | Dark |
 |---|---|---|
 | Page plane | `#f9f9f7` | `#0d0d0d` |
 | Surface (card/chart) | `#fcfcfb` | `#1a1a19` |
 | Primary ink | `#0b0b0b` | `#ffffff` |
 | Secondary ink | `#52514e` | `#c3c2b7` |
-| Muted (axis/labels/meta) | `#898781` | `#898781` |
+| Muted (axis/labels/meta) | `#6b6963` | `#898781` |
 | Hairline border | `rgba(11,11,11,0.10)` | `rgba(255,255,255,0.10)` |
 | Gridline | `#e1e0d9` | `#2c2c2a` |
 
@@ -62,12 +64,14 @@ Slots 3–8 are reserved for future multi-asset/comparison work, not needed at M
 
 **Status palette (fixed, shared by chart annotations and ordinary UI states — one system, not two):**
 
-| Role | Hex | Use |
-|---|---|---|
-| good | `#0ca30c` | Positive return badges, success toasts |
-| warning | `#fab219` | Rate-limit/soft-warning banners |
-| serious | `#ec835a` | Missing-data / partial-result states |
-| critical | `#d03b3b` | Hard errors, validation failures |
+**Amended at M7 Phase 1.5 (ADR-028):** the single-hex-per-status design below could not pass WCAG AA (4.5:1) as *text* color against both a near-white and a near-black background simultaneously — a real, shipped contrast bug caught during Phase 1.5's accessibility hardening pass (`frontend/src/__tests__/lib/contrast.test.ts`). Each status now has a light-mode and dark-mode text-safe variant, matching how the chart and neutral palettes already worked. The hue identity (green/amber/orange-red/red) is unchanged — only the exact shade shifts per theme for contrast safety.
+
+| Role | Hex (light) | Hex (dark) | Use |
+|---|---|---|---|
+| good | `#0b7d0b` | `#0ca30c` | Positive return badges, success toasts |
+| warning | `#8a5a00` | `#fab219` | Rate-limit/soft-warning banners |
+| serious | `#a8451f` | `#ec835a` | Missing-data / partial-result states |
+| critical | `#c23434` | `#e8605f` | Hard errors, validation failures |
 
 Per the dataviz skill's non-negotiables: status color is never the sole carrier of meaning (icon + label always accompany it), and these four hues are never reused as chart series colors.
 

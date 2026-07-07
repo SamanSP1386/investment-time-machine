@@ -7,6 +7,10 @@
  *   2. prefers-color-scheme: dark, guarded by :not([data-theme="light"]) so
  *      an explicit user override always wins over the OS preference.
  * See src/providers/theme-provider.tsx and BRAND_CONSTITUTION.md §4 (FD-005).
+ *
+ * Every color used as text (ink-*, status-*) is theme-split specifically
+ * so it can pass WCAG AA (4.5:1) against its own theme's background —
+ * see ADR-028 and src/__tests__/lib/contrast.test.ts.
  */
 
 :root {
@@ -14,7 +18,7 @@
   --color-surface: var(--color-surface-light);
   --color-ink-primary: var(--color-ink-primary-light);
   --color-ink-secondary: var(--color-ink-secondary-light);
-  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-muted: var(--color-ink-muted-light);
   --color-border-hairline: var(--color-hairline-light);
   --color-border-gridline: var(--color-gridline-light);
 
@@ -26,10 +30,10 @@
   --color-chart-real: var(--color-chart-real-light);
   --color-chart-negative: var(--color-chart-negative-light);
 
-  --color-status-good: var(--color-status-good);
-  --color-status-warning: var(--color-status-warning);
-  --color-status-serious: var(--color-status-serious);
-  --color-status-critical: var(--color-status-critical);
+  --color-status-good: var(--color-status-good-light);
+  --color-status-warning: var(--color-status-warning-light);
+  --color-status-serious: var(--color-status-serious-light);
+  --color-status-critical: var(--color-status-critical-light);
 
   --color-ai-surface: var(--color-ai-surface-light);
   --color-ai-border: var(--color-ai-border-light);
@@ -41,6 +45,7 @@
     --color-surface: var(--color-surface-dark);
     --color-ink-primary: var(--color-ink-primary-dark);
     --color-ink-secondary: var(--color-ink-secondary-dark);
+    --color-ink-muted: var(--color-ink-muted-dark);
     --color-border-hairline: var(--color-hairline-dark);
     --color-border-gridline: var(--color-gridline-dark);
 
@@ -50,6 +55,11 @@
     --color-chart-portfolio: var(--color-chart-portfolio-dark);
     --color-chart-real: var(--color-chart-real-dark);
     --color-chart-negative: var(--color-chart-negative-dark);
+
+    --color-status-good: var(--color-status-good-dark);
+    --color-status-warning: var(--color-status-warning-dark);
+    --color-status-serious: var(--color-status-serious-dark);
+    --color-status-critical: var(--color-status-critical-dark);
 
     --color-ai-surface: var(--color-ai-surface-dark);
     --color-ai-border: var(--color-ai-border-dark);
@@ -61,6 +71,7 @@
   --color-surface: var(--color-surface-dark);
   --color-ink-primary: var(--color-ink-primary-dark);
   --color-ink-secondary: var(--color-ink-secondary-dark);
+  --color-ink-muted: var(--color-ink-muted-dark);
   --color-border-hairline: var(--color-hairline-dark);
   --color-border-gridline: var(--color-gridline-dark);
 
@@ -70,6 +81,11 @@
   --color-chart-portfolio: var(--color-chart-portfolio-dark);
   --color-chart-real: var(--color-chart-real-dark);
   --color-chart-negative: var(--color-chart-negative-dark);
+
+  --color-status-good: var(--color-status-good-dark);
+  --color-status-warning: var(--color-status-warning-dark);
+  --color-status-serious: var(--color-status-serious-dark);
+  --color-status-critical: var(--color-status-critical-dark);
 
   --color-ai-surface: var(--color-ai-surface-dark);
   --color-ai-border: var(--color-ai-border-dark);
