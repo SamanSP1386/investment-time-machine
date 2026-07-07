@@ -24,4 +24,18 @@ describe('ErrorState', () => {
     render(<ErrorState title="Something went wrong" requestId="req-123" />);
     expect(screen.getByText(/req-123/)).toBeInTheDocument();
   });
+
+  it('collapses request id / error code behind a "Technical details" disclosure, closed by default', () => {
+    render(<ErrorState title="Something went wrong" requestId="req-123" errorCode="INTERNAL_SERVER_ERROR" />);
+    const details = screen.getByText('Technical details').closest('details');
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute('open');
+    expect(screen.getByText(/req-123/)).toBeInTheDocument();
+    expect(screen.getByText(/INTERNAL_SERVER_ERROR/)).toBeInTheDocument();
+  });
+
+  it('renders no disclosure at all when neither request id nor error code is provided', () => {
+    render(<ErrorState title="Something went wrong" />);
+    expect(screen.queryByText('Technical details')).not.toBeInTheDocument();
+  });
 });

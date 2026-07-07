@@ -231,3 +231,19 @@ Also note (Docker/session-specific, not a repeated M1–M5 KI-001 environmental 
 **Failed Tests**: 0 at final verification (141/145 passing, 4 gracefully skipped without a live backend). No new issues surfaced — both test changes (the updated assertion and the new guidance-text test) passed on the first run once written against the actual rendered copy.
 
 **Fixes Applied**: None needed. `npx eslint .` and `npx tsc --noEmit` both pass with zero errors; `npm run build` succeeds, `/simulator` still prerenders as static content.
+
+---
+
+## M7 Phase 2 Final Polish & Closure (2026-07-18)
+
+**Unit Tests**: 2 new — `ErrorState`'s "Technical details" disclosure (collapsed by default, contains both `requestId` and the new `errorCode` when provided) and its complementary case (no disclosure rendered at all when neither is provided).
+
+**Integration Tests**: 3 new in `simulation-form.test.tsx` — the asset information panel (absent before selection, present with symbol/name/type after, sourced only from already-fetched data), the same technical-details collapse behavior exercised through the real `SimulationForm` error path, and the updated success-state copy assertion. 1 new file, `simulator-page.test.tsx` — confirms the page heading and all four trust-indicator labels render, with `SimulationForm` mocked out (a page-level smoke test, not a re-test of the form's own already-covered behavior).
+
+**Accessibility Tests**: No new dedicated test — `ErrorState`'s disclosure reuses the same native `<details>`/`<summary>` pattern already established (and tested) for `StatTile`'s source disclosure; the trust-indicator list is a plain `<ul>` with an `aria-label`, verified present via its accessible role/name in the new page test.
+
+**Coverage**: 93.58% statements / 81.68% branches / 92.7% functions / 95.75% lines (`npm run test:coverage`) — essentially flat against the prior entry (93.56%/81.6%/92.7%/95.74%), consistent with a copy/structure-only pass.
+
+**Failed Tests**: 0 at final verification (149/150 passing, 1 gracefully skipped — a live backend was reachable this session, so most of the usually-skipped API-contract-drift assertions actually ran and passed). One test-authoring issue was caught and fixed before it became a false failure: an assertion checked for the CSS-`uppercase`-rendered text (`'STOCK'`) rather than the actual DOM text node (`'stock'`) — `text-transform` is presentation-only and does not change `textContent`, which jsdom-based queries read directly.
+
+**Fixes Applied**: The one item above. `npx eslint .` and `npx tsc --noEmit` both pass with zero errors; `npm run build` succeeds. Manually verified against the live local backend: asset search, availability, and simulation creation all still function exactly as before; the live-rendered `/simulator` HTML was fetched and inspected directly to confirm the new copy/panels/indicators are actually present in served output, not just in the test DOM.

@@ -152,6 +152,33 @@ describe('SimulationForm', () => {
     expect(screen.getByText(/never moves your dates automatically/)).toBeInTheDocument();
   });
 
+  it('shows no asset information panel before an asset is selected, then shows one using only already-fetched data', async () => {
+    const user = userEvent.setup();
+    render(<SimulationForm />);
+
+    expect(screen.queryByText('Asset information')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Select AAPL' }));
+
+    expect(screen.getByText('Asset information')).toBeInTheDocument();
+    expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
+    expect(screen.getByText('AAPL')).toBeInTheDocument();
+    // The "uppercase" styling is a CSS text-transform (visual only) — the
+    // underlying text node is still the raw lowercase asset_type value.
+    expect(screen.getByText('stock')).toBeInTheDocument();
+  });
+
+  it('collapses the request ID / error code behind a "Technical details" disclosure, not always-visible', () => {
+    mutationState.error = new ApiError({ code: 'MISSING_HISTORICAL_DATA', message: 'internal', request_id: 'req-42' });
+    render(<SimulationForm />);
+
+    const details = screen.getByText('Technical details').closest('details');
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute('open');
+    expect(screen.getByText('req-42', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('MISSING_HISTORICAL_DATA', { exact: false })).toBeInTheDocument();
+  });
+
   it('renders a calm inline success card with the echoed inputs, no navigation', async () => {
     mutationState.isSuccess = true;
     mutationState.data = {
@@ -178,7 +205,10 @@ describe('SimulationForm', () => {
 
     render(<SimulationForm />);
 
-    expect(screen.getByText('Simulation created')).toBeInTheDocument();
+    expect(screen.getByText('Simulation complete')).toBeInTheDocument();
+    expect(
+      screen.getByText('Your historical investment simulation has been successfully created and recorded.')
+    ).toBeInTheDocument();
     expect(screen.getByText('sim-123')).toBeInTheDocument();
     expect(screen.getByText('completed')).toBeInTheDocument();
     const startNewButton = screen.getByRole('button', { name: 'Start a new simulation' });

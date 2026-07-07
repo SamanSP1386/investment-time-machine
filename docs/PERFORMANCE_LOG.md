@@ -203,3 +203,19 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: None applicable this pass.
 
 **Future Improvements**: Unchanged from the prior entry.
+
+---
+
+## M7 Phase 2 Final Polish & Closure (2026-07-18)
+
+**API Response Time / Database Query Time / Memory Usage**: Not applicable — no backend change, and the asset information panel/trust indicators render exclusively from data already fetched for the form (no new request added).
+
+**Startup Time**: `npm run build` unchanged; `npm run test:coverage` (150 tests) comparable to the prior entry.
+
+**Bundle size**: No measurable change — one new icon import (`Check` from the already-installed `lucide-react`), a small amount of additional static JSX/copy, and a `<details>` element replacing a `<p>` in `ErrorState` (net-neutral).
+
+**Performance Bottlenecks**: None — no new logic, computation, or network call.
+
+**Optimizations**: None applicable this pass.
+
+**Future Improvements**: Unchanged from the prior entry.

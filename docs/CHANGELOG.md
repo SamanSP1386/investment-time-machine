@@ -4,6 +4,32 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.9.3] — 2026-07-18 — M7 Phase 2 Final Polish & Closure
+
+### Added
+- **Asset information panel** (`SimulationForm`): once an asset is selected, a compact panel shows symbol, name, asset type, and the historical data availability range — every field sourced from data already fetched for the form (the search result itself, plus the existing availability query), nothing new requested and nothing calculated. `exchange` deliberately omitted (not part of `AssetSummary`, and always `null` today per KI-025 — not worth a second request for a field with no value to show).
+- **Trust indicators** (`/simulator` page heading): four understated, factual labels — "Deterministic simulation," "Historical market data," "No predictions," "Educational platform" — rendered as plain muted text with a small check icon, explicitly not `Badge` (which is colored from the status palette and would read as a marketing claim, not a calm restatement of fact).
+- **"Technical details" progressive disclosure** (`ErrorState`, a shared primitive used by the Simulator, the route-level error boundary, and the dev playground): a new `errorCode` prop; Request ID and error code are now collapsed behind a closed-by-default `<details>`/`<summary>` disclosure rather than an always-visible line — the same native, zero-JS pattern `StatTile`'s source disclosure already established. Nothing was removed, only made progressive.
+- 8 new/updated tests covering the asset information panel, the collapsed technical-details disclosure (on both `ErrorState` directly and through `SimulationForm`), and the trust indicators.
+
+### Changed
+- Success state copy (`SimulationForm`): "Simulation created" → **"Simulation complete"**; description → "Your historical investment simulation has been successfully created and recorded." — calmer, no change in what information is shown, no celebratory language added (`docs/BRAND_CONSTITUTION.md` §2/§10).
+- `selectedAsset`'s `asset_type` in the new panel renders via the same `uppercase` CSS convention `AssetSearchCombobox` already uses for the identical field, for visual consistency between the two.
+
+### Fixed
+- N/A.
+
+### Removed
+- N/A — Request ID/error code are still shown, only behind progressive disclosure rather than always visible.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — pure UI/copy changes; `ErrorState`'s new `errorCode` prop surfaces the same `ApiErrorCode` value already present on every thrown `ApiError`, not new information.
+
+---
+
 ## [0.9.2] — 2026-07-18 — M7 Phase 2 Final UX Polish: Trading-Day Guidance + Educational Error Copy
 
 ### Added

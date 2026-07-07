@@ -1,10 +1,25 @@
 import type { Metadata } from 'next';
+import { Check } from 'lucide-react';
 import { SimulationForm } from '@/components/simulator/simulation-form';
 
 export const metadata: Metadata = {
   title: 'Simulator — Investment Time Machine',
   description: 'Simulate a historical investment decision against real historical market data.',
 };
+
+/**
+ * Understated, factual — never a marketing badge (BRAND_CONSTITUTION §7's
+ * "AI misuse" rule extends naturally here: no saturated color, no
+ * celebratory styling, plain sentence-case text per §10). Not a claim about
+ * a feature the page doesn't have; each restates something already true of
+ * the Simulation Engine and this screen specifically.
+ */
+const TRUST_INDICATORS = [
+  'Deterministic simulation',
+  'Historical market data',
+  'No predictions',
+  'Educational platform',
+];
 
 /**
  * The Simulator — a decision screen, generously spaced (BRAND_CONSTITUTION
@@ -23,6 +38,14 @@ export default function SimulatorPage() {
           Choose an asset, an amount, and a date range. Every result comes directly from the Simulation Engine — this
           page never estimates or calculates on its own.
         </p>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-ink-muted" aria-label="Platform principles">
+          {TRUST_INDICATORS.map((label) => (
+            <li key={label} className="flex items-center gap-1.5">
+              <Check aria-hidden className="h-3 w-3" />
+              {label}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <SimulationForm />

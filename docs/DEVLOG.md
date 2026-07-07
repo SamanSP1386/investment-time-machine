@@ -741,3 +741,41 @@ Eight primitive components (`src/components/ui/`) were built and reviewed agains
 **Next Milestone**: M7 Phase 2 is now considered complete and ready for founder review (pending sign-off) — see `docs/MILESTONE_REPORTS/M7_PHASE_2_REPORT.md`. **M7 Phase 3 — Results Experience** is queued next but explicitly not started per direct instruction; awaiting founder approval before continuing.
 
 ---
+
+## 2026-07-18 — M7 Phase 2 Final Polish & Closure
+
+**Version**: 0.9.3
+
+**Objective**: The final pass before M7 Phase 2 is permanently closed — make the Simulator feel complete while preserving its current architecture exactly. Explicitly not a redesign, not a new feature, not the start of M7 Phase 3: polish, UX, and documentation only.
+
+**Scope**: `frontend/src/components/ui/error-state.tsx` (new `errorCode` prop, Request ID/error code moved behind progressive disclosure), `frontend/src/components/simulator/simulation-form.tsx` (success copy, asset information panel, `errorCode` threaded through), `frontend/src/app/simulator/page.tsx` (trust indicators), plus corresponding tests. Trading-day guidance text (added in the prior pass) was reviewed against the three required points and found to already state all of them — left unchanged rather than churned for its own sake. No backend change, no new fetch, no new calculation, no architectural change.
+
+**Implementation Summary**: (1) **Technical details disclosure**: `ErrorState` — a shared primitive already used by the Simulator's error rendering, the route-level `error.tsx` boundary, and the dev playground — gained an `errorCode` prop, and its Request ID/error-code rendering moved from an always-visible line to a closed-by-default `<details>`/`<summary>` ("Technical details"), the same native, zero-JS pattern `StatTile`'s own source disclosure already established at Phase 1. Updating the shared component (rather than a one-off variant inside `SimulationForm`) means `error.tsx`'s crash boundary gets the same improvement for free. (2) **Trading-day guidance**: reviewed the existing wording one final time against the three required points (weekends/holidays may lack price data; dates are never moved automatically; historical accuracy matters more than convenience) — confirmed all three are already present and the tone is calm and educational; left unchanged. (3) **Success state wording**: "Simulation created" → "Simulation complete," description reworded to "Your historical investment simulation has been successfully created and recorded." — the same information, a calmer register, no celebratory language anywhere. (4) **Asset information panel**: added directly beneath the asset combobox, rendering symbol/name/asset-type from the already-selected `AssetSummary` plus the historical-availability range from the already-fetched `useAssetAvailability` query — zero new network requests. `exchange` was deliberately left out: `AssetSummary` doesn't carry it, and per KI-025 the field is always `null` today regardless, so a second `GET /assets/{symbol}` call just to render nothing would violate the explicit "do not fetch additional data" instruction for no benefit. (5) **Trust indicators**: added a small, muted, check-prefixed list ("Deterministic simulation," "Historical market data," "No predictions," "Educational platform") near the page heading in `simulator/page.tsx` — deliberately plain text, not `Badge` (whose colored, bordered treatment is reserved for real state per `docs/BRAND_CONSTITUTION.md` §7, and would read as a marketing claim here, exactly what the instruction warned against). Sentence case throughout, per the constitution's own writing-style rule, even though the instruction's example text used title case.
+
+**Files Created**: `frontend/src/__tests__/app/simulator-page.test.tsx`.
+
+**Files Modified**: `frontend/src/components/ui/error-state.tsx`, `frontend/src/components/simulator/simulation-form.tsx`, `frontend/src/app/simulator/page.tsx`, `frontend/src/__tests__/components/{simulation-form,states}.test.tsx`.
+
+**Architecture Decisions**: None — every change routes through an existing mechanism (the shared `ErrorState` primitive's own disclosure pattern, data already fetched by existing hooks, the existing `ERROR_COPY`/copy conventions). No new pattern, dependency, or data flow was introduced.
+
+**Problems Encountered**: (1) A test asserting the asset-type field's rendered text as `'STOCK'` (uppercase) failed — `uppercase` is a CSS `text-transform`, which changes visual rendering only; the underlying DOM text node is still the raw lowercase value (`'stock'`), and jsdom's `textContent`-based queries see the unstyled text. (2) No other issues — small, well-scoped changes, each verified individually before moving to the next.
+
+**Solutions**: (1) Corrected the test assertion to check for the actual lowercase text node (`'stock'`) rather than the CSS-rendered appearance, with a comment explaining why — the same category of "test the actual DOM, not the visual" lesson, applied here rather than to a self-matching-regex trap this time.
+
+**Lessons Learned**: Improving a shared primitive (`ErrorState`) rather than special-casing the improvement inside the one screen that prompted it (`SimulationForm`) meant the fix reached every consumer — the route-level crash boundary and the dev playground both got calmer, less-cluttered error presentation for free, from the same change. This is the same "fix it at the layer that owns the behavior" instinct this project has applied consistently since the backend's Provider Layer/orchestrator split — a screen-specific fix would have been faster to write but would have left the other two call sites with the old, always-visible treatment, a real inconsistency a future contributor would have had to notice and fix separately.
+
+**Security Review Summary**: Not applicable — pure UI copy/structure changes. `ErrorState`'s new `errorCode` prop surfaces the same `ApiErrorCode` value already present on every thrown `ApiError` object; no new information is exposed, only rendered.
+
+**Testing Summary**: 8 new/updated tests (150 total, 149 passing, 1 gracefully skipped — the live-backend-dependent API-contract-drift assertions ran against the actually-running local backend this session, so only the one test whose specific condition wasn't met was skipped, not the usual four). Coverage: 93.58% statements / 81.68% branches / 92.7% functions / 95.75% lines. `npx eslint .` and `npx tsc --noEmit` both pass with zero errors; `npm run build` succeeds, `/simulator` still prerenders as static content. Manually verified against the live local stack (already running from the prior session): `GET /api/v1/assets?query=AAPL`, `GET /api/v1/assets/AAPL/availability`, and `POST /api/v1/simulations` all still succeed exactly as before; fetched the live `/simulator` page and confirmed the new trust-indicator and trading-day-guidance text render in the actual served HTML.
+
+**Technical Debt Introduced**: None.
+
+**Performance Notes**: Not applicable — a shared component's rendering changed (moving already-present text behind a `<details>`, not adding new data), plus a small amount of new static copy (the asset panel, the trust-indicator list). No new dependency, no new network call, no measurable bundle-size change.
+
+**Recruiter Value**: Medium-High. A clean, complete example of "polish without redesign" — every addition (the asset panel, the trust indicators, the technical-details disclosure) is built entirely from data and patterns that already existed, several instructed constraints ("do not fetch additional data," "do not calculate anything," "no bright badges") were followed to the letter rather than loosely interpreted, and the one improvement made was deliberately applied at the shared-component layer so every consumer benefited, not just the screen that prompted it.
+
+**Production Readiness Score**: Unchanged (~5/10 platform-wide) — a UX-polish pass on an already-built, already-reviewed screen.
+
+**Next Milestone**: M7 Phase 2 is now **permanently closed** from an implementation standpoint — see the updated `docs/MILESTONE_REPORTS/M7_PHASE_2_REPORT.md`. **M7 Phase 3 — Results Experience** remains queued but explicitly not started; awaiting founder approval before continuing.
+
+---

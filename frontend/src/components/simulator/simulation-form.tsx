@@ -87,8 +87,10 @@ export function SimulationForm() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Simulation created</CardTitle>
-          <CardDescription>Your historical investment simulation has been recorded.</CardDescription>
+          <CardTitle>Simulation complete</CardTitle>
+          <CardDescription>
+            Your historical investment simulation has been successfully created and recorded.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -154,6 +156,47 @@ export function SimulationForm() {
               />
             )}
           />
+
+          {/*
+           * Asset information panel — reinforces trust/transparency by
+           * showing exactly what the platform already knows about the
+           * selected asset before the user commits to an amount or date
+           * range. Every field here is data already in hand (the search
+           * result itself, plus the availability query already fetched for
+           * the date-range clamp below) — nothing new is fetched, and
+           * nothing here is calculated (frontend_design_system.md §13/
+           * BRAND_CONSTITUTION §9's "every number carries a legible
+           * source"). `exchange` is deliberately omitted: AssetSummary
+           * doesn't carry it, and fetching AssetDetail just for a field
+           * that's always null today (KI-025) isn't worth a second request.
+           */}
+          {selectedAsset ? (
+            <div className="rounded-[var(--card-radius)] border border-border-hairline bg-background p-4">
+              <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">Asset information</p>
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-ink-muted">Symbol</dt>
+                  <dd className="figure font-mono text-ink-primary">{selectedAsset.symbol}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-muted">Name</dt>
+                  <dd className="text-ink-primary">{selectedAsset.name}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-ink-muted">Type</dt>
+                  <dd className="text-ink-primary uppercase">{selectedAsset.asset_type}</dd>
+                </div>
+                {availability ? (
+                  <div className="col-span-2 sm:col-span-3">
+                    <dt className="text-xs text-ink-muted">Historical data available</dt>
+                    <dd className="figure text-ink-primary">
+                      {formatDateRange(availability.earliest_date, availability.latest_date)}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+          ) : null}
 
           <Input
             label="Investment amount (USD)"
@@ -235,6 +278,7 @@ export function SimulationForm() {
               title={errorCopy.title}
               description={errorCopy.description}
               requestId={apiError instanceof ApiError ? apiError.requestId : undefined}
+              errorCode={apiError instanceof ApiError ? apiError.code : undefined}
             />
           ) : null}
 
