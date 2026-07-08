@@ -1,6 +1,6 @@
 # Experience Constitution — Investment Time Machine
 
-**Status: PROPOSED — pending Founder Decision 013.** This is the highest-level UX and interaction reference for the product: not a UI specification, not an animation specification, not a design system — the philosophy that governs how a person *experiences* Investment Time Machine, one level above both. It answers exactly one question, for every future interaction decision: **how should this feel to use?**
+**Status: APPROVED — Founder Decision 013 (2026-07-19), see `docs/FOUNDER_DECISIONS.md`.** This is the highest-level UX and interaction reference for the product: not a UI specification, not an animation specification, not a design system — the philosophy that governs how a person *experiences* Investment Time Machine, one level above both. It answers exactly one question, for every future interaction decision: **how should this feel to use?**
 
 **Relationship to the documents beneath it**: `docs/BRAND_CONSTITUTION.md` governs how the product *looks* (visual identity, color, typography, iconography) and remains the authoritative source for those decisions. `docs/frontend_design_system.md` governs how the product is *built* (tokens, component specs, page inventory). This document sits upstream of both — where a future visual or implementation choice would require relaxing a principle stated here, that is a signal the choice needs to change, not this document. It does not restate detail already settled in those two documents (an exact color hex, an exact spacing value, an exact component prop) — it states the philosophy that detail must obey, the same relationship the Brand Constitution already holds toward the Design System, one level further up.
 
@@ -125,9 +125,9 @@ This document is written to hold as the product grows past M7 — a Results scre
 
 ---
 
-## Founder Decision Proposal — FD-013: Experience Philosophy
+## Founder Decision 013: Experience Philosophy — Approved
 
-*Prepared for founder review. Not yet approved. `docs/FOUNDER_DECISIONS.md` has not been modified — this section is the complete proposal, ready to be formalized into that document's own numbering exactly as Founder Decision 004 was, once approved, following the same precedent `docs/BRAND_CONSTITUTION.md` §3 set for FD-004 through FD-012.*
+*Approved 2026-07-19, formalized in `docs/FOUNDER_DECISIONS.md` in full. The text below is retained verbatim as the original proposal record; the authoritative decision entry is in `docs/FOUNDER_DECISIONS.md`.*
 
 - **Context**: M7 Phase 0 through Phase 2 established what the product looks like (`docs/BRAND_CONSTITUTION.md`) and how its first screen was built (`docs/frontend_design_system.md`, the shipped Simulator). Neither document, by design, states the interaction-level philosophy that should govern every *future* screen's feel — loading states, transitions, disclosure patterns, error tone — leaving that judgment to be re-derived per screen rather than stated once, authoritatively, above both existing documents.
 - **Decision**: The founder approves `docs/EXPERIENCE_CONSTITUTION.md` as the product's highest-level UX and interaction philosophy, upstream of `docs/BRAND_CONSTITUTION.md` (visual identity) and `docs/frontend_design_system.md` (implementation), governing every future interaction decision. Specifically approves:

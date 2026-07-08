@@ -133,8 +133,10 @@ export interface SimulationResponse {
   /** null means "not requested" OR "CPI data gap" — see formatNullableCurrency/formatNullablePercentage in src/lib/format. */
   inflation_adjusted_final_value: DecimalString | null;
   disclosed_splits: DisclosedSplit[];
-  /** Empty on GET-after-creation until KI-021/FD-008 land — never assume populated. */
+  /** Empty on GET-after-creation until KI-021/FD-014 land — never assume populated. */
   growth_series: GrowthSeriesPoint[];
+  /** Exposed as of M7 Phase 3B (Founder Decision 014) — identical on POST and GET. */
+  calculation_version: string;
   /** Non-null only when status is 'failed' — the descriptive message docs/api_design.md's MissingHistoricalDataError/CalculationError paths persist. */
   error_message: string | null;
   created_at: string;

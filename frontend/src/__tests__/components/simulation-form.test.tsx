@@ -199,6 +199,7 @@ describe('SimulationForm', () => {
       inflation_adjusted_final_value: null,
       disclosed_splits: [],
       growth_series: [],
+      calculation_version: 'v1',
       error_message: null,
       created_at: '2026-07-18T00:00:00Z',
     };

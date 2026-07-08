@@ -26,7 +26,17 @@ export function createSimulation(input: SimulationCreateInput): Promise<Simulati
   return apiRequest<SimulationResponse>({ method: 'POST', url: '/api/v1/simulations', data: input });
 }
 
-/** GET /api/v1/simulations/{id} — docs/api_design.md §5. growth_series/disclosed_splits may be empty (KI-021/FD-008). */
-export function getSimulation(id: string): Promise<SimulationResponse> {
-  return apiRequest<SimulationResponse>({ method: 'GET', url: `/api/v1/simulations/${encodeURIComponent(id)}` });
+/**
+ * GET /api/v1/simulations/{id} — docs/api_design.md §5. growth_series/
+ * disclosed_splits may be empty (KI-021/FD-008, approved for full
+ * resolution by Founder Decision 014 but not yet implemented — the Results
+ * screen must not assume either is populated). `signal` is threaded through
+ * to match the other GET endpoints' cancellation convention (src/lib/api/endpoints/assets.ts).
+ */
+export function getSimulation(id: string, signal?: AbortSignal): Promise<SimulationResponse> {
+  return apiRequest<SimulationResponse>({
+    method: 'GET',
+    url: `/api/v1/simulations/${encodeURIComponent(id)}`,
+    signal,
+  });
 }

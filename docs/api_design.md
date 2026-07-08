@@ -106,11 +106,13 @@
       "cagr_percentage": "9.596872",
       "inflation_adjusted_final_value": null,
       "disclosed_splits": [],
+      "calculation_version": "v1",
       "created_at": "2026-07-10T12:00:00Z"
     }
   }
   ```
-- **Growth chart data — implemented (2026-07-10).** `disclosed_splits`/`growth_series` are both present in the response above once populated by the Simulation Engine's `calculate_growth_series` (extended in M4, per the founder-approved decision to keep this calculation in the engine, not the API layer). **Retrieval-path gap**: since neither is persisted (no `simulations` columns exist for them), a subsequent `GET /api/v1/simulations/{id}` returns both as empty lists — tracked at KI-021, the founder's own approved fallback for exactly this case.
+- **Growth chart data — implemented (2026-07-10).** `disclosed_splits`/`growth_series` are both present in the response above once populated by the Simulation Engine's `calculate_growth_series` (extended in M4, per the founder-approved decision to keep this calculation in the engine, not the API layer). **Retrieval-path gap**: since neither is persisted (no `simulations` columns exist for them), a subsequent `GET /api/v1/simulations/{id}` returns both as empty lists — tracked at KI-021, the founder's own approved fallback for exactly this case, approved for full resolution by Founder Decision 014 (implementation scheduled, not yet built as of M7 Phase 3B).
+- **`calculation_version` — exposed (M7 Phase 3B, Founder Decision 014).** Was already stored on every `Simulation` row from the first migration (`app.models.simulation`) but not surfaced on `SimulationResponse` until now; a pure additive field, present on both `POST` and `GET` responses identically. Lets the Results screen's technical-details disclosure show which calculation model produced a given result.
 - Error responses map 1:1 to `app.simulation.exceptions`: `ASSET_NOT_FOUND` (404), `INVALID_DATE_RANGE` (422), `INVALID_INVESTMENT_AMOUNT` (422), `MISSING_HISTORICAL_DATA` (422, includes the persisted failed `Simulation`'s `id` in the error response so the user/support can reference it), `CALCULATION_ERROR` (500, generic message only). Implemented in `app/api/v1/exception_handlers.py`.
 - Rate limit: 60/min (Part 2.8.13, "Simulation Endpoints"). Implemented via `app/core/rate_limit.py` (Redis-backed fixed window, fails open on Redis outage).
 - **Audit — implemented (KI-026, 2026-07-10 follow-up fix).** `app/api/v1/audit.py::record_simulation_audit`, called from `simulation_service.create_simulation`, writes an `audit_logs` row for every request, success or failure — plus a second function for the one case that never reaches the service layer at all (a Pydantic-level request validation failure). See KI-026's resolution for the one deliberate deviation from this note's literal text (no new `SIMULATION_FAILED` enum value).
@@ -121,7 +123,7 @@
 **`GET /api/v1/simulations/{id}`**
 - Purpose: retrieve a previously-run simulation (Founder Specification 2.6.24's reproducibility policy, Results screen revisits, Part 3.2.11).
 - Auth: conditional — if the stored simulation's `user_id` is `NULL` (anonymous), public read access is allowed; if `user_id` is set, only that authenticated user (or a future admin role) may read it (`FORBIDDEN` 403 otherwise). This access rule is an inference from Part 2.8.6 ("Standard User: View own history"), not an explicit spec mandate — flagged for confirmation. **Implemented (2026-07-10)**: `app/api/v1/services/simulation_service.py::get_simulation_by_id` enforces this exactly; since M4 has no authentication, `requesting_user_id` is always `None`, so in practice any simulation with a non-null `user_id` is forbidden to every caller today — the correct fail-closed default until M5 introduces real auth.
-- Response: same shape as the `POST` response above, except `disclosed_splits`/`growth_series` are always empty (KI-021 — neither is persisted).
+- Response: same shape as the `POST` response above, including `calculation_version` (M7 Phase 3B), except `disclosed_splits`/`growth_series` are always empty (KI-021 — neither is persisted; approved for full resolution by Founder Decision 014, not yet implemented).
 - Error: no such `id` → `SIMULATION_NOT_FOUND` (404).
 
 **`GET /api/v1/simulations`** *(Simulation History — Founder Specification 3.3.10)*

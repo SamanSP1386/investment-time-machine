@@ -4,6 +4,39 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.10.0] — 2026-07-19 — M7 Phase 3B: Founder Decisions + Results Foundation
+
+### Added
+- **`/simulation/[id]`** — the frontend's first dynamic route, the Results screen's foundation (no growth chart, AI panel, or methodology section yet, per explicit scope). Server component shell (`frontend/src/app/simulation/[id]/page.tsx`) + one client boundary (`SimulationResultClient`), mirroring the Simulator's page/client split.
+- `useSimulation(id)` React Query hook (`frontend/src/hooks/use-simulation.ts`), wrapping the pre-existing but previously-unwired `getSimulation` endpoint function.
+- Status-aware rendering for all three `SimulationStatus` values: `completed` (hero `StatTile`s for Final Value/Total Return/CAGR, each with a `source` formula string), `pending` (a calm processing card with a manual "Check again" refetch action), `failed` (the existing `error_message`, rendered via `ErrorState`).
+- A worked-example sentence ("If you had invested $X in SYMBOL, starting DATE and held until DATE — here's precisely what would have happened…") whose closing clause adapts to `status`, per `docs/EXPERIENCE_CONSTITUTION.md` §4.
+- A Simulation Snapshot card (every input the user chose, never a result) and a collapsed Technical Details disclosure (simulation ID, `calculation_version`, created timestamp).
+- "Run another simulation" link and a client-side "Copy link" affordance (`navigator.clipboard`, nothing sent anywhere).
+- `StatTile` gained an opt-in `size?: 'default' | 'compact'` prop (default unchanged) for a genuine multi-tile row, plus `break-words`/`min-w-0` as a defensive overflow floor — fixes a real layout defect found by live-rendering the new page (`docs/ARCHITECTURE_DECISIONS.md` ADR-037).
+- Backend: `calculation_version` exposed on `SimulationResponse` (`POST` and `GET` identically) — was already stored on every `Simulation` row, never previously surfaced (ADR-036).
+- `docs/FOUNDER_DECISIONS.md`: Founder Decision 013 (Experience Philosophy, formalizing `docs/EXPERIENCE_CONSTITUTION.md`), Founder Decision 014 (Growth Series Persistence, Option A — approved, not yet implemented), Founder Decision 015 (Anonymous Educational AI Limits, Option D — approved, not yet implemented).
+- 15 new/updated frontend tests (`use-simulation.test.tsx`, `simulation-result-client.test.tsx`, `simulation-result-page.test.tsx`) and 2 new backend assertions (`test_simulations.py`).
+
+### Changed
+- `docs/EXPERIENCE_CONSTITUTION.md`: status flipped from PROPOSED to APPROVED (Founder Decision 013).
+- `docs/KNOWN_ISSUES.md` KI-021: reopened from "Resolved — partially" to "Open" now that Founder Decision 014 has approved a full-resolution mechanism not yet implemented — was at risk of being mistaken for closed.
+- `frontend/src/lib/api/endpoints/simulations.ts::getSimulation` now accepts an optional `AbortSignal`, matching every other GET endpoint's cancellation convention.
+
+### Fixed
+- N/A — the `StatTile` overflow (above) is new-in-this-pass code, not a regression of previously-shipped behavior.
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — the Results page is a read-only `GET` against an endpoint whose anonymous/ownership access rules already existed (Founder Decision 002); `calculation_version` is a non-sensitive string; the clipboard affordance is same-origin and sends no data anywhere.
+
+---
+
 ## [0.9.3] — 2026-07-18 — M7 Phase 2 Final Polish & Closure
 
 ### Added

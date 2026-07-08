@@ -219,3 +219,23 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: None applicable this pass.
 
 **Future Improvements**: Unchanged from the prior entry.
+
+---
+
+## M7 Phase 3B — Founder Decisions + Results Foundation (2026-07-19)
+
+**API Response Time**: No new query pattern — `GET /api/v1/simulations/{id}` is reused unmodified (the same `session.get(Simulation, simulation_id)` plus one relationship load for `asset.symbol` that already existed). `calculation_version` is an already-selected scalar column on the same row, adding zero additional queries or measurable latency.
+
+**Database Query Time**: Unchanged — no new table, no new index, no new query shape. `calculation_version`'s exposure is a response-schema change only, not a persistence-layer change.
+
+**Memory Usage**: Not measured separately — no new in-memory computation, no new large payload (the Results page does not yet read `growth_series`, which is the one field on this response that scales with date range).
+
+**Startup Time**: `npm run build` unchanged in character (Turbopack, ~19s cold); `npx vitest run` (162 tests, up from 150) ran in ~24-30s depending on cache warmth, in line with the prior entry's per-test scaling.
+
+**Bundle size**: One new route (`/simulation/[id]`) registers as dynamic (`ƒ`, server-rendered on demand), not statically prerendered — expected, since it depends on a runtime path parameter and client-side data fetching, unlike `/simulator`'s static shell. No new external dependency was added (`Badge` and `StatTile` were both already in the component library; `lucide-react`'s existing icon set is reused, not extended).
+
+**Performance Bottlenecks**: None identified. The one new client-side interaction with any latency (`useSimulation`'s `GET` request) is already bounded by the existing `apiClient` 15s timeout and TanStack Query's existing `staleTime`/`retry` defaults (`frontend/src/providers/query-provider.tsx`), unchanged by this pass.
+
+**Optimizations**: None applied — nothing in this pass's scope (route foundation, hero numbers, snapshot, technical details) has a performance-sensitive path yet; the growth chart (a genuinely data-volume-sensitive future addition, once `growth_series` is persisted per Founder Decision 014) is explicitly out of scope for this pass.
+
+**Future Improvements**: Once `growth_series` persistence (Founder Decision 014) lands and the growth chart is built on top of it, revisit whether a multi-hundred-point series needs pagination, downsampling, or a dedicated lighter-weight retrieval shape — not a concern for this pass, since no code path reads that field yet.

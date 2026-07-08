@@ -2,14 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { useCreateSimulation } from '@/hooks/use-simulation';
+import { useCreateSimulation, useSimulation } from '@/hooks/use-simulation';
 import { ApiError } from '@/lib/api/errors';
 
 vi.mock('@/lib/api/endpoints/simulations', () => ({
   createSimulation: vi.fn(),
+  getSimulation: vi.fn(),
 }));
 
-const { createSimulation } = await import('@/lib/api/endpoints/simulations');
+const { createSimulation, getSimulation } = await import('@/lib/api/endpoints/simulations');
 
 function createWrapper() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -59,5 +60,36 @@ describe('useCreateSimulation', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(ApiError);
     expect((result.current.error as ApiError).code).toBe('MISSING_HISTORICAL_DATA');
+  });
+});
+
+describe('useSimulation', () => {
+  it('calls getSimulation with the given id and returns the response as-is', async () => {
+    const response = { id: 'sim-1', status: 'completed', ...input };
+    vi.mocked(getSimulation).mockResolvedValueOnce(response as never);
+
+    const { result } = renderHook(() => useSimulation('sim-1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(getSimulation).mock.calls[0]?.[0]).toBe('sim-1');
+    expect(result.current.data).toEqual(response);
+  });
+
+  it('does not fetch when id is empty', () => {
+    const callsBefore = vi.mocked(getSimulation).mock.calls.length;
+    const { result } = renderHook(() => useSimulation(''), { wrapper: createWrapper() });
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(vi.mocked(getSimulation).mock.calls.length).toBe(callsBefore);
+  });
+
+  it('surfaces a thrown ApiError through the query result', async () => {
+    vi.mocked(getSimulation).mockRejectedValueOnce(new ApiError({ code: 'SIMULATION_NOT_FOUND', message: 'no sim' }));
+
+    const { result } = renderHook(() => useSimulation('missing'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(ApiError);
+    expect((result.current.error as ApiError).code).toBe('SIMULATION_NOT_FOUND');
   });
 });

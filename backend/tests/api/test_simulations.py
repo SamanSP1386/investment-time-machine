@@ -48,6 +48,7 @@ def test_create_simulation_success_returns_201_with_growth_series(client, db_ses
     assert len(data["growth_series"]) == 3
     assert data["growth_series"][0]["point_date"] == "2020-01-02"
     assert data["growth_series"][-1]["point_date"] == "2021-01-04"
+    assert data["calculation_version"] == "v1"
 
 
 def test_create_simulation_uses_founder_spec_field_names(client, db_session):
@@ -168,8 +169,12 @@ def test_get_simulation_by_id_round_trips(client, db_session):
     assert body["asset_symbol"] == symbol
     # KI-021: growth_series/disclosed_splits are never persisted, so a
     # retrieval-after-creation GET (unlike the immediate POST response)
-    # returns them empty — a documented M4 scope cut.
+    # returns them empty — a documented M4 scope cut, approved for full
+    # resolution by Founder Decision 014 but not yet implemented.
     assert body["growth_series"] == []
+    # Founder Decision 014 / M7 Phase 3B: calculation_version is now exposed
+    # on every retrieval, not only the creation response.
+    assert body["calculation_version"] == "v1"
 
 
 def test_get_simulation_not_found_returns_404(client, db_session):

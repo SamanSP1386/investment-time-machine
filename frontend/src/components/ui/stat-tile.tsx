@@ -8,6 +8,15 @@ export interface StatTileProps {
   /** The field/formula this figure traces to — rendered as a tap-to-expand disclosure, never hidden. */
   source?: string;
   className?: string;
+  /**
+   * 'default' (text-3xl/text-4xl) suits one tile shown alone or full-width.
+   * 'compact' (text-2xl/text-3xl) is for a multi-tile row (e.g. three hero
+   * numbers side by side) where a long currency figure at the default size
+   * would overflow a narrow column — found on the Results screen (M7 Phase
+   * 3B) with a five-figure `final_value`. Defaults to 'default' so every
+   * existing call site is unaffected.
+   */
+  size?: 'default' | 'compact';
 }
 
 /**
@@ -17,16 +26,24 @@ export interface StatTileProps {
  * source." Uses a native <details> so it is keyboard- and
  * screen-reader-operable with zero additional JavaScript.
  */
-export function StatTile({ label, value, delta, source, className }: StatTileProps) {
+export function StatTile({ label, value, delta, source, className, size = 'default' }: StatTileProps) {
   return (
     <div
       className={cn(
-        'flex flex-col gap-1 rounded-[var(--card-radius)] border border-border-hairline bg-surface p-6',
+        'flex min-w-0 flex-col gap-1 rounded-[var(--card-radius)] border border-border-hairline bg-surface',
+        size === 'compact' ? 'p-4' : 'p-6',
         className
       )}
     >
       <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">{label}</p>
-      <p className="figure text-3xl font-semibold text-ink-primary sm:text-4xl">{value}</p>
+      <p
+        className={cn(
+          'figure font-semibold text-ink-primary break-words',
+          size === 'compact' ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl'
+        )}
+      >
+        {value}
+      </p>
       {delta ? (
         <p
           className={cn(

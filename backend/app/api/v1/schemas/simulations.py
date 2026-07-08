@@ -59,6 +59,7 @@ class SimulationResponse(BaseModel):
     inflation_adjusted_final_value: DecimalStr | None
     disclosed_splits: list[DisclosedSplit]
     growth_series: list[GrowthSeriesPoint]
+    calculation_version: str
     error_message: str | None
     created_at: datetime
 
@@ -76,7 +77,12 @@ class SimulationResponse(BaseModel):
         to empty: neither is persisted (no `simulations` columns exist for
         them), so a simulation retrieved after creation (not the immediate
         POST response) currently returns them empty — a documented M4 scope
-        cut, see docs/KNOWN_ISSUES.md KI-021."""
+        cut, see docs/KNOWN_ISSUES.md KI-021, approved for full resolution by
+        Founder Decision 014. `calculation_version` (Founder Decision 014,
+        M7 Phase 3B) was already stored on every `Simulation` row from the
+        first migration (`app.models.simulation`) but never surfaced on this
+        response until now — a pure additive field exposure, no schema or
+        engine change."""
         return cls(
             id=simulation.id,
             status=simulation.status,
@@ -93,6 +99,7 @@ class SimulationResponse(BaseModel):
             total_return_percentage=simulation.total_return_percentage,
             cagr_percentage=simulation.cagr_percentage,
             inflation_adjusted_final_value=simulation.inflation_adjusted_final_value,
+            calculation_version=simulation.calculation_version,
             disclosed_splits=[
                 DisclosedSplit(split_date=s.split_date, split_ratio=s.split_ratio)
                 for s in disclosed_splits

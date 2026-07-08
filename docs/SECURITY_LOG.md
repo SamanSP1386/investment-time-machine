@@ -280,3 +280,23 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 **Remaining Risks**: KI-016, KI-039, KI-042 — all unaffected by this phase's scope (no deployment configuration or cookie behavior was touched). No new open risk introduced.
 
 **Threats Deferred**: Unchanged — a full CSRF/XSS review still waits on AI-rendered content existing to review; the Simulator introduces a real form but no markdown/HTML rendering of untrusted content.
+
+---
+
+## M7 Phase 3B — Founder Decisions + Results Foundation (2026-07-19)
+
+**Risks Found**: One new route (`/simulation/[id]`, the platform's first dynamic segment) and one backend schema addition (`calculation_version` exposure) reviewed for new attack surface. No new risk identified.
+
+**Severity**: N/A — no finding required mitigation.
+
+**Findings**:
+1. **`/simulation/[id]` is a read-only `GET` against an already-reviewed endpoint.** `GET /api/v1/simulations/{id}` already enforces the anonymous/ownership access rule approved by Founder Decision 002 (a `NULL`-`user_id` simulation is publicly readable by anyone with the link; a user-owned simulation is `FORBIDDEN` to any other caller) — this pass adds a frontend consumer of that endpoint, it does not change the endpoint's own access control. The dynamic `id` path segment is a UUID, parsed and validated by FastAPI/Pydantic (`uuid.UUID` path param type) before reaching any application code — an arbitrary or malformed string in the URL produces a `422`, not a query with attacker-controlled content.
+2. **`calculation_version` is a non-sensitive string.** Sourced from `simulation.calculation_version` (a small enum-like version tag, e.g. `"v1"`) — no PII, no secret, no internal path or stack detail. Exposing it on both `POST` and `GET` responses (previously `POST`-response-implicit-only, since the field wasn't returned by either) introduces no new information a determined caller could not already infer from the API's existing, documented behavior.
+3. **The "Copy link" affordance is same-origin and client-only.** `navigator.clipboard.writeText(window.location.href)` reads the browser's own current URL and writes it to the browser's own clipboard — no network request, no data sent to any server, nothing beyond what the user already has open in their address bar. A denied clipboard permission fails silently (no error surfaced, no broken state) rather than throwing an unhandled rejection.
+4. **No new user input is accepted anywhere in this pass.** The Results page only reads a URL path segment and renders backend-returned data through the existing `formatCurrency`/`formatPercentage`/`formatDate` formatters (never `dangerouslySetInnerHTML`, never raw HTML interpolation) — the same guardrails (ADR-029/033) that governed the Simulator's own review apply unchanged here, since no new component bypasses them.
+
+**Mitigations Implemented**: None required — every finding above is a review confirmation, not a defect needing a fix.
+
+**Remaining Risks**: KI-016, KI-039, KI-042 — all unaffected by this phase's scope (no deployment configuration, cookie behavior, or split-consistency logic was touched). KI-021 (`growth_series` persistence) remains open with no new security implication — an empty array is returned identically to before, not new attacker-influenceable behavior.
+
+**Threats Deferred**: Unchanged — a full CSRF/XSS review still waits on AI-rendered content existing to review; this pass renders no AI-generated or otherwise untrusted markdown/HTML.

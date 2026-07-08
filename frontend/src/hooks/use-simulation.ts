@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createSimulation } from '@/lib/api/endpoints/simulations';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createSimulation, getSimulation } from '@/lib/api/endpoints/simulations';
 import { queryKeys } from '@/lib/query/keys';
 
 /**
@@ -18,5 +18,21 @@ export function useCreateSimulation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.simulations.all });
     },
+  });
+}
+
+/**
+ * Backs the Results screen (`/simulation/[id]`) — `GET
+ * /api/v1/simulations/{id}` (docs/api_design.md §5). Never computes
+ * anything itself; `data` is the backend's own `SimulationResponse`,
+ * displayed as-is. Mirrors `useAssetAvailability`'s GET-query shape
+ * (ADR-032's reference pattern), enabled only once a real `id` is known.
+ */
+export function useSimulation(id: string) {
+  return useQuery({
+    queryKey: queryKeys.simulations.detail(id),
+    queryFn: ({ signal }) => getSimulation(id, signal),
+    // eslint-disable-next-line no-restricted-syntax -- id.length is a string length, not a DecimalString comparison (ADR-033).
+    enabled: id.length > 0,
   });
 }
