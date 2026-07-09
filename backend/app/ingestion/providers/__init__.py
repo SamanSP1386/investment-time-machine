@@ -28,4 +28,10 @@ def get_provider(provider_name: str):
     return provider_cls()
 
 
-__all__ = ["CoinGeckoProvider", "DevSeedProvider", "FredProvider", "YFinanceProvider", "get_provider"]
+__all__ = [
+    "CoinGeckoProvider",
+    "DevSeedProvider",
+    "FredProvider",
+    "YFinanceProvider",
+    "get_provider",
+]

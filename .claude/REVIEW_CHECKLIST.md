@@ -29,6 +29,7 @@ Every PR, every milestone, every "done" claim is measured against all six items 
 - [ ] AI service changes: confirm no path lets the AI compute, alter, or "correct" a financial figure.
 - [ ] Coverage target for the touched component (see [TESTING_GUIDELINES.md](TESTING_GUIDELINES.md)) is met or the shortfall is explicitly called out with a reason.
 - [ ] Anything left unfinished is documented as *intentional, temporary, tracked* technical debt (see below) — not silent.
+- [ ] Before claiming "CI will pass" or "the suite is green": reproduce each CI job's exact steps from `.github/workflows/ci.yml`, in order, in an environment matching its constraints (no `.env.local`, a fresh/empty database if the workflow provisions one, the pinned tool/runtime versions) — not the closest local dev-loop command. `ruff check <changed files>` is not `ruff check .`; a local `npm run build` with `.env.local` present is not CI's `npm run build`. `main` was red for 8 consecutive commits (`docs/KNOWN_ISSUES.md` KI-046) specifically because this substitution went unnoticed.
 - [ ] `docs/DEVLOG.md`, `docs/CHANGELOG.md`, `docs/SECURITY_LOG.md`, `docs/TESTING_REPORT.md`, `docs/PERFORMANCE_LOG.md` each have a new appended entry for this milestone (see [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md)).
 - [ ] `docs/KNOWN_ISSUES.md` updated if any issue was found, changed status, or was resolved.
 - [ ] `docs/ARCHITECTURE_DECISIONS.md` has a new ADR for any significant decision made this milestone (never edit a prior ADR — supersede it).

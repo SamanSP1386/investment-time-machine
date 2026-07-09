@@ -54,6 +54,15 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+    env:
+      # frontend/src/config/env.ts fails fast (by design, see
+      # docs/SECURITY_LOG.md) when NODE_ENV=production (set by `next build`)
+      # and NEXT_PUBLIC_API_BASE_URL is unset — a deliberate deployment-safety
+      # guard against silently shipping pointed at localhost. CI's Build step
+      # never actually calls this URL (a static/prerender build only), so any
+      # syntactically valid URL satisfies it; using the same placeholder
+      # frontend/.env.example documents for local development.
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
     steps:
       - uses: actions/checkout@v4
 
