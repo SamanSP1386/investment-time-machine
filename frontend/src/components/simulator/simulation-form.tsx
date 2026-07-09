@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { useCreateSimulation } from '@/hooks/use-simulation';
 import { useAssetAvailability } from '@/hooks/use-asset-availability';
 import { simulationCreateSchema } from '@/lib/api/endpoints/simulations';
 import { ApiError, getErrorCopy } from '@/lib/api';
-import { formatCurrency, formatDate, formatDateRange } from '@/lib/format';
+import { formatDate, formatDateRange } from '@/lib/format';
 import type { AssetSummary, SimulationCreateInput } from '@/types/api';
 
 /**
@@ -50,13 +51,8 @@ const DEFAULT_VALUES: FormValues = {
  * as-is (src/lib/format's wire-format contract).
  */
 export function SimulationForm() {
+  const router = useRouter();
   const [selectedAsset, setSelectedAsset] = useState<AssetSummary | null>(null);
-  // AssetSearchCombobox manages its own displayed text as uncontrolled
-  // state; resetting the RHF form alone would not clear it. Bumping this
-  // key on "Start a new simulation" forces React to remount the form
-  // subtree (including the combobox), the standard way to reset
-  // uncontrolled child state that a parent doesn't otherwise own.
-  const [formKey, setFormKey] = useState(0);
   const { data: availability } = useAssetAvailability(selectedAsset?.symbol ?? null);
   const createSimulation = useCreateSimulation();
 
@@ -64,7 +60,6 @@ export function SimulationForm() {
     register,
     handleSubmit,
     control,
-    reset,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -75,56 +70,27 @@ export function SimulationForm() {
     createSimulation.mutate(values);
   }
 
-  function handleStartNew() {
-    createSimulation.reset();
-    setSelectedAsset(null);
-    reset(DEFAULT_VALUES);
-    setFormKey((key) => key + 1);
-  }
+  // The moment a submission succeeds, the button stays in its "Calculating
+  // historical returns…" state through the route transition too — derived
+  // directly from mutation state, not a separate flag, so it can never
+  // drift out of sync with it.
+  const isNavigating = createSimulation.isSuccess;
 
-  if (createSimulation.isSuccess && createSimulation.data) {
-    const sim = createSimulation.data;
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Simulation complete</CardTitle>
-          <CardDescription>
-            Your historical investment simulation has been successfully created and recorded.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Simulation ID</dt>
-              <dd className="figure font-mono text-sm text-ink-primary">{sim.id}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Status</dt>
-              <dd className="text-sm text-ink-primary capitalize">{sim.status}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Asset</dt>
-              <dd className="figure font-mono text-sm text-ink-primary">{sim.asset_symbol}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Investment amount</dt>
-              <dd className="figure text-sm text-ink-primary">{formatCurrency(sim.investment_amount)}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Date range</dt>
-              <dd className="figure text-sm text-ink-primary">{formatDateRange(sim.start_date, sim.end_date)}</dd>
-            </div>
-          </dl>
-          {sim.status === 'failed' && sim.error_message ? (
-            <ErrorState title="Simulation could not be completed" description={sim.error_message} />
-          ) : null}
-          <Button variant="secondary" size="sm" onClick={handleStartNew} className="self-start">
-            Start a new simulation
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  /**
+   * The product "begins answering the user's question" the moment the
+   * Simulation Engine completes (EXPERIENCE_CONSTITUTION.md, M7 Phase 3B.1)
+   * — this form no longer shows its own inline success card; it hands off
+   * to the Results screen immediately. `?new=1` is the one-shot marker
+   * (`useJustCreatedFlag`) that lets the Results screen tell "just arrived
+   * from here" apart from a refresh/back/shared-link visit, so the opening
+   * sequence plays exactly once and only for a genuinely completed result.
+   */
+  useEffect(() => {
+    if (createSimulation.isSuccess && createSimulation.data) {
+      const sim = createSimulation.data;
+      router.push(sim.status === 'completed' ? `/simulation/${sim.id}?new=1` : `/simulation/${sim.id}`);
+    }
+  }, [createSimulation.isSuccess, createSimulation.data, router]);
 
   const apiError = createSimulation.error;
   const errorCopy = apiError
@@ -140,7 +106,7 @@ export function SimulationForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form key={formKey} onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
           <Controller
             name="asset_symbol"
             control={control}
@@ -282,8 +248,8 @@ export function SimulationForm() {
             />
           ) : null}
 
-          <Button type="submit" loading={createSimulation.isPending} className="self-start">
-            {createSimulation.isPending ? 'Calculating historical returns…' : 'Run simulation'}
+          <Button type="submit" loading={createSimulation.isPending || isNavigating} className="self-start">
+            {createSimulation.isPending || isNavigating ? 'Calculating historical returns…' : 'Run simulation'}
           </Button>
         </form>
       </CardContent>
