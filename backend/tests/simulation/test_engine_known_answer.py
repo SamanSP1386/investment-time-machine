@@ -33,8 +33,14 @@ def test_basic_growth_matches_founder_spec_2_14_7_example(db_session) -> None:
     assert sim.shares_purchased == Decimal("10.00000000")
     assert sim.final_value == Decimal("2500.00000000")
     assert sim.total_return_percentage == Decimal("150.000000")
-    expected_cagr = math.pow(2.5, 1 / (3653 / 365.25)) - 1
-    assert abs(float(sim.cagr_percentage) - expected_cagr) < 1e-6
+    # Hand-derived, independent of calculate_cagr: 2015-01-01 -> 2025-01-01
+    # is 3653 calendar days (10 years plus 3 leap days: 2016, 2020, 2024),
+    # so years = 3653 / 365.25 = 10.001369. CAGR fraction =
+    # 2.5 ** (1 / 10.001369) - 1 = 0.095944. calculate_cagr (Founder
+    # Decision 016 / ADR-040, "v2") scales this to a percentage to match
+    # total_return_percentage's own convention: 0.095944 * 100 = 9.5944...%.
+    expected_cagr_percentage = (math.pow(2.5, 1 / (3653 / 365.25)) - 1) * 100
+    assert abs(float(sim.cagr_percentage) - expected_cagr_percentage) < 1e-4
     assert outcome.disclosed_splits == ()
 
 

@@ -5,16 +5,6 @@ import { SimulationResultClient } from '@/components/simulation-result/simulatio
 import { ApiError } from '@/lib/api/errors';
 import type { SimulationResponse } from '@/types/api';
 
-// No `?new=1` marker by default — every test in this file renders a
-// completed simulation's *settled* state immediately, exactly like a
-// revisited/shared link. The opening sequence's own animated timeline is
-// covered separately by opening-sequence-heading.test.tsx.
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn() }),
-  usePathname: () => '/simulation/sim-123',
-  useSearchParams: () => new URLSearchParams(),
-}));
-
 const refetchMock = vi.fn();
 let queryState: {
   data: SimulationResponse | undefined;
@@ -42,11 +32,11 @@ const BASE_SIM: SimulationResponse = {
   shares_purchased: '10.00000000' as SimulationResponse['shares_purchased'],
   final_value: '2500.00000000' as SimulationResponse['final_value'],
   total_return_percentage: '150.000000' as SimulationResponse['total_return_percentage'],
-  cagr_percentage: '9.596872' as SimulationResponse['cagr_percentage'],
+  cagr_percentage: '9.594448' as SimulationResponse['cagr_percentage'],
   inflation_adjusted_final_value: null,
   disclosed_splits: [],
   growth_series: [],
-  calculation_version: 'v1',
+  calculation_version: 'v2',
   error_message: null,
   created_at: '2026-07-18T00:00:00Z',
 };
@@ -73,7 +63,7 @@ describe('SimulationResultClient', () => {
     expect(screen.getByText('Run another simulation')).toBeInTheDocument();
   });
 
-  it('renders the worked-example sentence as the hero (settled), with the reading order Sections 1-2, 4-7 all present, for a completed simulation', () => {
+  it('renders the worked-example sentence as the hero, with the reading order Sections 1-2, 4-7 all present and rendered immediately, for a completed simulation', () => {
     queryState = { data: BASE_SIM, isPending: false, isError: false, error: null, isFetching: false };
     render(<SimulationResultClient id="sim-123" />);
 
@@ -81,13 +71,13 @@ describe('SimulationResultClient', () => {
     expect(screen.getByText('Simulation result')).toBeInTheDocument();
     expect(screen.queryByText('completed')).not.toBeInTheDocument();
 
-    // Section 2 — the hero sentence, the page's only real headline.
+    // Section 2 — the hero sentence, the page's only real headline. Present
+    // (and, per Founder Decision 017, un-gated) from the very first render.
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveAttribute(
       'aria-label',
       'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025 your investment would be worth $2,500.00 today.'
     );
-    expect(heading).not.toHaveClass('sr-only');
 
     // Section 4 — Supporting Facts, plain label/value pairs, never a bordered card grid.
     expect(screen.getByText('Final Value')).toBeInTheDocument();
@@ -95,7 +85,7 @@ describe('SimulationResultClient', () => {
     expect(screen.getByText('Total Return')).toBeInTheDocument();
     expect(screen.getByText('+150.00%')).toBeInTheDocument();
     expect(screen.getByText('Annual Return (CAGR)')).toBeInTheDocument();
-    expect(screen.getByText('+9.60%')).toBeInTheDocument();
+    expect(screen.getByText('+9.59%')).toBeInTheDocument();
 
     // Section 5 — Growth Over Time, honest "not yet available" (KI-021).
     expect(screen.getByText(/day-by-day view of this investment.s path isn.t available/)).toBeInTheDocument();
@@ -109,7 +99,7 @@ describe('SimulationResultClient', () => {
     const proofSummary = screen.getByText('Methodology, assumptions, and technical details');
     expect(proofSummary.closest('details')).not.toHaveAttribute('open');
     expect(screen.getByText('sim-123')).toBeInTheDocument();
-    expect(screen.getByText('v1')).toBeInTheDocument();
+    expect(screen.getByText('v2')).toBeInTheDocument();
   });
 
   it('renders a calm processing state, no hero numbers, for a pending simulation', () => {

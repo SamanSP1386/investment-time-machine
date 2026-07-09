@@ -51,15 +51,25 @@ Since one ingestion call (`YFinanceProvider.fetch_prices`) retrieves an entire d
 ```
 years = Decimal(end_date - start_date).days / Decimal("365.25")
 total_return_ratio = final_value / initial_investment_amount
-cagr = total_return_ratio ** (Decimal(1) / years) - Decimal(1)
+cagr_percentage = (total_return_ratio ** (Decimal(1) / years) - Decimal(1)) * Decimal(100)
 ```
 
-Matches Founder Specification Part 2.14.9 / Part 3.5.4 exactly: `CAGR = (final_value / investment_amount) ^ (1/years) - 1`.
+Matches Founder Specification Part 2.14.9 / Part 3.5.4's formula, `CAGR = (final_value / investment_amount) ^ (1/years) - 1`, then scaled by `× 100` to match `calculate_total_return_percent`'s existing percentage convention — both values populate identically-typed `NUMERIC(10, 6)` columns named with the same `_percentage` suffix (`app.models.simulation.Simulation`), so they must share a scale. See §4a for why this `× 100` was added after M3's original implementation.
+
+### 4a. `calculation_version` "v1" vs "v2" — the CAGR percentage-scale correction
+
+**"v1"** (every simulation created before this correction shipped): `calculate_cagr` returned a **raw fraction** (e.g., `0.095944` for a ~9.59% annual return), not multiplied by 100 — an oversight relative to `calculate_total_return_percent`'s sibling convention in the same module, discovered via a live end-to-end check during M7 Phase 3B.2 (`docs/KNOWN_ISSUES.md` KI-045) and approved for correction by [Founder Decision 016](FOUNDER_DECISIONS.md).
+
+**"v2"** (this correction, and every simulation created from this point forward): `calculate_cagr` returns a **percentage** (e.g., `9.594448`), matching `total_return_percentage`'s scale exactly — the value shown in `docs/api_design.md`'s worked example and read directly by `frontend/src/lib/format/percentage.ts::formatPercentage` with no client-side rescaling.
+
+Every `completed` simulation stored under "v1" was backfilled in place (its already-stored `cagr_percentage` multiplied by exactly 100, a lossless rescale of an already-computed value — not a re-derivation from raw price data) and re-stamped to `calculation_version = "v2"` in the same migration that shipped this fix, per ADR-002's reproducibility principle and the identical persist/version/backfill precedent Founder Decision 014 established for `growth_series`. `pending`/`failed` rows (`cagr_percentage IS NULL`) were left untouched — there is no value to rescale. A handful of pre-existing rows whose backfilled value would have overflowed the `NUMERIC(10, 6)` column bound were flagged rather than silently truncated or failed outright; see `docs/ARCHITECTURE_DECISIONS.md` ADR-040 for the full backfill design and `backend/alembic/versions/0004_cagr_percentage_v2_backfill.py` for the implementation.
+
+Any future consumer reading `cagr_percentage` directly from the database (rather than through the API, which always reflects the current stored value) must check `calculation_version` first — a "v1" row's `cagr_percentage`, if any such row could still exist outside this codebase's own database, is a raw fraction, not a percentage.
 
 - Day-count convention: **365.25 days/year** (average, leap-year-inclusive) — the Founder Specification's formula does not define a day-count convention, so this is a documented, explicit implementation choice, not a spec requirement. More precise conventions (actual/actual, 30/360) are deferred (§6).
 - All arithmetic in `decimal.Decimal`, including the fractional exponent — Python's `decimal` module supports non-integer `Decimal ** Decimal` directly (correctly-rounded power, per the General Decimal Arithmetic spec), so no `float` conversion is needed anywhere in this formula, satisfying Part 2.14.9's "preserve intermediate precision" requirement.
 - **Precision and rounding (new, from Design Review)**: all calculations run inside a scoped `decimal.localcontext()` with explicit precision (`prec=38`, well above the 28-digit default) so intermediate results (especially repeated dividend-reinvestment division across long holding periods) don't silently lose precision — scoped locally so it never leaks into unrelated code. Final values are rounded to match column precision (`NUMERIC(20,8)` for currency, `NUMERIC(10,6)` for percentages) using `ROUND_HALF_EVEN` (banker's rounding — the `decimal` module default, chosen to avoid systematic upward bias across many rounding operations), applied once at the point of storage, never mid-calculation.
-- `total_return_ratio` is always `>= 0` (share prices and share counts are both validated non-negative at ingestion — a stored `close_price` is always `> 0`, so `shares_held` can never be undefined via division by zero, and `final_value` can never be negative). A total-loss scenario (`final_value = 0`) yields `cagr = -1` (-100%), which is mathematically correct and requires no special-case handling.
+- `total_return_ratio` is always `>= 0` (share prices and share counts are both validated non-negative at ingestion — a stored `close_price` is always `> 0`, so `shares_held` can never be undefined via division by zero, and `final_value` can never be negative). A total-loss scenario (`final_value = 0`) yields `cagr_percentage = -100` (a percentage-scaled -100%, "v2" convention — see §4a), which is mathematically correct and requires no special-case handling.
 - `years <= 0` (invalid or same-day range) is rejected as a functional-requirements-level input validation concern before the engine runs (Founder Specification Part 3.3.2: "End date must be after start date"), not handled inside this formula.
 
 ## 5. How inflation adjustment is calculated

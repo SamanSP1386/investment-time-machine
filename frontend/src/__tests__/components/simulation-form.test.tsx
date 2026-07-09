@@ -185,7 +185,7 @@ describe('SimulationForm', () => {
     expect(screen.getByText('MISSING_HISTORICAL_DATA', { exact: false })).toBeInTheDocument();
   });
 
-  it('navigates to the Results screen with the opening-sequence marker when the simulation completes', async () => {
+  it('navigates straight to the plain Results screen URL when the simulation completes — no replay marker (Founder Decision 017)', async () => {
     mutationState.isSuccess = true;
     mutationState.data = {
       id: 'sim-123',
@@ -201,22 +201,22 @@ describe('SimulationForm', () => {
       shares_purchased: '10.00000000' as SimulationResponse['shares_purchased'],
       final_value: '2500.00000000' as SimulationResponse['final_value'],
       total_return_percentage: '150.000000' as SimulationResponse['total_return_percentage'],
-      cagr_percentage: '9.596872' as SimulationResponse['cagr_percentage'],
+      cagr_percentage: '9.594448' as SimulationResponse['cagr_percentage'],
       inflation_adjusted_final_value: null,
       disclosed_splits: [],
       growth_series: [],
-      calculation_version: 'v1',
+      calculation_version: 'v2',
       error_message: null,
       created_at: '2026-07-18T00:00:00Z',
     };
 
     render(<SimulationForm />);
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/simulation/sim-123?new=1'));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/simulation/sim-123'));
     expect(screen.getByRole('button', { name: 'Calculating historical returns…' })).toBeInTheDocument();
   });
 
-  it('navigates to the Results screen with no opening-sequence marker when the simulation failed', async () => {
+  it('navigates to the plain Results screen URL identically when the simulation failed', async () => {
     mutationState.isSuccess = true;
     mutationState.data = {
       id: 'sim-456',

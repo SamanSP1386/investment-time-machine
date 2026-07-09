@@ -4,10 +4,47 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
-<<<<<<< HEAD
+## [0.11.0] — 2026-07-22 — CAGR Percentage Scale Correction + Opening Sequence Ruling
+
+### Added
+- `backend/alembic/versions/0004_cagr_percentage_v2_backfill.py` — one-time, idempotent data migration rescaling every existing `completed`, `calculation_version = "v1"` simulation's stored `cagr_percentage` by exactly ×100 and re-stamping it to `"v2"`, with a logged, non-destructive carve-out for any row a lossless rescale would overflow `NUMERIC(10,6)` on (none matched against this platform's real data).
+- `frontend/src/hooks/use-settle-in.ts` — a minimal, single-boolean entrance-transition hook (replaces `use-opening-sequence.ts`'s multi-phase state machine), captured once at mount, `requestAnimationFrame`-paired, reduced-motion-aware.
+- `docs/simulation_formulas.md` §4a — `calculation_version` "v1" (raw fraction) vs. "v2" (percentage) semantics for `cagr_percentage`.
+- `docs/ARCHITECTURE_DECISIONS.md` **ADR-040** (CAGR percentage-scale fix engineering record) and **ADR-041** (removing the staged opening-sequence timeline).
+- `docs/FOUNDER_DECISIONS.md` **Founder Decision 017** (Results Opening Sequence: staged reveal rejected, editorial components kept).
+
+### Changed
+- `backend/app/simulation/formulas.py::calculate_cagr` now multiplies by `Decimal(100)`, matching `calculate_total_return_percent`'s existing percentage convention.
+- `backend/app/simulation/engine.py::DEFAULT_CALCULATION_VERSION` bumped `"v1"` → `"v2"`.
+- `docs/api_design.md`'s `POST /api/v1/simulations` worked example corrected: `"cagr_percentage": "9.594448"` (was the internally-inconsistent `"9.596872"`), `"calculation_version": "v2"`.
+- `frontend/src/components/simulation-result/opening-sequence-heading.tsx` — renders the worked-example sentence and every child section immediately on mount; the only motion is a single ~200ms ease-in opacity/translate settle on the sentence via `useSettleIn`, fully disabled under `prefers-reduced-motion`.
+- `frontend/src/components/simulator/simulation-form.tsx` — post-submit navigation no longer appends `?new=1`; every completed or failed simulation navigates to the same plain `/simulation/{id}` URL.
+- `frontend/src/app/simulation/[id]/page.tsx` — the `<Suspense>` boundary is removed; nothing under `SimulationResultClient` calls `useSearchParams()` anymore.
+- `docs/FOUNDER_DECISIONS.md` **Founder Decision 016** — status Proposed → **Approved** (Option 1a); the two accidentally-duplicated draft entries consolidated into one.
+- `docs/ARCHITECTURE_DECISIONS.md` **ADR-038** — Status: Accepted → **Superseded by ADR-041**.
+- `docs/KNOWN_ISSUES.md` **KI-045** — status Open → **Resolved**.
+
+### Fixed
+- The CAGR percentage-scale defect (KI-045): every `completed` simulation's `cagr_percentage` was under-reporting the annualized return by a factor of exactly 100. Live-verified: a seeded AAPL simulation reproducing the originally-cited scenario now shows `+14.69% CAGR` alongside `+73.05% Total Return` (was `+0.15%`).
+- Two `backend/tests/simulation/test_formulas.py` unit-test assertions that had been certifying the raw-fraction (pre-fix) `calculate_cagr` output as correct.
+
+### Removed
+- `frontend/src/hooks/use-opening-sequence.ts` (the `composing`/`paused`/`answered`/`settled` phase machine) and its test file — replaced by `use-settle-in.ts`.
+- `frontend/src/hooks/use-just-created-flag.ts` and its `?new=1` query-marker mechanism, and its test file — no longer serves any purpose with the staged timeline gone.
+- `frontend/src/app/dev/opening-sequence-preview/` — the temporary dev-only preview route; nothing left worth a dedicated multi-second-timeline preview harness.
+- The "Skip" affordance on the Results page hero — there is no longer a timeline to skip.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A. The CAGR fix is a pure calculation-scale correction to an already-served field, with no new endpoint or input. The backfill migration is a scoped, logged, non-destructive data-only `UPDATE`. Removing the `?new=1` marker narrows attack surface trivially (one fewer URL parameter, one fewer `useSearchParams` call site) rather than adding any.
+
+---
+
 ## [Unreleased] — 2026-07-21 — Review, Fix-Investigation, Philosophy Audit & Reconciliation Pass
 
-No version bump — this entry documents a review pass, not a release. `v0.10.0` remains the current tagged version.
+No version bump — this entry documents a review pass, not a release. `v0.10.0` remains the current tagged version at the time this entry was written; see `[0.11.0]` above for the pass that resolved the two items this entry left open.
 
 ### Added
 - `docs/KNOWN_ISSUES.md` **KI-045** (High) — `cagr_percentage` served at 1/100th its correct value across the Simulation Engine, its own known-answer test, `docs/api_design.md`'s worked example, and the frontend display layer. Root-caused end to end; no code fix yet.
@@ -23,7 +60,15 @@ No version bump — this entry documents a review pass, not a release. `v0.10.0`
 
 ### Removed
 - N/A — nothing deleted. The uncommitted Results-redesign work was parked (preserved on a pushed branch), not discarded.
-=======
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — documentation, a git tag, and branch/commit reorganization only.
+
+---
+
 ## [0.10.2] — 2026-07-20 — M7 Phase 3B.2: Results Reading Experience
 
 ### Added
@@ -40,15 +85,11 @@ No version bump — this entry documents a review pass, not a release. `v0.10.0`
 
 ### Removed
 - `StatTile`'s bordered three-tile hero-number row, the bordered "Simulation Snapshot" card, and the separately-bordered "Technical Details" disclosure — all folded into or replaced by the new editorial sections above. `StatTile` itself is untouched and still used elsewhere (e.g. `dev/playground`).
->>>>>>> results/pending-founder-review
 
 ### Deprecated
 - N/A.
 
 ### Security
-<<<<<<< HEAD
-- N/A — documentation, a git tag, and branch/commit reorganization only.
-=======
 - N/A — a pure visual/structural redesign of an existing read-only screen; no new data fetched, no new endpoint, no change to what information is shown for a given simulation.
 
 ---
@@ -80,7 +121,6 @@ No version bump — this entry documents a review pass, not a release. `v0.10.0`
 
 ### Security
 - N/A — the `?new=1` marker changes only whether an animation plays, never what data is fetched, shown, or fetched from; see ADR-038's Tradeoffs for the (accepted, low-severity) case of a copy-pasted marker.
->>>>>>> results/pending-founder-review
 
 ---
 

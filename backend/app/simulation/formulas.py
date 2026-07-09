@@ -58,7 +58,15 @@ def calculate_years_between(start_date: date, end_date: date) -> Decimal:
 
 def calculate_cagr(final_value: Decimal, investment_amount: Decimal, years: Decimal) -> Decimal:
     """Founder Specification 2.14.9 / 3.5.4:
-    CAGR = (final_value / investment_amount) ^ (1 / years) - 1.
+    CAGR = ((final_value / investment_amount) ^ (1 / years) - 1) × 100.
+
+    Percentage-scaled to match `calculate_total_return_percent`'s convention
+    — both populate identically-typed, identically-suffixed `_percentage`
+    columns (`app.models.simulation.Simulation`), so they must share a scale.
+    Prior to `calculation_version` "v2" (see `docs/simulation_formulas.md`
+    §4a, `docs/ARCHITECTURE_DECISIONS.md` ADR-040), this function returned an
+    unscaled raw fraction — Founder Decision 016 approved this correction and
+    a backfill of every "v1" stored value.
 
     `years <= 0` should already be rejected by input validation (end_date
     must be strictly after start_date) before this is ever called — raising
@@ -68,7 +76,7 @@ def calculate_cagr(final_value: Decimal, investment_amount: Decimal, years: Deci
     if years <= 0:
         raise CalculationError(f"CAGR requires years > 0, got {years}")
     ratio = final_value / investment_amount
-    return ratio ** (Decimal(1) / years) - Decimal(1)
+    return (ratio ** (Decimal(1) / years) - Decimal(1)) * Decimal(100)
 
 
 def calculate_inflation_adjusted_value(

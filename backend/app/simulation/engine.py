@@ -57,7 +57,10 @@ from app.simulation.repository import SimulationRepository
 logger = logging.getLogger(__name__)
 
 DEFAULT_CPI_INDICATOR_CODE = "CPIAUCSL"
-DEFAULT_CALCULATION_VERSION = "v1"
+# "v2": calculate_cagr returns a percentage (Founder Decision 016 / ADR-040),
+# not the "v1" raw fraction every simulation before this fix stored. See
+# docs/simulation_formulas.md §4a for the full version-semantics note.
+DEFAULT_CALCULATION_VERSION = "v2"
 
 
 @dataclass(frozen=True)

@@ -103,10 +103,10 @@
       "shares_purchased": "10.00000000",
       "final_value": "2500.00000000",
       "total_return_percentage": "150.000000",
-      "cagr_percentage": "9.596872",
+      "cagr_percentage": "9.594448",
       "inflation_adjusted_final_value": null,
       "disclosed_splits": [],
-      "calculation_version": "v1",
+      "calculation_version": "v2",
       "created_at": "2026-07-10T12:00:00Z"
     }
   }

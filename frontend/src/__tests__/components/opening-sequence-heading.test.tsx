@@ -1,16 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, beforeEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import { OpeningSequenceHeading } from '@/components/simulation-result/opening-sequence-heading';
 import type { SimulationResponse } from '@/types/api';
-
-const replaceMock = vi.fn();
-let params: URLSearchParams;
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: replaceMock }),
-  usePathname: () => '/simulation/sim-123',
-  useSearchParams: () => params,
-}));
 
 const BASE_SIM: SimulationResponse = {
   id: 'sim-123',
@@ -26,11 +17,11 @@ const BASE_SIM: SimulationResponse = {
   shares_purchased: '10.00000000' as SimulationResponse['shares_purchased'],
   final_value: '2500.00000000' as SimulationResponse['final_value'],
   total_return_percentage: '150.000000' as SimulationResponse['total_return_percentage'],
-  cagr_percentage: '9.596872' as SimulationResponse['cagr_percentage'],
+  cagr_percentage: '9.594448' as SimulationResponse['cagr_percentage'],
   inflation_adjusted_final_value: null,
   disclosed_splits: [],
   growth_series: [],
-  calculation_version: 'v1',
+  calculation_version: 'v2',
   error_message: null,
   created_at: '2026-07-18T00:00:00Z',
 };
@@ -49,18 +40,18 @@ function setReducedMotion(matches: boolean) {
     }) as MediaQueryList;
 }
 
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 describe('OpeningSequenceHeading', () => {
   beforeEach(() => {
-    replaceMock.mockClear();
     setReducedMotion(false);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('renders the full sentence to assistive tech immediately, before the sequence settles', () => {
-    params = new URLSearchParams('new=1');
+  it('renders the full sentence and every child section immediately — no gating, no composing/pause/reveal choreography', () => {
     render(
       <OpeningSequenceHeading sim={BASE_SIM}>
         <div data-testid="child-content">child</div>
@@ -72,13 +63,10 @@ describe('OpeningSequenceHeading', () => {
       'aria-label',
       'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025 your investment would be worth $2,500.00 today.'
     );
-    expect(heading).toHaveClass('sr-only');
-    expect(screen.queryByTestId('child-content')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.getByTestId('child-content')).toBeInTheDocument();
   });
 
   it('renders only a tiny kicker label — nothing more — no status badge competing with the sentence', () => {
-    params = new URLSearchParams();
     render(
       <OpeningSequenceHeading sim={BASE_SIM}>
         <div data-testid="child-content">child</div>
@@ -90,61 +78,51 @@ describe('OpeningSequenceHeading', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('composes, pauses, reveals the answer, then settles and reveals the rest of the page', () => {
-    vi.useFakeTimers();
-    params = new URLSearchParams('new=1');
+  it('has no skip affordance — there is no timeline left to skip', () => {
     render(
       <OpeningSequenceHeading sim={BASE_SIM}>
         <div data-testid="child-content">child</div>
       </OpeningSequenceHeading>
     );
 
-    expect(screen.queryByTestId('child-content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+  });
 
-    act(() => {
-      vi.advanceTimersByTime(2750);
+  it('plays a single opacity/translate settle on the sentence, then settles — content was never hidden while it played', async () => {
+    render(
+      <OpeningSequenceHeading sim={BASE_SIM}>
+        <div data-testid="child-content">child</div>
+      </OpeningSequenceHeading>
+    );
+
+    // Content is present on the very first render, before the settle transition resolves.
+    expect(screen.getByTestId('child-content')).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading.className).toMatch(/opacity-0/);
+
+    await act(async () => {
+      await nextFrame();
+      await nextFrame();
     });
 
-    const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).not.toHaveClass('sr-only');
+    expect(heading.className).toMatch(/opacity-100/);
+    // Still the same content, unaffected by the transition having played.
     expect(screen.getByTestId('child-content')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 
-  it('skips straight to the settled state on click, with no information loss', () => {
-    params = new URLSearchParams('new=1');
+  it('renders identically for a revisited simulation — no replay marker, nothing to distinguish it from a fresh arrival', () => {
     render(
       <OpeningSequenceHeading sim={BASE_SIM}>
         <div data-testid="child-content">child</div>
       </OpeningSequenceHeading>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-
-    const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).not.toHaveClass('sr-only');
-    expect(heading).toHaveAttribute('aria-label', expect.stringContaining('your investment would be worth $2,500.00 today.'));
-    expect(screen.getByTestId('child-content')).toBeInTheDocument();
-  });
-
-  it('never plays the sequence for a revisited simulation (no ?new=1 marker) — settled immediately', () => {
-    params = new URLSearchParams();
-    render(
-      <OpeningSequenceHeading sim={BASE_SIM}>
-        <div data-testid="child-content">child</div>
-      </OpeningSequenceHeading>
-    );
-
-    const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).not.toHaveClass('sr-only');
     expect(screen.getByTestId('child-content')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
-    expect(replaceMock).not.toHaveBeenCalled();
   });
 
-  it('never plays the sequence when the user prefers reduced motion, even right after creation', () => {
+  it('skips the settle transition entirely when the user prefers reduced motion — the sentence is settled from the first render', () => {
     setReducedMotion(true);
-    params = new URLSearchParams('new=1');
     render(
       <OpeningSequenceHeading sim={BASE_SIM}>
         <div data-testid="child-content">child</div>
@@ -152,8 +130,7 @@ describe('OpeningSequenceHeading', () => {
     );
 
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).not.toHaveClass('sr-only');
+    expect(heading.className).toMatch(/opacity-100/);
     expect(screen.getByTestId('child-content')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 });

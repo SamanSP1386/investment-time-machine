@@ -78,17 +78,16 @@ export function SimulationForm() {
 
   /**
    * The product "begins answering the user's question" the moment the
-   * Simulation Engine completes (EXPERIENCE_CONSTITUTION.md, M7 Phase 3B.1)
-   * — this form no longer shows its own inline success card; it hands off
-   * to the Results screen immediately. `?new=1` is the one-shot marker
-   * (`useJustCreatedFlag`) that lets the Results screen tell "just arrived
-   * from here" apart from a refresh/back/shared-link visit, so the opening
-   * sequence plays exactly once and only for a genuinely completed result.
+   * Simulation Engine completes (EXPERIENCE_CONSTITUTION.md) — this form no
+   * longer shows its own inline success card; it hands off to the Results
+   * screen immediately, which renders the same way regardless of how it was
+   * reached (Founder Decision 017 — no more `?new=1` replay marker, since
+   * there is no longer a staged reveal that needs to play "exactly once").
    */
   useEffect(() => {
     if (createSimulation.isSuccess && createSimulation.data) {
       const sim = createSimulation.data;
-      router.push(sim.status === 'completed' ? `/simulation/${sim.id}?new=1` : `/simulation/${sim.id}`);
+      router.push(`/simulation/${sim.id}`);
     }
   }, [createSimulation.isSuccess, createSimulation.data, router]);
 

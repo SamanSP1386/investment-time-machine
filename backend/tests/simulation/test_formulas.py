@@ -46,14 +46,17 @@ def test_cagr_matches_independent_cross_check_via_math_module() -> None:
     # Founder Specification 2.14.9 example: $1,000 -> $2,500 over 10 years.
     # Cross-checked against Python's `math` module (an independent code path
     # from `decimal`) rather than re-deriving the same formula under test.
+    # calculate_cagr returns a percentage (Founder Decision 016 / ADR-040,
+    # "v2"), so the independently cross-checked fraction is scaled by 100
+    # to match.
     cagr = calculate_cagr(Decimal("2500"), Decimal("1000"), Decimal("10"))
-    expected_float = math.pow(2.5, 1 / 10) - 1
-    assert abs(float(cagr) - expected_float) < 1e-9
+    expected_float = (math.pow(2.5, 1 / 10) - 1) * 100
+    assert abs(float(cagr) - expected_float) < 1e-6
 
 
 def test_cagr_total_loss_yields_negative_100_percent() -> None:
     cagr = calculate_cagr(Decimal("0"), Decimal("1000"), Decimal("5"))
-    assert cagr == Decimal("-1")
+    assert cagr == Decimal("-100")
 
 
 def test_cagr_rejects_non_positive_years_as_calculation_error() -> None:
