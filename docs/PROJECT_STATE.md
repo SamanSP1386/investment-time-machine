@@ -87,6 +87,7 @@ Asset Explorer, Simulation History, and Auth screens are named in `docs/frontend
 - **Founder Decision 013** (Approved, 2026-07-19) — Experience Philosophy: approves `docs/EXPERIENCE_CONSTITUTION.md` in full as the product's highest-level UX/interaction philosophy. Closed.
 - **Founder Decision 014** (Approved, 2026-07-19) — Growth Series Persistence, Option A: persist `growth_series` at creation, backfill existing completed simulations, version against `calculation_version`. **Approved as policy; implementation not yet built** — tracked as KI-021 (reopened).
 - **Founder Decision 015** (Approved, 2026-07-19) — Anonymous Educational AI Limits, Option D: anonymous keeps no-auth-wall access at a lower per-minute rate plus a new daily cap; authenticated keeps the spec-mandated 20/min at a higher daily cap. **Approved as policy; implementation not yet built** — scheduled for M7 Phase 4.
+- **Founder Decision 016** (Proposed, 2026-07-21) — CAGR Percentage Scale Correction: three fix options drafted (source/API-boundary/frontend-only), recommendation is to fix at the source with a `calculation_version` bump and backfill. **Not yet decided — blocks KI-045 and the parked Results branch from being considered milestone-complete.**
 
 ## Open ADRs
 
@@ -97,7 +98,8 @@ No ADR is currently in Proposed/Draft state. New this pass: **ADR-039** (the Res
 
 ## Critical Known Issues
 
-- **KI-016 (High, Open)** — Split-consistency assumption underlying `close_price`-based calculation unverified against live data. The single highest-priority open item in the project, unrelated to M6 or M7.
+- **KI-045 (High, Open — new this pass)** — `cagr_percentage` served at 1/100th its correct value across every layer (Simulation Engine, backend test suite, API docs example, frontend display). Root-caused end to end; Founder Decision 016 drafts the fix options, awaiting sign-off. The single highest-severity *newly discovered* item this pass — a silently wrong, user-facing financial figure.
+- **KI-016 (High, Open)** — Split-consistency assumption underlying `close_price`-based calculation unverified against live data. The single highest-priority *long-standing* open item in the project, unrelated to M6 or M7.
 - **KI-039 (High, Open)** — Custom-domain requirement for `SameSite=Strict` cookies to function at all (ADR-018's own assumption) is never enforced or verified anywhere — breaks the first *staging/demo* deployment, not only production, if frontend and backend ship on default Vercel/Railway/Render subdomains. Deadline: before the first deployed staging/demo environment. Found during M7 Phase 1.5, unaffected by this phase's work (no deployment configuration changed).
 - **KI-021 (Medium, Open — reopened 2026-07-19)** — `growth_series`/`disclosed_splits` still not persisted (empty on retrieval-after-creation); Founder Decision 014 approves the full-resolution mechanism (Option A), but implementation is scheduled for M7 Phase 3C, not yet built. Blocking the growth chart specifically, not the Results foundation (which does not read this field).
 - **KI-031 (Medium, Open)** — Password reset / account recovery not implemented — deliberately deferred past M5, but a real requirement before any production launch per `.claude/SECURITY_POLICY.md`.
