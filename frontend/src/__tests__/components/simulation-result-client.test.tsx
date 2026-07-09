@@ -5,6 +5,16 @@ import { SimulationResultClient } from '@/components/simulation-result/simulatio
 import { ApiError } from '@/lib/api/errors';
 import type { SimulationResponse } from '@/types/api';
 
+// No `?new=1` marker by default — every test in this file renders a
+// completed simulation's *settled* state immediately, exactly like a
+// revisited/shared link. The opening sequence's own animated timeline is
+// covered separately by opening-sequence-heading.test.tsx.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => '/simulation/sim-123',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const refetchMock = vi.fn();
 let queryState: {
   data: SimulationResponse | undefined;
@@ -63,21 +73,41 @@ describe('SimulationResultClient', () => {
     expect(screen.getByText('Run another simulation')).toBeInTheDocument();
   });
 
-  it('renders the worked-example sentence, snapshot, and hero numbers for a completed simulation', () => {
+  it('renders the worked-example sentence as the hero (settled), with the reading order Sections 1-2, 4-7 all present, for a completed simulation', () => {
     queryState = { data: BASE_SIM, isPending: false, isError: false, error: null, isFetching: false };
     render(<SimulationResultClient id="sim-123" />);
 
-    expect(screen.getByRole('heading', { name: 'Simulation Result' })).toBeInTheDocument();
-    expect(screen.getByText(/If you had invested \$1,000\.00 in AAPL/)).toBeInTheDocument();
+    // Section 1 — a tiny kicker label, nothing more.
+    expect(screen.getByText('Simulation result')).toBeInTheDocument();
+    expect(screen.queryByText('completed')).not.toBeInTheDocument();
 
+    // Section 2 — the hero sentence, the page's only real headline.
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveAttribute(
+      'aria-label',
+      'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025 your investment would be worth $2,500.00 today.'
+    );
+    expect(heading).not.toHaveClass('sr-only');
+
+    // Section 4 — Supporting Facts, plain label/value pairs, never a bordered card grid.
     expect(screen.getByText('Final Value')).toBeInTheDocument();
-    expect(screen.getByText('$2,500.00')).toBeInTheDocument();
+    expect(screen.getByText('Final Value').closest('div')).toHaveTextContent('$2,500.00');
     expect(screen.getByText('Total Return')).toBeInTheDocument();
     expect(screen.getByText('+150.00%')).toBeInTheDocument();
-    expect(screen.getByText('CAGR')).toBeInTheDocument();
+    expect(screen.getByText('Annual Return (CAGR)')).toBeInTheDocument();
     expect(screen.getByText('+9.60%')).toBeInTheDocument();
 
-    expect(screen.getByText('Simulation Snapshot')).toBeInTheDocument();
+    // Section 5 — Growth Over Time, honest "not yet available" (KI-021).
+    expect(screen.getByText(/day-by-day view of this investment.s path isn.t available/)).toBeInTheDocument();
+
+    // Section 6 — Why, three plain-English paragraphs.
+    expect(screen.getByText('Price appreciation')).toBeInTheDocument();
+    expect(screen.getByText('Dividend contribution')).toBeInTheDocument();
+    expect(screen.getByText('Inflation adjustment')).toBeInTheDocument();
+
+    // Section 7 — The Proof, collapsed by default, folding in the former Snapshot/Technical Details content.
+    const proofSummary = screen.getByText('Methodology, assumptions, and technical details');
+    expect(proofSummary.closest('details')).not.toHaveAttribute('open');
     expect(screen.getByText('sim-123')).toBeInTheDocument();
     expect(screen.getByText('v1')).toBeInTheDocument();
   });

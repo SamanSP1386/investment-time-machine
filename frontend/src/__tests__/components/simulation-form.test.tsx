@@ -5,6 +5,11 @@ import { SimulationForm } from '@/components/simulator/simulation-form';
 import { ApiError } from '@/lib/api/errors';
 import type { SimulationResponse } from '@/types/api';
 
+const pushMock = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
+
 vi.mock('@/components/simulator/asset-search-combobox', () => ({
   AssetSearchCombobox: ({
     label,
@@ -80,6 +85,7 @@ describe('SimulationForm', () => {
     resetMutationState();
     mutateMock.mockClear();
     resetMock.mockClear();
+    pushMock.mockClear();
   });
 
   it('shows an inline validation error and never submits when the investment amount is invalid', async () => {
@@ -179,11 +185,42 @@ describe('SimulationForm', () => {
     expect(screen.getByText('MISSING_HISTORICAL_DATA', { exact: false })).toBeInTheDocument();
   });
 
-  it('renders a calm inline success card with the echoed inputs, no navigation', async () => {
+  it('navigates to the Results screen with the opening-sequence marker when the simulation completes', async () => {
     mutationState.isSuccess = true;
     mutationState.data = {
       id: 'sim-123',
       status: 'completed',
+      asset_symbol: 'AAPL',
+      investment_amount: '1000.00000000' as SimulationResponse['investment_amount'],
+      start_date: '2015-01-01',
+      end_date: '2025-01-01',
+      include_dividends: false,
+      adjust_for_inflation: false,
+      initial_price: '100.00000000' as SimulationResponse['initial_price'],
+      final_price: '250.00000000' as SimulationResponse['final_price'],
+      shares_purchased: '10.00000000' as SimulationResponse['shares_purchased'],
+      final_value: '2500.00000000' as SimulationResponse['final_value'],
+      total_return_percentage: '150.000000' as SimulationResponse['total_return_percentage'],
+      cagr_percentage: '9.596872' as SimulationResponse['cagr_percentage'],
+      inflation_adjusted_final_value: null,
+      disclosed_splits: [],
+      growth_series: [],
+      calculation_version: 'v1',
+      error_message: null,
+      created_at: '2026-07-18T00:00:00Z',
+    };
+
+    render(<SimulationForm />);
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/simulation/sim-123?new=1'));
+    expect(screen.getByRole('button', { name: 'Calculating historical returns…' })).toBeInTheDocument();
+  });
+
+  it('navigates to the Results screen with no opening-sequence marker when the simulation failed', async () => {
+    mutationState.isSuccess = true;
+    mutationState.data = {
+      id: 'sim-456',
+      status: 'failed',
       asset_symbol: 'AAPL',
       investment_amount: '1000.00000000' as SimulationResponse['investment_amount'],
       start_date: '2015-01-01',
@@ -200,23 +237,12 @@ describe('SimulationForm', () => {
       disclosed_splits: [],
       growth_series: [],
       calculation_version: 'v1',
-      error_message: null,
+      error_message: 'Historical data unavailable for the selected date range.',
       created_at: '2026-07-18T00:00:00Z',
     };
 
     render(<SimulationForm />);
 
-    expect(screen.getByText('Simulation complete')).toBeInTheDocument();
-    expect(
-      screen.getByText('Your historical investment simulation has been successfully created and recorded.')
-    ).toBeInTheDocument();
-    expect(screen.getByText('sim-123')).toBeInTheDocument();
-    expect(screen.getByText('completed')).toBeInTheDocument();
-    const startNewButton = screen.getByRole('button', { name: 'Start a new simulation' });
-    expect(startNewButton).toBeInTheDocument();
-
-    const user = userEvent.setup();
-    await user.click(startNewButton);
-    expect(resetMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/simulation/sim-456'));
   });
 });

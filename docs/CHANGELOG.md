@@ -4,6 +4,7 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+<<<<<<< HEAD
 ## [Unreleased] — 2026-07-21 — Review, Fix-Investigation, Philosophy Audit & Reconciliation Pass
 
 No version bump — this entry documents a review pass, not a release. `v0.10.0` remains the current tagged version.
@@ -22,12 +23,64 @@ No version bump — this entry documents a review pass, not a release. `v0.10.0`
 
 ### Removed
 - N/A — nothing deleted. The uncommitted Results-redesign work was parked (preserved on a pushed branch), not discarded.
+=======
+## [0.10.2] — 2026-07-20 — M7 Phase 3B.2: Results Reading Experience
+
+### Added
+- **The Results Reading Experience** — a full redesign of the completed-simulation Results screen from a KPI-card dashboard to a fixed-order editorial composition (`docs/ARCHITECTURE_DECISIONS.md` ADR-039): Section 1 (a tiny "Simulation result" kicker, nothing more — the status `Badge` is removed), Section 2 (the worked-example sentence — now `OpeningSequenceHeading`'s sole content, redesigned as stacked, editorial lines with the two key figures — investment amount and final value — at a large "Hero Figure" size, the rest of the sentence at a supporting size; no card, no border, no color, no status chip), Section 3 (pure whitespace between the sentence and what follows — a real gap, not a component), Section 4 ("Supporting Facts" — Final Value/Total Return/Annual Return, plain label-value pairs with a native source disclosure, never a bordered tile), Section 5 ("Growth Over Time" — an honest, plainly-stated "not yet available" note, since `growth_series` is always empty today per KI-021; structured so a real chart can slot in later without a redesign), Section 6 ("Why" — three static, non-AI, plain-English paragraphs personalized to the simulation's own values: price appreciation always; dividend contribution and inflation adjustment each stating what was actually chosen, an assumption stated plainly rather than silently applied either way), Section 7 ("The Proof" — one collapsed-by-default disclosure folding in the former "Simulation Snapshot" and "Technical Details" cards as "Assumptions" and "Technical details" subsections, plus new methodology copy referencing the `close_price` basis).
+- `frontend/src/components/simulation-result/results-sections.tsx` — `SupportingFacts`, `GrowthOverTime`, `WhyExplanation`, `TheProof`, the four new presentational components backing Sections 4–7.
+- 21 new frontend tests (`results-sections.test.tsx` covering every conditional copy branch; updates to `opening-sequence-heading.test.tsx` and `simulation-result-client.test.tsx` for the new markup).
+
+### Changed
+- `OpeningSequenceHeading` — completely restyled while its animation/replay logic (`useOpeningSequence`, `useJustCreatedFlag`, `useReducedMotion`, the `?new=1` marker) is unchanged from M7 Phase 3B.1; only what the settled and composing states *look like* changed, not when or whether they play.
+- `SimulationResultClient`'s `completed` branch now renders `SupportingFacts`/`GrowthOverTime`/`WhyExplanation`/`TheProof` instead of a `StatTile` grid, a `SimulationSnapshot` card, and a `TechnicalDetails` card. The `pending`/`failed` branches are unchanged — this redesign is scoped to the completed, "what actually happened" case the new reading order describes; `ResultHeader`, `SimulationSnapshot`, and `TechnicalDetails` remain in place, serving those two states exactly as before.
+
+### Fixed
+- A real accessibility regression caught only by the test suite, not by visual inspection: the redesign's first draft wrapped the "Skip" button inside the same `aria-hidden="true"` container as the decorative composing animation, making it unreachable by role/keyboard — moved outside that boundary so it remains a real, focusable, announced control.
+
+### Removed
+- `StatTile`'s bordered three-tile hero-number row, the bordered "Simulation Snapshot" card, and the separately-bordered "Technical Details" disclosure — all folded into or replaced by the new editorial sections above. `StatTile` itself is untouched and still used elsewhere (e.g. `dev/playground`).
+>>>>>>> results/pending-founder-review
 
 ### Deprecated
 - N/A.
 
 ### Security
+<<<<<<< HEAD
 - N/A — documentation, a git tag, and branch/commit reorganization only.
+=======
+- N/A — a pure visual/structural redesign of an existing read-only screen; no new data fetched, no new endpoint, no change to what information is shown for a given simulation.
+
+---
+
+## [0.10.1] — 2026-07-20 — M7 Phase 3B.1: Results Opening Sequence
+
+### Added
+- **The Results Opening Sequence** — the calm, one-time animated bridge between the Simulator and a freshly-completed simulation's Results screen (`frontend/src/components/simulation-result/opening-sequence-heading.tsx`), replacing the static "Simulation Result" heading for the `completed` case only. Phrases (asset, amount, dates) compose in one at a time, a silent ~1s pause, then the answer ("…your investment would be worth $X.") arrives calmly with a larger figure size — never a count-up, celebration, or sign-dependent treatment — before settling into the permanent page `<h1>`, at which point the rest of the completed Results screen (hero numbers, snapshot, technical details, links — all pre-existing M7 Phase 3B content, unchanged) mounts beneath it.
+- `useOpeningSequence` (`frontend/src/hooks/use-opening-sequence.ts`) — the timeline state machine (`composing` → `paused` → `answered` → `settled`), plus a `skip()` escape hatch that jumps straight to the settled end state.
+- `useJustCreatedFlag` (`frontend/src/hooks/use-just-created-flag.ts`) — reads and immediately strips a one-shot `?new=1` URL marker, the "play exactly once" mechanism (see `docs/ARCHITECTURE_DECISIONS.md` ADR-038 for why a query marker was chosen over `sessionStorage`).
+- `useReducedMotion` (`frontend/src/hooks/use-reduced-motion.ts`) — JS-level `prefers-reduced-motion` detection for the sequence's `setTimeout`-scheduled timeline, which the project's existing global CSS reduced-motion override cannot collapse (that override only zeroes `animation`/`transition-duration`, not a JS-scheduled delay).
+- `SimulationForm` now navigates to `/simulation/{id}` on a successful submission (`?new=1` appended only when the resulting simulation is `completed`) instead of rendering its own inline "Simulation complete" success card, which is removed along with its now-unreachable "Start a new simulation" reset flow.
+- The one real `<h1>` on the Results screen carries its final sentence (including the emphasized answer figure) from first render, visually hidden (`sr-only`) until the sequence settles — screen readers get the complete answer immediately, never only via the decorative animation, per `docs/EXPERIENCE_CONSTITUTION.md` §9.
+- A visible "Skip" affordance (keyboard-reachable, no focus trap) jumps directly to the settled state with no information loss; `prefers-reduced-motion` does the same automatically.
+- 24 new frontend tests (`use-opening-sequence.test.tsx`, `use-just-created-flag.test.tsx`, `opening-sequence-heading.test.tsx`), plus updates to `simulation-form.test.tsx` and `simulation-result-client.test.tsx` for the new navigation/heading behavior.
+
+### Changed
+- `frontend/src/app/simulation/[id]/page.tsx` now wraps `SimulationResultClient` in a `<Suspense>` boundary — required by Next.js for any client component calling `useSearchParams` (the opening sequence's marker read) to build for production.
+- The pending/failed worked-example sentence (`ResultHeader`/`workedExampleSentence`, unchanged for those two states) no longer has a `completed` branch — a completed simulation's sentence is now owned entirely by `OpeningSequenceHeading`.
+
+### Fixed
+- A real layout bug found only by live-rendering in a browser (not caught by the jsdom-based test suite): the decorative composing phrases used `inline-block` spans with trailing whitespace baked into their text content, which browsers trim at an `inline-block` box's edge — words ran together ("invested$10,000.00in AAPL"). Fixed by moving the space to a separate plain text node between spans (`docs/ARCHITECTURE_DECISIONS.md` ADR-038's companion fix, verified via a headless-Chromium screenshot before and after).
+
+### Removed
+- `SimulationForm`'s inline post-submit success card and its `formKey`-remount "Start a new simulation" reset flow — both unreachable now that a successful submission navigates away immediately.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — the `?new=1` marker changes only whether an animation plays, never what data is fetched, shown, or fetched from; see ADR-038's Tradeoffs for the (accepted, low-severity) case of a copy-pasted marker.
+>>>>>>> results/pending-founder-review
 
 ---
 

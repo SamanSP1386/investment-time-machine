@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
-import { StatTile } from '@/components/ui/stat-tile';
+import { OpeningSequenceHeading } from '@/components/simulation-result/opening-sequence-heading';
+import { GrowthOverTime, SupportingFacts, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
 import { useSimulation } from '@/hooks/use-simulation';
 import { ApiError, getErrorCopy } from '@/lib/api';
-import { formatCurrency, formatDate, formatDateRange, formatPercentage } from '@/lib/format';
+import { formatCurrency, formatDate, formatDateRange } from '@/lib/format';
 import type { SimulationResponse, SimulationStatus } from '@/types/api';
 
 const STATUS_BADGE_VARIANT: Record<SimulationStatus, 'good' | 'warning' | 'critical'> = {
@@ -19,19 +20,15 @@ const STATUS_BADGE_VARIANT: Record<SimulationStatus, 'good' | 'warning' | 'criti
 };
 
 /**
- * The worked-example question this simulation answers, in the product's
- * own "if I had invested…" language (docs/EXPERIENCE_CONSTITUTION.md §4) —
- * never an abstracted portfolio-analytics restatement. The closing clause
- * changes with `status`, since a pending/failed simulation hasn't actually
- * produced "precisely what would have happened" yet.
+ * The worked-example question a pending/failed simulation is still
+ * answering (docs/EXPERIENCE_CONSTITUTION.md §4). A completed simulation no
+ * longer uses this — `OpeningSequenceHeading` composes its own sentence,
+ * the Results Opening Sequence's "first sentence of the answer"
+ * (M7 Phase 3B.1), ending in the actual answer rather than a promissory
+ * "here's precisely what would have happened."
  */
 function workedExampleSentence(sim: SimulationResponse): string {
-  const amount = formatCurrency(sim.investment_amount);
-  const range = formatDateRange(sim.start_date, sim.end_date);
-  const opening = `If you had invested ${amount} in ${sim.asset_symbol}, starting ${formatDate(sim.start_date)} and held until ${formatDate(sim.end_date)}`;
-  if (sim.status === 'completed') {
-    return `${opening} — here's precisely what would have happened, ${range}.`;
-  }
+  const opening = `If you had invested ${formatCurrency(sim.investment_amount)} in ${sim.asset_symbol}, starting ${formatDate(sim.start_date)} and held until ${formatDate(sim.end_date)}`;
   if (sim.status === 'pending') {
     return `${opening} — here's what we're calculating.`;
   }
@@ -119,6 +116,7 @@ function CopyLinkButton() {
   );
 }
 
+/** Used for the pending/failed states only — a completed simulation renders `OpeningSequenceHeading` instead. */
 function ResultHeader({ sim }: { sim: SimulationResponse }) {
   return (
     <div className="flex flex-col gap-2">
@@ -172,6 +170,23 @@ export function SimulationResultClient({ id }: { id: string }) {
     );
   }
 
+  if (sim.status === 'completed') {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col p-6 sm:p-10">
+        <OpeningSequenceHeading sim={sim}>
+          <SupportingFacts sim={sim} />
+          <GrowthOverTime sim={sim} />
+          <WhyExplanation sim={sim} />
+          <TheProof sim={sim} />
+          <div className="flex flex-wrap items-center gap-4">
+            <RunAnotherSimulationLink />
+            <CopyLinkButton />
+          </div>
+        </OpeningSequenceHeading>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6 sm:p-10">
       <ResultHeader sim={sim} />
@@ -188,37 +203,12 @@ export function SimulationResultClient({ id }: { id: string }) {
             </Button>
           </CardContent>
         </Card>
-      ) : null}
-
-      {sim.status === 'failed' ? (
+      ) : (
         <ErrorState
           title="Simulation could not be completed"
           description={sim.error_message ?? 'The simulation could not be calculated.'}
         />
-      ) : null}
-
-      {sim.status === 'completed' ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatTile
-            size="compact"
-            label="Final Value"
-            value={sim.final_value !== null ? formatCurrency(sim.final_value) : 'Not available'}
-            source="final_value — Simulation Engine output"
-          />
-          <StatTile
-            size="compact"
-            label="Total Return"
-            value={sim.total_return_percentage !== null ? formatPercentage(sim.total_return_percentage) : 'Not available'}
-            source="total_return_percentage = ((final_value − investment_amount) / investment_amount) × 100"
-          />
-          <StatTile
-            size="compact"
-            label="CAGR"
-            value={sim.cagr_percentage !== null ? formatPercentage(sim.cagr_percentage) : 'Not available'}
-            source="cagr_percentage — compound annual growth rate over the simulated period"
-          />
-        </div>
-      ) : null}
+      )}
 
       <SimulationSnapshot sim={sim} />
 
