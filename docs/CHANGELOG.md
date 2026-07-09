@@ -4,6 +4,33 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [Unreleased] — 2026-07-21 — Review, Fix-Investigation, Philosophy Audit & Reconciliation Pass
+
+No version bump — this entry documents a review pass, not a release. `v0.10.0` remains the current tagged version.
+
+### Added
+- `docs/KNOWN_ISSUES.md` **KI-045** (High) — `cagr_percentage` served at 1/100th its correct value across the Simulation Engine, its own known-answer test, `docs/api_design.md`'s worked example, and the frontend display layer. Root-caused end to end; no code fix yet.
+- `docs/FOUNDER_DECISIONS.md` **Founder Decision 016** (Proposed) — three fix options for KI-045 (source/API-boundary/frontend-only), with a recommendation, awaiting founder sign-off.
+- Annotated git tag **`v0.10.0`** on commit `15474d3`, closing a drift where `docs/CHANGELOG.md`/`docs/PROJECT_STATE.md` had documented the M7 Phase 3B version since 2026-07-19 but no tag had ever been created.
+- Branch **`results/pending-founder-review`** (pushed to origin) — the full, tested, independently-green Results Opening Sequence (M7 Phase 3B.1) and Results Reading Experience (M7 Phase 3B.2) changeset, committed as 5 logical commits, parked pending founder resolution of KI-045/Founder Decision 016 and a motion-philosophy review finding (see below). Not merged to `main`.
+
+### Changed
+- `docs/PROJECT_STATE.md` — Current Milestone, roadmap table, Open Founder Decisions, and Critical Known Issues rewritten to reflect actual `main` state versus what exists only on the parked branch.
+
+### Fixed
+- N/A — the CAGR defect (KI-045) is documented, not yet fixed; no code changed on `main` this pass.
+
+### Removed
+- N/A — nothing deleted. The uncommitted Results-redesign work was parked (preserved on a pushed branch), not discarded.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A — documentation, a git tag, and branch/commit reorganization only.
+
+---
+
 ## [0.10.0] — 2026-07-19 — M7 Phase 3B: Founder Decisions + Results Foundation
 
 ### Added
