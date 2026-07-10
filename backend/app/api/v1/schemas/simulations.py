@@ -71,18 +71,18 @@ class SimulationResponse(BaseModel):
         disclosed_splits: tuple[StockSplit, ...] = (),
         growth_series: tuple[EngineGrowthSeriesPoint, ...] = (),
     ) -> SimulationResponse:
-        """Pure data mapping (ORM + ephemeral engine output -> API schema) —
+        """Pure data mapping (ORM + engine/repository output -> API schema) —
         no calculation happens here, matching "no financial calculation
         logic in the API layer." `disclosed_splits`/`growth_series` default
-        to empty: neither is persisted (no `simulations` columns exist for
-        them), so a simulation retrieved after creation (not the immediate
-        POST response) currently returns them empty — a documented M4 scope
-        cut, see docs/KNOWN_ISSUES.md KI-021, approved for full resolution by
-        Founder Decision 014. `calculation_version` (Founder Decision 014,
-        M7 Phase 3B) was already stored on every `Simulation` row from the
-        first migration (`app.models.simulation`) but never surfaced on this
-        response until now — a pure additive field exposure, no schema or
-        engine change."""
+        to empty only for a caller that doesn't pass them; as of Founder
+        Decision 014, both the `POST` (via `SimulationOutcome`) and `GET`
+        (via `simulation_service.get_simulation_by_id`'s read-through) paths
+        always pass real values for a completed simulation — see
+        docs/KNOWN_ISSUES.md KI-021 (Resolved). `calculation_version`
+        (Founder Decision 014, M7 Phase 3B) was already stored on every
+        `Simulation` row from the first migration (`app.models.simulation`)
+        but never surfaced on this response until now — a pure additive
+        field exposure, no schema or engine change."""
         return cls(
             id=simulation.id,
             status=simulation.status,

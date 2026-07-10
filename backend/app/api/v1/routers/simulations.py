@@ -73,8 +73,10 @@ def get_simulation(
     # may view simulation results and share simulation links) — ownership
     # enforcement only applies when the simulation itself has a user_id.
     requesting_user_id = current_user.id if current_user is not None else None
-    simulation = simulation_service.get_simulation_by_id(
+    simulation, disclosed_splits, growth_series = simulation_service.get_simulation_by_id(
         session, simulation_id, requesting_user_id=requesting_user_id
     )
-    body = SimulationResponse.from_simulation(simulation, simulation.asset.symbol)
+    body = SimulationResponse.from_simulation(
+        simulation, simulation.asset.symbol, disclosed_splits, growth_series
+    )
     return SuccessResponse(data=body)

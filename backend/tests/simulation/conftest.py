@@ -13,7 +13,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_engine
-from app.models import Asset, Dividend, EconomicIndicator, EconomicIndicatorValue, HistoricalPrice
+from app.models import (
+    Asset,
+    Dividend,
+    EconomicIndicator,
+    EconomicIndicatorValue,
+    HistoricalPrice,
+    StockSplit,
+)
 from app.models.enums import AssetType
 
 
@@ -89,6 +96,18 @@ def make_dividend(session: Session, asset: Asset, ex_dividend_date: date, amount
     session.add(dividend)
     session.flush()
     return dividend
+
+
+def make_split(session: Session, asset: Asset, split_date: date, split_ratio: str) -> StockSplit:
+    split = StockSplit(
+        asset_id=asset.id,
+        split_date=split_date,
+        split_ratio=Decimal(split_ratio),
+        data_source="manual_import",
+    )
+    session.add(split)
+    session.flush()
+    return split
 
 
 def make_cpi_observation(

@@ -10,7 +10,8 @@ from datetime import date
 from app.api.v1.dependencies import rate_limit_simulation
 from app.api.v1.errors import RateLimitExceededError
 from app.main import app
-from tests.simulation.conftest import make_asset, make_dividend, make_price
+from app.models import Asset
+from tests.simulation.conftest import make_asset, make_dividend, make_price, make_split
 
 
 def _make_priced_asset(db_session, *, with_dividend: bool = False):
@@ -159,7 +160,8 @@ def test_get_simulation_by_id_round_trips(client, db_session):
             "end_date": "2021-01-04",
         },
     )
-    simulation_id = create_response.json()["data"]["id"]
+    create_body = create_response.json()["data"]
+    simulation_id = create_body["id"]
 
     response = client.get(f"/api/v1/simulations/{simulation_id}")
 
@@ -167,14 +169,39 @@ def test_get_simulation_by_id_round_trips(client, db_session):
     body = response.json()["data"]
     assert body["id"] == simulation_id
     assert body["asset_symbol"] == symbol
-    # KI-021: growth_series/disclosed_splits are never persisted, so a
-    # retrieval-after-creation GET (unlike the immediate POST response)
-    # returns them empty — a documented M4 scope cut, approved for full
-    # resolution by Founder Decision 014 but not yet implemented.
-    assert body["growth_series"] == []
+    # Founder Decision 014, clause 4 — the closing condition for KI-021: a
+    # completed simulation's GET must never return an empty growth_series,
+    # and the persisted series must be the exact one the POST response
+    # already returned (persist-at-creation, never recomputed).
+    assert body["growth_series"] != []
+    assert body["growth_series"] == create_body["growth_series"]
     # Founder Decision 014 / M7 Phase 3B: calculation_version is now exposed
     # on every retrieval, not only the creation response.
     assert body["calculation_version"] == "v2"
+
+
+def test_get_simulation_by_id_returns_disclosed_splits(client, db_session):
+    symbol = _make_priced_asset(db_session)
+    asset = db_session.query(Asset).filter(Asset.symbol == symbol).one()
+    make_split(db_session, asset, date(2020, 6, 15), "4.0")
+
+    create_response = client.post(
+        "/api/v1/simulations",
+        json={
+            "asset_symbol": symbol,
+            "investment_amount": "1000",
+            "start_date": "2020-01-02",
+            "end_date": "2021-01-04",
+        },
+    )
+    create_body = create_response.json()["data"]
+    assert len(create_body["disclosed_splits"]) == 1
+
+    response = client.get(f"/api/v1/simulations/{create_body['id']}")
+    body = response.json()["data"]
+
+    assert body["disclosed_splits"] == create_body["disclosed_splits"]
+    assert body["disclosed_splits"][0]["split_date"] == "2020-06-15"
 
 
 def test_get_simulation_not_found_returns_404(client, db_session):

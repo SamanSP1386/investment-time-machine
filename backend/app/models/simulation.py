@@ -3,7 +3,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
@@ -30,6 +30,13 @@ class Simulation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
       SimulationStatus.PENDING and FAILED are valid states in which no output
       exists yet. The Founder Specification's literal NOT NULL on these
       columns was an internal spec bug given its own status enum.
+
+    growth_series (Founder Decision 014, Option A): persisted at creation
+    time for completed simulations only -- a failed/pending row's value is
+    always NULL, matching every other output column's convention. Stored as
+    a JSON array of {"point_date", "value"} objects with `value` serialized
+    as a string (Decimal-safe, `app.simulation.growth_series_codec`), never
+    recomputed on `GET`. See docs/KNOWN_ISSUES.md KI-021.
     """
 
     __tablename__ = "simulations"
@@ -61,6 +68,15 @@ class Simulation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     cagr_percentage: Mapped[float | None] = mapped_column(Numeric(10, 6), nullable=True)
     inflation_adjusted_final_value: Mapped[float | None] = mapped_column(
         Numeric(20, 8), nullable=True
+    )
+    # `none_as_null=True`: without it, assigning Python `None` to a JSON(B)
+    # column writes the JSON literal `null`, not SQL NULL -- silently
+    # breaking any `IS NULL` filter (e.g. the backfill script's own query
+    # for not-yet-backfilled rows). Every other nullable column on this
+    # model gets real SQL NULL "for free" from a plain Python `None`; JSONB
+    # needs this explicit opt-in to match that same behavior.
+    growth_series: Mapped[list[dict] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
     )
 
     status: Mapped[SimulationStatus] = mapped_column(

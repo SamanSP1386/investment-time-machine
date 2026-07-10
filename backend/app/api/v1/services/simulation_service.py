@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.audit import record_simulation_audit
 from app.api.v1.errors import ForbiddenError, SimulationNotFoundError
 from app.api.v1.schemas.simulations import SimulationCreateRequest
-from app.models import Simulation
+from app.models import Simulation, StockSplit
 from app.simulation.engine import SimulationOutcome, run_simulation
 from app.simulation.exceptions import (
     AssetNotFoundError,
@@ -38,6 +38,9 @@ from app.simulation.exceptions import (
     InvalidInvestmentAmountError,
     MissingHistoricalDataError,
 )
+from app.simulation.formulas import GrowthSeriesPoint
+from app.simulation.growth_series_codec import deserialize_growth_series
+from app.simulation.repository import SimulationRepository
 
 _PRE_FLIGHT_ERROR_CODES = {
     AssetNotFoundError: "ASSET_NOT_FOUND",
@@ -121,7 +124,15 @@ def get_simulation_by_id(
     session: Session,
     simulation_id: uuid.UUID,
     requesting_user_id: uuid.UUID | None = None,
-) -> Simulation:
+) -> tuple[Simulation, tuple[StockSplit, ...], tuple[GrowthSeriesPoint, ...]]:
+    """Returns (simulation, disclosed_splits, growth_series) — Founder
+    Decision 014's `GET` read-through. `disclosed_splits` is never persisted
+    on `simulations`; it is re-queried fresh from `stock_splits` via the same
+    range query the engine itself uses at creation (clause 5: splits already
+    live queryably elsewhere, no new column needed). `growth_series` is
+    deserialized straight from the persisted column (clauses 1-4) — never
+    recomputed — so it is empty only for a row the column itself is NULL for
+    (a pending/failed simulation, or a completed one not yet backfilled)."""
     simulation = session.get(Simulation, simulation_id)
     if simulation is None:
         raise SimulationNotFoundError(simulation_id)
@@ -129,4 +140,10 @@ def get_simulation_by_id(
     if simulation.user_id is not None and simulation.user_id != requesting_user_id:
         raise ForbiddenError()
 
-    return simulation
+    repo = SimulationRepository(session)
+    disclosed_splits = tuple(
+        repo.get_splits_ordered(simulation.asset_id, simulation.start_date, simulation.end_date)
+    )
+    growth_series = deserialize_growth_series(simulation.growth_series)
+
+    return simulation, disclosed_splits, growth_series

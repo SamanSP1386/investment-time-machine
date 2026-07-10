@@ -4,6 +4,39 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.12.0] — 2026-07-23 — Growth Series Persistence (Founder Decision 014) + KI-016 Verification
+
+### Added
+- `backend/alembic/versions/0005_growth_series_persistence.py` — nullable `simulations.growth_series` JSONB column (schema-only).
+- `backend/app/simulation/growth_series_codec.py` — `serialize_growth_series`/`deserialize_growth_series`, the Decimal-safe (string-valued, never a JSON number) storage encoding shared by the write and read paths.
+- `backend/app/simulation/backfill_growth_series.py` — one-time operator script (`python -m app.simulation.backfill_growth_series [--dry-run]`) that re-runs `calculate_growth_series` against each pre-existing completed simulation's own stored inputs and stamps the result onto that row's own `calculation_version`; skips and reports (never fails the run) a row whose underlying price/dividend data can no longer support a recompute.
+- `docs/ARCHITECTURE_DECISIONS.md` **ADR-042** (growth series persistence — column/serialization/backfill engineering record).
+- `backend/tests/simulation/test_growth_series_codec.py`, `backend/tests/simulation/test_backfill_growth_series.py`, plus a `make_split` fixture helper in `backend/tests/simulation/conftest.py`.
+- A create-then-`GET` round-trip test asserting `growth_series`/`disclosed_splits` are byte-identical between `POST` and a subsequent `GET` (`backend/tests/api/test_simulations.py`) — the literal closing condition for Founder Decision 014 clause 4.
+
+### Changed
+- `backend/app/models/simulation.py::Simulation.growth_series` — new column, `JSONB(none_as_null=True)` so an explicit `None` assignment always writes real SQL NULL, never a JSON `null` literal.
+- `backend/app/simulation/engine.py::run_simulation` — persists the computed `growth_series` onto the `Simulation` row at creation for completed simulations only; the `POST` response shape is unchanged.
+- `backend/app/api/v1/services/simulation_service.py::get_simulation_by_id` — now also returns `disclosed_splits` (re-queried fresh from `stock_splits` on every call, no new column) and `growth_series` (deserialized from the persisted column, never recomputed).
+- `backend/app/api/v1/routers/simulations.py::get_simulation` — passes both fields through to `SimulationResponse.from_simulation`, closing the gap where a `GET` previously always returned them empty.
+- `docs/KNOWN_ISSUES.md` **KI-021** — status Open → **Resolved**.
+- `docs/KNOWN_ISSUES.md` **KI-016** — status Partially Verified → **Resolved**, with the observed AAPL split-date price numbers recorded.
+
+### Fixed
+- KI-021: `GET /api/v1/simulations/{id}` no longer returns an empty `growth_series`/`disclosed_splits` for a completed simulation — both now read-through from real, persisted/queryable data, live-verified against the running API.
+- A latent JSONB correctness bug found while testing the backfill script: assigning Python `None` to a `JSONB` column without `none_as_null=True` writes the JSON literal `null`, not SQL `NULL`, silently breaking `IS NULL` filters against it.
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A. `growth_series`/`disclosed_splits` persistence serves data the engine already computed and already served on `POST` — no new computation, input, or exposure. The backfill script has no HTTP surface. The KI-016 verification's direct-endpoint fetch was a read-only, unauthenticated GET against Yahoo Finance's own public chart data endpoint.
+
+---
+
 ## [0.11.0] — 2026-07-22 — CAGR Percentage Scale Correction + Opening Sequence Ruling
 
 ### Added

@@ -84,8 +84,9 @@ export interface AssetSearchResult {
  * Field names confirmed directly against `backend/app/api/v1/schemas/simulations.py::GrowthSeriesPoint`
  * during M7 Phase 1.5's contract-drift review — the point's date field is
  * `point_date`, not `date` (KI-036, resolved: Phase 1's original guess was
- * wrong). Still always an empty array in practice today (KI-021 — not yet
- * persisted between creation and retrieval).
+ * wrong). Shape unchanged by Founder Decision 014/KI-021's persistence fix
+ * (M7 Phase 3C-2) — only the emptiness on GET-after-creation was fixed, not
+ * the field names.
  */
 export interface GrowthSeriesPoint {
   point_date: string;
@@ -133,7 +134,13 @@ export interface SimulationResponse {
   /** null means "not requested" OR "CPI data gap" — see formatNullableCurrency/formatNullablePercentage in src/lib/format. */
   inflation_adjusted_final_value: DecimalString | null;
   disclosed_splits: DisclosedSplit[];
-  /** Empty on GET-after-creation until KI-021/FD-014 land — never assume populated. */
+  /**
+   * Persisted at creation and read through on GET as of Founder Decision 014
+   * (M7 Phase 3C-2, KI-021 resolved) — non-empty on every retrieval for a
+   * `completed` simulation, except the rare pre-existing row a backfill
+   * skipped for missing underlying price data (logged, not silent; see
+   * docs/KNOWN_ISSUES.md KI-021). Still empty for `pending`/`failed`.
+   */
   growth_series: GrowthSeriesPoint[];
   /** Exposed as of M7 Phase 3B (Founder Decision 014) — identical on POST and GET. */
   calculation_version: string;

@@ -47,6 +47,7 @@ from app.simulation.formulas import (
     calculate_total_return_percent,
     calculate_years_between,
 )
+from app.simulation.growth_series_codec import serialize_growth_series
 from app.simulation.precision import (
     quantize_currency,
     quantize_percentage,
@@ -69,9 +70,13 @@ class SimulationOutcome:
     row, plus any stock splits disclosed for audit/transparency (Founder
     Decision 001), plus the value-over-time `growth_series` (Founder
     Specification Part 3.3.2's required "Growth Chart" output, added in M4 —
-    see docs/KNOWN_ISSUES.md KI-021). Neither is persisted to the
-    `simulations` table (no columns exist for them) — both are computed
-    fresh from already-stored data and surfaced only to the caller."""
+    see docs/KNOWN_ISSUES.md KI-021). `growth_series` is also persisted onto
+    `simulation.growth_series` itself as of Founder Decision 014 (Option A)
+    — it is surfaced here too so the immediate `POST` response can serve it
+    without a round-trip deserialization of what was just serialized.
+    `disclosed_splits` is never persisted (splits already live queryably in
+    `stock_splits`, per Founder Decision 014 clause 5 — a `GET` re-queries
+    that table directly rather than needing a stored copy here)."""
 
     simulation: Simulation
     disclosed_splits: tuple[StockSplit, ...] = ()
@@ -210,6 +215,11 @@ def run_simulation(
                 ),
                 status=SimulationStatus.COMPLETED,
                 calculation_version=calculation_version,
+                # Founder Decision 014 (Option A): persisted at creation, not
+                # recomputed on GET. Failed rows never reach this branch, so
+                # growth_series stays NULL for them, matching every other
+                # output column's nullable-until-completed convention.
+                growth_series=serialize_growth_series(growth_series),
             )
             session.add(simulation)
             session.flush()
