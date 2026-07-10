@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; background: #05070a; }
+    @keyframes bandDriftA {
+      0% { transform: translateX(-4%); }
+      50% { transform: translateX(4%); }
+      100% { transform: translateX(-4%); }
+    }
+    @keyframes bandDriftB {
+      0% { transform: translateX(4%); }
+      50% { transform: translateX(-4%); }
+      100% { transform: translateX(4%); }
+    }
+    @keyframes whaleDrift1 {
+      0% { transform: translate(-8%, 0%) scale(1); }
+      50% { transform: translate(9%, 5%) scale(1.08); }
+      100% { transform: translate(-8%, 0%) scale(1); }
+    }
+    @keyframes whaleDrift2 {
+      0% { transform: translate(6%, -4%) scale(1.05); }
+      50% { transform: translate(-9%, 6%) scale(0.95); }
+      100% { transform: translate(6%, -4%) scale(1.05); }
+    }
+    @keyframes whaleDrift3 {
+      0% { transform: translate(-5%, 5%) scale(0.98); }
+      50% { transform: translate(8%, -6%) scale(1.1); }
+      100% { transform: translate(-5%, 5%) scale(0.98); }
+    }
+    @keyframes rippleEcho {
+      0% { transform: scale(0.4); opacity: 0.22; }
+      70% { opacity: 0.05; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
+    @keyframes speckFade {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      [data-tide-anim] { animation: none !important; }
+    }
+  </style>
+</helmet>
+
+<div style="position:relative; width:100%; height:100vh; min-height:720px; background: linear-gradient(160deg, #0a0d12 0%, #0d1420 55%, #070a10 100%); overflow:hidden; font-family:'Public Sans',sans-serif;">
+
+  <div style="position:absolute; inset:0; opacity:{{ masterOpacity }};">
+
+    <sc-for list="{{ whales }}" as="w" hint-placeholder-count="3">
+      <div style="position:absolute; left:{{ w.left }}%; top:{{ w.top }}%; width:{{ w.size }}px; height:{{ w.size }}px; margin-left:{{ w.negHalf }}px; margin-top:{{ w.negHalf }}px; border-radius:50%; filter:blur(100px); pointer-events:none;">
+        <div data-tide-anim="1" style="position:absolute; inset:0; border-radius:50%; background: radial-gradient(circle, rgba({{ w.color }},{{ w.op }}) 0%, rgba({{ w.color }},0) 70%); animation: {{ w.driftName }} {{ w.dur }}s ease-in-out infinite; animation-play-state:{{ motionState }};"></div>
+      </div>
+      <div data-tide-anim="1" style="position:absolute; left:{{ w.left }}%; top:{{ w.top }}%; width:120px; height:120px; margin-left:-60px; margin-top:-60px; border-radius:50%; border:1px solid rgba({{ w.color }},0.5); pointer-events:none; animation: rippleEcho {{ w.rippleDur }}s ease-out {{ w.rippleDelay }}s infinite; animation-play-state:{{ motionState }};"></div>
+    </sc-for>
+
+    <sc-for list="{{ bands }}" as="b" hint-placeholder-count="7">
+      <div data-tide-anim="1" style="position:absolute; left:-20%; top:{{ b.top }}%; width:140%; height:{{ b.height }}px; filter:blur(48px); pointer-events:none; background: linear-gradient(90deg, rgba({{ b.color }},0) 0%, rgba({{ b.color }},{{ b.op }}) 35%, rgba({{ b.color }},{{ b.op }}) 65%, rgba({{ b.color }},0) 100%); animation: {{ b.driftName }} {{ b.dur }}s ease-in-out infinite; animation-play-state:{{ motionState }};"></div>
+    </sc-for>
+
+    <sc-if value="{{ showMicrostructure }}" hint-placeholder-val="{{ true }}">
+      <sc-for list="{{ specks }}" as="s" hint-placeholder-count="16">
+        <div style="position:absolute; left:{{ s.left }}%; top:{{ s.top }}%; opacity:{{ s.peak }}; pointer-events:none;">
+          <div data-tide-anim="1" style="width:{{ s.width }}px; height:1px; background: rgba(180,205,210,0.9); animation: speckFade {{ s.dur }}s ease-in-out {{ s.delay }}s infinite; animation-play-state:{{ motionState }};"></div>
+        </div>
+      </sc-for>
+    </sc-if>
+
+  </div>
+
+  <div style="position:absolute; top:28px; left:32px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(180,205,210,0.55);">DarkPoolLiquidityTide — background layer</div>
+
+  <div style="position:absolute; top:100px; left:32px; width:300px; padding:18px 20px; border:1px solid rgba(180,205,210,0.14); border-radius:2px;">
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(180,205,210,0.4); margin-bottom:8px;">Order Book</div>
+    <div style="font-family:'Public Sans',sans-serif; font-size:13px; color:rgba(210,225,228,0.5);">UI panels sit above this layer</div>
+  </div>
+
+  <div style="position:absolute; bottom:60px; right:40px; width:340px; height:160px; border:1px solid rgba(180,205,210,0.14); border-radius:2px;"></div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1440, &quot;height&quot;: 900}, &quot;intensity&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 0.6, &quot;min&quot;: 0.2, &quot;max&quot;: 1, &quot;step&quot;: 0.05, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Tide&quot;}, &quot;speed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1, &quot;min&quot;: 0.4, &quot;max&quot;: 2, &quot;step&quot;: 0.1, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Tide&quot;}, &quot;opacity&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1, &quot;min&quot;: 0.3, &quot;max&quot;: 1, &quot;step&quot;: 0.05, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Tide&quot;}, &quot;accentColor&quot;: {&quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#2FBFA0&quot;, &quot;options&quot;: [&quot;#2FBFA0&quot;, &quot;#D9A441&quot;, &quot;#C1594A&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Tide&quot;}, &quot;showMicrostructure&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Tide&quot;}, &quot;reducedMotion&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Tide&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const intensity = this.props.intensity ?? 0.6;
+    const speed = this.props.speed ?? 1;
+    const masterOpacity = this.props.opacity ?? 1;
+    const accent = this.hexToRgb(this.props.accentColor ?? "#2FBFA0");
+    const showMicrostructure = this.props.showMicrostructure ?? true;
+    const reducedMotion = this.props.reducedMotion ?? false;
+    const motionState = reducedMotion ? "paused" : "running";
+
+    const teal = "45,145,150";
+    const blue = "58,90,140";
+    const rustFaint = "150,85,72";
+
+    const bands = [
+      { top: 8,  height: 150, color: teal, op: (0.16 * intensity).toFixed(3), dur: +(42 / speed).toFixed(1), driftName: "bandDriftA" },
+      { top: 22, height: 170, color: blue, op: (0.13 * intensity).toFixed(3), dur: +(55 / speed).toFixed(1), driftName: "bandDriftB" },
+      { top: 38, height: 130, color: teal, op: (0.15 * intensity).toFixed(3), dur: +(38 / speed).toFixed(1), driftName: "bandDriftA" },
+      { top: 54, height: 175, color: blue, op: (0.12 * intensity).toFixed(3), dur: +(60 / speed).toFixed(1), driftName: "bandDriftB" },
+      { top: 70, height: 145, color: teal, op: (0.14 * intensity).toFixed(3), dur: +(48 / speed).toFixed(1), driftName: "bandDriftA" },
+      { top: 84, height: 120, color: accent, op: (0.11 * intensity).toFixed(3), dur: +(65 / speed).toFixed(1), driftName: "bandDriftB" },
+      { top: 47, height: 90,  color: rustFaint, op: (0.045 * intensity).toFixed(3), dur: +(72 / speed).toFixed(1), driftName: "bandDriftA" },
+    ];
+
+    const whales = [
+      { left: 12, top: 20, size: 900,  negHalf: -450, color: "40,75,100", op: (0.22 * intensity).toFixed(3), dur: +(70 / speed).toFixed(1), driftName: "whaleDrift1", rippleDur: +(9 / speed).toFixed(1), rippleDelay: 0 },
+      { left: 55, top: 60, size: 1100, negHalf: -550, color: "35,60,90",  op: (0.2 * intensity).toFixed(3),  dur: +(90 / speed).toFixed(1), driftName: "whaleDrift2", rippleDur: +(11 / speed).toFixed(1), rippleDelay: 3 },
+      { left: 78, top: 26, size: 820,  negHalf: -410, color: "48,95,105", op: (0.2 * intensity).toFixed(3),  dur: +(80 / speed).toFixed(1), driftName: "whaleDrift3", rippleDur: +(10 / speed).toFixed(1), rippleDelay: 6 },
+    ];
+
+    const speckSeed = [
+      { left: 8, top: 14 }, { left: 22, top: 33 }, { left: 35, top: 12 }, { left: 47, top: 48 },
+      { left: 61, top: 24 }, { left: 73, top: 40 }, { left: 85, top: 18 }, { left: 92, top: 55 },
+      { left: 15, top: 62 }, { left: 29, top: 75 }, { left: 44, top: 84 }, { left: 58, top: 68 },
+      { left: 70, top: 88 }, { left: 82, top: 72 }, { left: 6, top: 90 }, { left: 95, top: 30 },
+    ];
+    const specks = speckSeed.map((p, i) => ({
+      left: p.left, top: p.top,
+      width: 18 + (i % 5) * 4,
+      peak: (0.06 + (i % 4) * 0.02) * intensity,
+      dur: +((5 + (i % 5)) / speed).toFixed(1),
+      delay: +((i * 0.7) % 6).toFixed(1),
+    }));
+
+    return {
+      masterOpacity,
+      motionState,
+      showMicrostructure,
+      bands,
+      whales,
+      specks,
+    };
+  }
+
+  hexToRgb(hex) {
+    const h = hex.replace("#", "");
+    const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+    const num = parseInt(full, 16);
+    return `${(num >> 16) & 255},${(num >> 8) & 255},${num & 255}`;
+  }
+}
+</script>
+</body>
+</html>

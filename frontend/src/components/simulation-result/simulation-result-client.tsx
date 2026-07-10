@@ -46,23 +46,23 @@ function SimulationSnapshot({ sim }: { sim: SimulationResponse }) {
       <CardContent>
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Asset</dt>
-            <dd className="figure font-mono text-sm text-ink-primary">{sim.asset_symbol}</dd>
+            <dt className="kicker">Asset</dt>
+            <dd className="figure text-sm text-ink-primary">{sim.asset_symbol}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Investment amount</dt>
+            <dt className="kicker">Investment amount</dt>
             <dd className="figure text-sm text-ink-primary">{formatCurrency(sim.investment_amount)}</dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Date range</dt>
+            <dt className="kicker">Date range</dt>
             <dd className="figure text-sm text-ink-primary">{formatDateRange(sim.start_date, sim.end_date)}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Dividends reinvested</dt>
+            <dt className="kicker">Dividends reinvested</dt>
             <dd className="text-sm text-ink-primary">{sim.include_dividends ? 'Yes' : 'No'}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Adjusted for inflation</dt>
+            <dt className="kicker">Adjusted for inflation</dt>
             <dd className="text-sm text-ink-primary">{sim.adjust_for_inflation ? 'Yes' : 'No'}</dd>
           </div>
         </dl>
@@ -76,17 +76,17 @@ function TechnicalDetails({ sim }: { sim: SimulationResponse }) {
   return (
     <details className="rounded-[var(--card-radius)] border border-border-hairline p-4">
       <summary className="cursor-pointer text-sm font-medium text-ink-primary select-none">Technical details</summary>
-      <dl className="figure mt-4 flex flex-col gap-2 font-mono text-xs text-ink-secondary">
+      <dl className="figure mt-4 flex flex-col gap-2 text-xs text-ink-secondary">
         <div className="flex flex-col gap-0.5">
-          <dt className="text-ink-muted uppercase">Simulation ID</dt>
+          <dt className="kicker">Simulation ID</dt>
           <dd>{sim.id}</dd>
         </div>
         <div className="flex flex-col gap-0.5">
-          <dt className="text-ink-muted uppercase">Calculation version</dt>
+          <dt className="kicker">Calculation version</dt>
           <dd>{sim.calculation_version}</dd>
         </div>
         <div className="flex flex-col gap-0.5">
-          <dt className="text-ink-muted uppercase">Created</dt>
+          <dt className="kicker">Created</dt>
           <dd>{sim.created_at}</dd>
         </div>
       </dl>
@@ -120,7 +120,7 @@ function CopyLinkButton() {
 function ResultHeader({ sim }: { sim: SimulationResponse }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="figure text-xs font-medium tracking-wide text-ink-muted uppercase">Historical simulation</p>
+      <p className="kicker">Historical simulation</p>
       <div className="h-px w-12 bg-border-gridline" aria-hidden />
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold text-ink-primary sm:text-3xl">Simulation Result</h1>
@@ -135,7 +135,7 @@ function RunAnotherSimulationLink() {
   return (
     <Link
       href="/simulator"
-      className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+      className="text-sm font-medium text-accent underline-offset-4 hover:underline"
     >
       Run another simulation
     </Link>
@@ -147,7 +147,7 @@ export function SimulationResultClient({ id }: { id: string }) {
 
   if (isPending) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center p-6 sm:p-10">
+      <main className="itm-elevated mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center p-6 sm:p-10">
         <p role="status" aria-live="polite" className="text-sm text-ink-secondary">
           Loading simulation…
         </p>
@@ -158,7 +158,7 @@ export function SimulationResultClient({ id }: { id: string }) {
   if (isError) {
     const errorCopy = getErrorCopy(error instanceof ApiError ? error.code : 'INTERNAL_SERVER_ERROR');
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6 sm:p-10">
+      <main className="itm-elevated mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6 sm:p-10">
         <ErrorState
           title={errorCopy.title}
           description={errorCopy.description}
@@ -172,7 +172,7 @@ export function SimulationResultClient({ id }: { id: string }) {
 
   if (sim.status === 'completed') {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col p-6 sm:p-10">
+      <main className="itm-elevated mx-auto flex min-h-screen max-w-[1120px] flex-col px-6 py-16 sm:px-10 sm:py-24">
         <OpeningSequenceHeading sim={sim}>
           <SupportingFacts sim={sim} />
           <GrowthOverTime sim={sim} />
@@ -188,7 +188,7 @@ export function SimulationResultClient({ id }: { id: string }) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6 sm:p-10">
+    <main className="itm-elevated mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6 sm:p-10">
       <ResultHeader sim={sim} />
 
       {sim.status === 'pending' ? (

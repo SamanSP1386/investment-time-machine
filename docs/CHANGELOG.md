@@ -4,6 +4,40 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.14.0] — 2026-07-25 — M7 Phase 3D: Design Elevation
+
+### Added
+- `docs/FOUNDER_DECISIONS.md` **Founder Decision 018** (Motion & Atmosphere Amendment) — amends Founder Decision 017's immediate-render principle to permit a one-shot digits-only figure scramble/settle, one-shot section entrances, an authorized (not yet applied) chart draw-in pattern, and static-only atmosphere, all gated by a test-enforced `prefers-reduced-motion` hard gate, with identical treatment for gains and losses.
+- `docs/ARCHITECTURE_DECISIONS.md` **ADR-044** (font self-hosting, the elevated token architecture, the scramble hook's design and the jsdom rAF-epoch bug it caught, the deliberate chart-color non-port, and the explicitly excluded "discarded looping background").
+- `frontend/src/hooks/use-scramble.ts` — the FD-018 rule 1 scramble/settle hook, mirroring `useSettleIn`'s once-per-mount pattern.
+- An "elevated" token namespace (`frontend/src/styles/tokens/primitives.css`) — oklch atmosphere/ink/accent/negative-tint/hairline values ported from the founder-approved mockup — and `.itm-elevated` (`globals.css`), a single scoped class that remaps semantic tokens (background, ink, hairline, primary/accent, button radius) within the Results and Simulator surfaces only.
+- Three self-hosted fonts via `next/font/google` (`frontend/src/app/layout.tsx`): Newsreader (display serif), IBM Plex Mono (figures/mono), Public Sans (body) — replacing Inter/JetBrains Mono.
+- A shared `.kicker` label class and a `.scramble-figure` glow-transition class (`globals.css`).
+- New/updated tests: `frontend/src/__tests__/lib/use-scramble.test.ts`, reduced-motion and gain/loss-parity coverage in `opening-sequence-heading.test.tsx` and `results-sections.test.tsx`, 12 new elevated-palette contrast cases in `contrast.test.ts` (computed directly from oklch, no lossy hex round trip).
+- `docs/KNOWN_ISSUES.md` **KI-047** (the mockup source's untracked/mis-pathed status) and **KI-048** (`docs/BRAND_CONSTITUTION.md`/`docs/frontend_design_system.md` now factually superseded for the elevated surfaces, not yet edited).
+
+### Changed
+- The Results hero sentence (`opening-sequence-heading.tsx`) now renders as one flowing serif paragraph with mono, scrambling answer figures, replacing the prior stacked-line layout; `aria-label` is unchanged in mechanism (always the final, non-scrambling text).
+- Supporting Facts, Why (now a 3-column grid), and The Proof (`results-sections.tsx`) restyled in the mockup's visual language; a restrained negative tint (new `--color-negative-tint` token) applies to Total Return/CAGR stat values only for a loss, never the hero sentence.
+- The Growth Chart (`growth-chart.tsx`) gained a gradient area fill, an invested-amount baseline reference line, an endpoint marker with an on-chart value label, and mono axis ticks — the data line itself deliberately stays the existing CVD-validated `--color-chart-portfolio` blue, not the mockup's gold accent (see ADR-044). Decimation, split markers, the tooltip, the accessible table, and the `toChartPlotNumber` boundary are unchanged; that function now has a second, equally-disclosed call site for the new baseline's plot value.
+- The Simulator (`simulation-form.tsx`, `simulator/page.tsx`) is now a flat, borderless, editorial layout — no `Card` wrapper, no card-in-card nesting, underline-only text/date inputs, and toggle-switch-styled (visually only) dividend/inflation checkboxes. Behavior and validation are unchanged.
+- `frontend/src/lib/format/index.ts` now re-exports the previously-internal `isNegativeDecimalString`.
+
+### Fixed
+- A latent jsdom testing-environment bug: `requestAnimationFrame`'s callback timestamp argument does not share `performance.now()`'s epoch in this environment, which would have made any rAF-driven animation using that pattern silently never complete under test. Caught by `use-scramble.test.ts`, fixed by re-calling `performance.now()` inside the callback.
+- A literal `*/` substring inside a `globals.css` comment prematurely closed the comment block — invisible to `vitest`/`tsc`/`eslint`, but a hard failure under Turbopack's production CSS parser (`npm run build`). Caught only by running the actual CI-parity build (KI-046's standing guardrail).
+
+### Removed
+- N/A. `SimulationForm`'s `Card` wrapper is removed from that one call site only — the `Card` primitive itself is unchanged and still used elsewhere (`simulation-result-client.tsx`).
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A. No new attack surface — this pass is presentational only (fonts, tokens, motion, layout); no new input, endpoint, or calculation. The scramble hook operates exclusively on already-formatted display strings, never a `DecimalString`; the new `toChartPlotNumber` call site is chart-geometry-only, matching ADR-043's existing disclosed-exception shape.
+
+---
+
 ## [0.13.0] — 2026-07-24 — M7 Phase 3C-3: Growth Chart, Why, and The Proof
 
 ### Added

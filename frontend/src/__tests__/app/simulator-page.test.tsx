@@ -10,7 +10,7 @@ describe('SimulatorPage', () => {
   it('renders the page heading and the understated trust indicators, no marketing badges', () => {
     render(<SimulatorPage />);
 
-    expect(screen.getByRole('heading', { name: 'Run a historical simulation' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Run a historical simulation.' })).toBeInTheDocument();
 
     const indicators = screen.getByRole('list', { name: 'Platform principles' });
     expect(indicators).toHaveTextContent('Deterministic simulation');

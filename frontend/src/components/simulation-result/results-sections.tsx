@@ -1,36 +1,72 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { GrowthChart } from './growth-chart';
 import { useAssetDetail } from '@/hooks/use-asset-detail';
-import { formatCurrency, formatDate, formatDateRange, formatPercentage } from '@/lib/format';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { useScramble } from '@/hooks/use-scramble';
+import { useSettleIn } from '@/hooks/use-settle-in';
+import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateRange, formatPercentage, isNegativeDecimalString } from '@/lib/format';
 import type { SimulationResponse } from '@/types/api';
 
 /**
  * Sections 4-7 of the Results Reading Experience (M7 Phase 3B.2, extended
- * by M7 Phase 3C-3 with the Growth Chart, the full Why explanation, and The
- * Proof's methodology/assumptions/provenance) — every one of these exists
- * to support Section 2's sentence, never to compete with it. No cards, no
- * borders, no dashboard grids; a small uppercase kicker label plus generous
- * whitespace is the only structure carrying section identity, matching the
- * editorial reading order the approved redesign specifies (Sections 1-2
- * live in `opening-sequence-heading.tsx`, the hero this file's sections are
- * read after).
+ * by M7 Phase 3C-3 with the Growth Chart, Why, and The Proof; restyled by
+ * M7 Phase 3D — Design Elevation, FD-018/ADR-044) — every one of these
+ * exists to support Section 2's sentence, never to compete with it. No
+ * cards, no borders, no dashboard grids; a small mono kicker label plus
+ * generous whitespace is the only structure carrying section identity,
+ * matching the editorial reading order the approved redesign specifies
+ * (Sections 1-2 live in `opening-sequence-heading.tsx`, the hero this
+ * file's sections are read after). Reading order and content are FD-013
+ * and do not move — only the visual language changes this pass, ported
+ * from the founder-approved mockup.
  */
 
 function SectionKicker({ children }: { children: string }) {
-  return <p className="figure text-xs font-medium tracking-wide text-ink-muted uppercase">{children}</p>;
+  return <p className="kicker">{children}</p>;
 }
 
-/** A single supporting fact — label, value, and a reachable source, never a bordered tile (BRAND_CONSTITUTION §5/§9's "every number carries a legible source," without the dashboard-KPI-card chrome M7 Phase 3B.2 explicitly rejects). */
-function Fact({ label, value, source }: { label: string; value: string; source: string }) {
+/**
+ * A single supporting fact — label, scrambled mono value, and a reachable
+ * source, never a bordered tile (BRAND_CONSTITUTION §5/§9's "every number
+ * carries a legible source," without the dashboard-KPI-card chrome M7
+ * Phase 3B.2 explicitly rejects). `negative` applies FD-018/STEP 3's
+ * restrained negative tint to a percentage stat VALUE only — never the
+ * hero sentence (opening-sequence-heading.tsx never receives this prop).
+ */
+function Fact({
+  label,
+  value,
+  source,
+  negative,
+  scramble,
+}: {
+  label: string;
+  value: string;
+  source: string;
+  negative?: boolean;
+  scramble: { duration: number; delay: number };
+}) {
+  const reducedMotion = useReducedMotion();
+  const { text, glow } = useScramble(value, !reducedMotion, scramble);
+
   return (
-    <div className="flex flex-col gap-1">
-      <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">{label}</dt>
-      <dd className="figure text-2xl font-semibold text-ink-primary sm:text-3xl">{value}</dd>
+    <div className="flex flex-col gap-1.5">
+      <dt className="kicker">{label}</dt>
+      <dd
+        className={cn(
+          'figure scramble-figure text-2xl font-semibold break-words sm:text-3xl',
+          negative ? 'text-negative-tint' : 'text-ink-primary'
+        )}
+        style={{ '--scramble-glow-px': glow ? '16px' : '0px' } as CSSProperties}
+      >
+        {text}
+      </dd>
       <details className="text-xs text-ink-muted">
         <summary className="cursor-pointer select-none">Source</summary>
-        <p className="figure mt-1 font-mono">{source}</p>
+        <p className="figure mt-1">{source}</p>
       </details>
     </div>
   );
@@ -38,24 +74,42 @@ function Fact({ label, value, source }: { label: string; value: string; source: 
 
 /** Section 4 — Supporting Facts: evidence for the sentence above, never the page's own headline. */
 export function SupportingFacts({ sim }: { sim: SimulationResponse }) {
+  const reducedMotion = useReducedMotion();
+  const settled = useSettleIn(!reducedMotion);
+
+  const finalValueText = sim.final_value !== null ? formatCurrency(sim.final_value) : 'Not available';
+  const totalReturnText =
+    sim.total_return_percentage !== null ? formatPercentage(sim.total_return_percentage) : 'Not available';
+  const cagrText = sim.cagr_percentage !== null ? formatPercentage(sim.cagr_percentage) : 'Not available';
+
   return (
-    <section aria-label="Supporting facts" className="flex flex-col gap-6">
-      <SectionKicker>Supporting facts</SectionKicker>
+    <section
+      aria-label="Supporting facts"
+      className={cn(
+        'flex flex-col gap-6 border-t border-b border-border-hairline py-8 transition duration-[var(--duration-transition)] ease-in',
+        settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      )}
+    >
       <dl className="grid grid-cols-1 gap-8 sm:grid-cols-3">
         <Fact
           label="Final Value"
-          value={sim.final_value !== null ? formatCurrency(sim.final_value) : 'Not available'}
+          value={finalValueText}
           source="final_value — Simulation Engine output"
+          scramble={{ duration: 450, delay: 0 }}
         />
         <Fact
           label="Total Return"
-          value={sim.total_return_percentage !== null ? formatPercentage(sim.total_return_percentage) : 'Not available'}
+          value={totalReturnText}
           source="((final_value − investment_amount) / investment_amount) × 100"
+          negative={sim.total_return_percentage !== null && isNegativeDecimalString(sim.total_return_percentage)}
+          scramble={{ duration: 450, delay: 100 }}
         />
         <Fact
           label="Annual Return (CAGR)"
-          value={sim.cagr_percentage !== null ? formatPercentage(sim.cagr_percentage) : 'Not available'}
+          value={cagrText}
           source="(final_value / investment_amount) ^ (1 / years) − 1"
+          negative={sim.cagr_percentage !== null && isNegativeDecimalString(sim.cagr_percentage)}
+          scramble={{ duration: 450, delay: 200 }}
         />
       </dl>
     </section>
@@ -66,8 +120,9 @@ export function SupportingFacts({ sim }: { sim: SimulationResponse }) {
  * Section 5 — Growth Over Time. As of Founder Decision 014 (M7 Phase 3C-2,
  * KI-021 resolved), `growth_series` is persisted at creation and read
  * through on every `GET` — reliably populated for a completed simulation.
- * `GrowthChart` (M7 Phase 3C-3) renders it; this wrapper only supplies the
- * section's kicker/landmark, matching every other section in this file.
+ * `GrowthChart` (M7 Phase 3C-3, restyled M7 Phase 3D) renders it; this
+ * wrapper only supplies the section's kicker/landmark, matching every
+ * other section in this file.
  */
 export function GrowthOverTime({ sim }: { sim: SimulationResponse }) {
   return (
@@ -78,12 +133,12 @@ export function GrowthOverTime({ sim }: { sim: SimulationResponse }) {
   );
 }
 
-/** One educational paragraph, personalized to this simulation's own values — never a generic, unanchored explainer. */
+/** One educational paragraph, personalized to this simulation's own values — never a generic, unanchored explainer. Heading styled per the mockup's accent-colored, semibold treatment. */
 function WhyParagraph({ heading, children }: { heading: string; children: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <h3 className="text-base font-semibold text-ink-primary">{heading}</h3>
-      <p className="max-w-prose text-sm text-ink-secondary">{children}</p>
+    <div className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold text-accent">{heading}</h3>
+      <p className="max-w-prose text-[15.5px] leading-relaxed text-ink-secondary">{children}</p>
     </div>
   );
 }
@@ -139,15 +194,27 @@ function inflationText(sim: SimulationResponse): string | null {
  * Section 6 — Why. Deterministic, template-composed from this exact
  * simulation's own fields — never AI-generated, per direct instruction.
  * Voice: a former quant who now teaches (BRAND_CONSTITUTION.md §2) — calm,
- * precise, no hype.
+ * precise, no hype. Laid out as the mockup's three-column grid under one
+ * italic serif "Why?" title (M7 Phase 3D).
  */
 export function WhyExplanation({ sim }: { sim: SimulationResponse }) {
+  const reducedMotion = useReducedMotion();
+  const settled = useSettleIn(!reducedMotion);
   const inflation = inflationText(sim);
 
   return (
-    <section aria-label="Why" className="flex flex-col gap-8">
-      <SectionKicker>Why</SectionKicker>
-      <div className="flex flex-col gap-6">
+    <section
+      aria-label="Why"
+      className={cn(
+        'flex flex-col gap-8 transition delay-100 duration-[var(--duration-transition)] ease-in',
+        settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      )}
+    >
+      <div className="flex flex-col gap-2">
+        <SectionKicker>Why</SectionKicker>
+        <h2 className="font-serif text-xl text-ink-primary italic">Why?</h2>
+      </div>
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
         <WhyParagraph heading="Price appreciation">{priceAppreciationText(sim)}</WhyParagraph>
         <WhyParagraph heading="Dividend contribution">{dividendText(sim)}</WhyParagraph>
         {inflation !== null ? <WhyParagraph heading="Inflation adjustment">{inflation}</WhyParagraph> : null}
@@ -162,8 +229,8 @@ function DataSourceLine({ symbol, enabled }: { symbol: string; enabled: boolean 
   const value = !enabled || isPending ? 'Loading…' : isError ? 'Not available' : (data?.data_source ?? 'Not available');
   return (
     <div>
-      <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Data source</dt>
-      <dd className="figure font-mono text-xs text-ink-primary">{value}</dd>
+      <dt className="kicker">Data source</dt>
+      <dd className="figure text-xs text-ink-primary">{value}</dd>
     </div>
   );
 }
@@ -178,10 +245,10 @@ function GrowthDataTable({ sim }: { sim: SimulationResponse }) {
       <table className="figure w-full text-left text-xs">
         <thead className="sticky top-0 bg-surface">
           <tr>
-            <th scope="col" className="border-b border-border-hairline px-3 py-2 font-medium text-ink-muted uppercase">
+            <th scope="col" className="kicker border-b border-border-hairline px-3 py-2">
               Date
             </th>
-            <th scope="col" className="border-b border-border-hairline px-3 py-2 font-medium text-ink-muted uppercase">
+            <th scope="col" className="kicker border-b border-border-hairline px-3 py-2">
               Value
             </th>
           </tr>
@@ -192,7 +259,7 @@ function GrowthDataTable({ sim }: { sim: SimulationResponse }) {
               <td className="border-b border-border-hairline px-3 py-1.5 text-ink-secondary">
                 {formatDate(point.point_date)}
               </td>
-              <td className="border-b border-border-hairline px-3 py-1.5 text-ink-primary">
+              <td className="border-b border-border-hairline px-3 py-1.5 text-accent">
                 {formatCurrency(point.value)}
               </td>
             </tr>
@@ -209,38 +276,51 @@ function GrowthDataTable({ sim }: { sim: SimulationResponse }) {
  * 365.25-day CAGR convention — sourced from docs/simulation_formulas.md),
  * assumptions (exact-date prices, dividend timing convention, the CPI
  * as-of lookup), provenance (data source, calculation version, simulation
- * ID, created timestamp), and the accessible growth-chart data table.
+ * ID, created timestamp), and the accessible growth-chart data table. The
+ * disclosure summary carries the mockup's small accent "+" mark (M7 Phase
+ * 3D) — a static glyph, not an icon font, so it needs no additional asset.
  */
 export function TheProof({ sim }: { sim: SimulationResponse }) {
   const [open, setOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const settled = useSettleIn(!reducedMotion);
 
   return (
-    <section aria-label="The proof" className="flex flex-col gap-6">
-      <SectionKicker>The proof</SectionKicker>
-      <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary className="cursor-pointer text-sm font-medium text-ink-primary select-none">
-          Methodology, assumptions, and technical details
+    <section
+      aria-label="The proof"
+      className={cn(
+        'flex flex-col gap-6 transition delay-150 duration-[var(--duration-transition)] ease-in',
+        settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      )}
+    >
+      <details
+        className="border-t border-border-hairline pt-7"
+        onToggle={(event) => setOpen(event.currentTarget.open)}
+      >
+        <summary className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-ink-primary select-none">
+          <span className="figure text-accent" aria-hidden>
+            +
+          </span>
+          The Proof — methodology &amp; data
         </summary>
-        <div className="mt-6 flex flex-col gap-8 text-sm text-ink-secondary">
+        <div className="mt-7 flex flex-col gap-8 text-sm text-ink-secondary">
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Methodology</h3>
             <p className="max-w-prose">
               This simulation uses each trading day&rsquo;s actual closing price (
-              <code className="figure font-mono">close_price</code>), never an adjusted-close shortcut — every
-              dollar of the result above traces to a real historical event, not an estimate. When dividends are
-              reinvested, each payment purchases additional shares at that day&rsquo;s closing price, compounding on
-              the share count already held at that point — not the original starting count. Stock splits are
-              retained for audit context but are not applied as a separate share-count adjustment, since the stored
-              price series is already internally consistent across splits within the same data fetch.
+              <code className="figure">close_price</code>), never an adjusted-close shortcut — every dollar of the
+              result above traces to a real historical event, not an estimate. When dividends are reinvested, each
+              payment purchases additional shares at that day&rsquo;s closing price, compounding on the share count
+              already held at that point — not the original starting count. Stock splits are retained for audit
+              context but are not applied as a separate share-count adjustment, since the stored price series is
+              already internally consistent across splits within the same data fetch.
             </p>
             <p className="max-w-prose">
               Annual return (CAGR) is calculated as{' '}
-              <code className="figure font-mono text-xs">
-                (final_value / investment_amount) ^ (1 / years) − 1
-              </code>
-              , where <code className="figure font-mono text-xs">years</code> uses a fixed 365.25-day-per-year
-              convention (an explicit, documented choice — the underlying specification does not mandate a
-              day-count convention, so this one is stated rather than left implicit).
+              <code className="figure text-xs">(final_value / investment_amount) ^ (1 / years) − 1</code>, where{' '}
+              <code className="figure text-xs">years</code> uses a fixed 365.25-day-per-year convention (an explicit,
+              documented choice — the underlying specification does not mandate a day-count convention, so this one
+              is stated rather than left implicit).
             </p>
           </div>
 
@@ -255,23 +335,23 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
             </p>
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Asset</dt>
-                <dd className="figure font-mono text-ink-primary">{sim.asset_symbol}</dd>
+                <dt className="kicker">Asset</dt>
+                <dd className="figure text-ink-primary">{sim.asset_symbol}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Investment amount</dt>
+                <dt className="kicker">Investment amount</dt>
                 <dd className="figure text-ink-primary">{formatCurrency(sim.investment_amount)}</dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Date range</dt>
+                <dt className="kicker">Date range</dt>
                 <dd className="figure text-ink-primary">{formatDateRange(sim.start_date, sim.end_date)}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Dividends reinvested</dt>
+                <dt className="kicker">Dividends reinvested</dt>
                 <dd className="text-ink-primary">{sim.include_dividends ? 'Yes' : 'No'}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium tracking-wide text-ink-muted uppercase">Adjusted for inflation</dt>
+                <dt className="kicker">Adjusted for inflation</dt>
                 <dd className="text-ink-primary">{sim.adjust_for_inflation ? 'Yes' : 'No'}</dd>
               </div>
             </dl>
@@ -279,18 +359,18 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
 
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Provenance</h3>
-            <dl className="figure flex flex-col gap-3 font-mono text-xs">
+            <dl className="figure flex flex-col gap-3 text-xs">
               <DataSourceLine symbol={sim.asset_symbol} enabled={open} />
               <div className="flex flex-col gap-0.5">
-                <dt className="text-ink-muted uppercase">Calculation version</dt>
+                <dt className="kicker">Calculation version</dt>
                 <dd>{sim.calculation_version}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
-                <dt className="text-ink-muted uppercase">Simulation ID</dt>
+                <dt className="kicker">Simulation ID</dt>
                 <dd>{sim.id}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
-                <dt className="text-ink-muted uppercase">Created</dt>
+                <dt className="kicker">Created</dt>
                 <dd>{sim.created_at}</dd>
               </div>
             </dl>

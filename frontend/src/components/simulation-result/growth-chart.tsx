@@ -1,6 +1,7 @@
+
 'use client';
 
-import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { Area, ComposedChart, Line, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { toChartPlotNumber } from './chart-plot-value';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useSettleIn } from '@/hooks/use-settle-in';
@@ -16,13 +17,24 @@ import type { DisclosedSplit, GrowthSeriesPoint, SimulationResponse } from '@/ty
 
 /**
  * The Growth Chart (M7 Phase 3C-3, Founder Decision 014's `growth_series`
- * finally has data to render). Evidence for the worked-example sentence
- * above it — never its own headline: no card chrome, no border, quiet axes,
- * one hue (`--color-chart-portfolio`) regardless of whether the trajectory
- * is a gain or a loss (EXPERIENCE_CONSTITUTION.md §6/§7 — identical visual
+ * finally has data to render; visually upgraded M7 Phase 3D — Design
+ * Elevation, FD-018/ADR-044). Evidence for the worked-example sentence
+ * above it — never its own headline: no card chrome, quiet axes, one hue
+ * (`--color-chart-portfolio`) regardless of whether the trajectory is a
+ * gain or a loss (EXPERIENCE_CONSTITUTION.md §6/§7 — identical visual
  * treatment regardless of a result's sign; BRAND_CONSTITUTION.md §3 —
  * chart-data hues carry meaning, never UI chrome, and a hue is never
- * reused to "moralize" a result).
+ * reused to "moralize" a result). M7 Phase 3D adds the mockup's gradient
+ * area fill, an invested-amount baseline reference line, and an endpoint
+ * marker with an on-chart final-value label — deliberately in the SAME
+ * validated `--color-chart-portfolio` hue the line already used, not the
+ * mockup's own warm accent color: BRAND_CONSTITUTION.md §7 and
+ * frontend_design_system.md §3/§8 both treat the chart-data palette as a
+ * closed, CVD-validated set that a UI accent must never be substituted
+ * into, and this task's own instructions never asked for that specific
+ * substitution — see ADR-044 for the full reasoning. Everything else
+ * (decimation, split markers, tooltip, the accessible table, and the
+ * `toChartPlotNumber` boundary) is unchanged.
  *
  * Motion: per Founder Decision 013/017 (superseding the older, pre-FD-017
  * "chart line draws in once" language in frontend_design_system.md §8–9,
@@ -30,13 +42,20 @@ import type { DisclosedSplit, GrowthSeriesPoint, SimulationResponse } from '@/ty
  * choreography. Recharts' own line-draw animation is disabled outright
  * (`isAnimationActive={false}`); the only motion is the same single ~200ms
  * settle already used for the hero sentence (`useSettleIn`), fully static
- * under `prefers-reduced-motion` via the same mechanism.
+ * under `prefers-reduced-motion` via the same mechanism. FD-018 rule 3
+ * authorizes a one-shot chart draw-in as a pattern the Experience
+ * Constitution permits; it does not by itself reopen this specific,
+ * already-shipped `isAnimationActive={false}` decision — unchanged this
+ * pass, on purpose.
  *
  * Every displayed figure (tooltip, split disclosure, the accessible
- * summary sentence) is formatted from the ORIGINAL `DecimalString` via
- * `src/lib/format` — never from the JS number `toChartPlotNumber` produces
- * for Recharts' own plotting geometry (see that module's doc comment and
- * ADR-043 for why that one narrow conversion is safe and disclosed).
+ * summary sentence, the new baseline/endpoint labels) is formatted from
+ * the ORIGINAL `DecimalString` via `src/lib/format` — never from the JS
+ * number `toChartPlotNumber` produces for Recharts' own plotting geometry
+ * (see that module's doc comment and ADR-043/ADR-044 for why that
+ * conversion is safe and disclosed; ADR-044 also notes this file now calls
+ * it at a second site, for the baseline's Y position, still the same one
+ * audited function).
  */
 
 interface PlotPoint {
@@ -136,6 +155,15 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
   const last = points[points.length - 1];
   const summary = `This chart traces the value of this investment from ${formatCurrency(first.rawValue)} on ${formatDate(first.point_date)} to ${formatCurrency(last.rawValue)} on ${formatDate(last.point_date)}, across ${points.length} data points.`;
 
+  // Baseline reference — the invested amount, matching the mockup's dashed
+  // "$X invested" line. The second (and, per ADR-044, last) call site for
+  // toChartPlotNumber: this is chart geometry only (a Y position), never
+  // displayed — the label text below reads investment_amount, the original
+  // DecimalString, via formatCurrency.
+  const investedPlotValue = toChartPlotNumber(sim.investment_amount);
+  const investedLabel = `${formatCurrency(sim.investment_amount, { decimals: 0 })} invested`;
+  const endpointLabel = formatCurrency(last.rawValue);
+
   return (
     <div
       className={cn(
@@ -148,16 +176,35 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
           to narrate SVG geometry. */}
       <div aria-hidden className="h-48 w-full sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <ComposedChart data={points} margin={{ top: 8, right: 72, bottom: 8, left: 8 }}>
+            <defs>
+              <linearGradient id="growthAreaFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style={{ stopColor: 'var(--color-chart-portfolio)' }} stopOpacity={0.28} />
+                <stop offset="100%" style={{ stopColor: 'var(--color-chart-portfolio)' }} stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <XAxis
               dataKey="point_date"
               tickFormatter={(date: string) => formatDate(date)}
-              tick={{ fontSize: 12, fill: 'var(--color-ink-muted)' }}
+              tick={{ fontSize: 11, fill: 'var(--color-ink-muted)', fontFamily: 'var(--font-mono)' }}
               axisLine={{ stroke: 'var(--color-border-gridline)' }}
               tickLine={false}
               minTickGap={48}
             />
             <Tooltip content={<ChartTooltip />} />
+            <ReferenceLine
+              y={investedPlotValue}
+              stroke="var(--color-ink-muted)"
+              strokeDasharray="3 5"
+              ifOverflow="extendDomain"
+              label={{
+                value: investedLabel,
+                position: 'insideTopLeft',
+                fill: 'var(--color-ink-muted)',
+                fontSize: 11,
+                fontFamily: 'var(--font-mono)',
+              }}
+            />
             {markedSplits.map((split) => (
               <ReferenceLine
                 key={split.split_date}
@@ -167,6 +214,13 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 ifOverflow="extendDomain"
               />
             ))}
+            <Area
+              type="monotone"
+              dataKey="plotValue"
+              stroke="none"
+              fill="url(#growthAreaFill)"
+              isAnimationActive={false}
+            />
             <Line
               type="monotone"
               dataKey="plotValue"
@@ -176,7 +230,22 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
               activeDot={{ r: 3 }}
               isAnimationActive={false}
             />
-          </LineChart>
+            <ReferenceDot
+              x={last.point_date}
+              y={last.plotValue}
+              r={4}
+              fill="var(--color-chart-portfolio)"
+              stroke="none"
+              label={{
+                value: endpointLabel,
+                position: 'right',
+                fill: 'var(--color-chart-portfolio)',
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+              }}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 

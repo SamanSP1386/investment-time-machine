@@ -61,7 +61,7 @@ describe('OpeningSequenceHeading', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveAttribute(
       'aria-label',
-      'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025 your investment would be worth $2,500.00 today.'
+      'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025, your investment would be worth $2,500.00 today.'
     );
     expect(screen.getByTestId('child-content')).toBeInTheDocument();
   });
@@ -73,7 +73,7 @@ describe('OpeningSequenceHeading', () => {
       </OpeningSequenceHeading>
     );
 
-    expect(screen.getByText('Simulation result')).toBeInTheDocument();
+    expect(screen.getByText('Investment Time Machine')).toBeInTheDocument();
     expect(screen.queryByText('completed')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
@@ -132,5 +132,39 @@ describe('OpeningSequenceHeading', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading.className).toMatch(/opacity-100/);
     expect(screen.getByTestId('child-content')).toBeInTheDocument();
+  });
+
+  it('FD-018 rule 5: under reduced motion, both hero figures render their final scrambled text on the very first render — no intermediate scrambled state ever observable', () => {
+    setReducedMotion(true);
+    render(
+      <OpeningSequenceHeading sim={BASE_SIM}>
+        <div data-testid="child-content">child</div>
+      </OpeningSequenceHeading>
+    );
+
+    expect(screen.getByText('$1,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2,500.00')).toBeInTheDocument();
+  });
+
+  it('FD-018 rule 6: a loss outcome renders the hero figures with the identical treatment as a gain — never tinted, never a different scramble schedule', () => {
+    setReducedMotion(true);
+    const lossSim: SimulationResponse = {
+      ...BASE_SIM,
+      investment_amount: '10000.00000000' as SimulationResponse['investment_amount'],
+      final_value: '7240.18000000' as SimulationResponse['final_value'],
+    };
+    render(
+      <OpeningSequenceHeading sim={lossSim}>
+        <div data-testid="child-content">child</div>
+      </OpeningSequenceHeading>
+    );
+
+    const investedFigure = screen.getByText('$10,000.00');
+    const finalFigure = screen.getByText('$7,240.18');
+    // Both figures share the exact same class list regardless of the
+    // outcome's sign — no negative-tint class, no extra sign-conditional
+    // class of any kind (EXPERIENCE_CONSTITUTION.md §6/§7, FD-013/017/018).
+    expect(investedFigure.className).toBe(finalFigure.className);
+    expect(investedFigure.className).not.toMatch(/negative-tint/);
   });
 });

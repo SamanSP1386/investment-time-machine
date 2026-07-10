@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,500&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; }
+    details.itm-proof summary::-webkit-details-marker { display: none; }
+    details.itm-proof summary { -webkit-appearance: none; }
+    @keyframes sectionRise {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInOpacity {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes chartDraw {
+      from { stroke-dashoffset: 1; }
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes popScale {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+  </style>
+</helmet>
+
+<sc-if value="{{ isGainPage }}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{ isDark }}" hint-placeholder-val="{{ true }}">
+<div style="position:relative; min-height:100vh; background: linear-gradient(160deg, #12151c 0%, #0d141f 55%, #0a0d13 100%); color: oklch(0.95 0.015 85); font-family:'Public Sans',sans-serif; overflow:hidden;">
+
+  <div style="position:absolute; inset:0; background: radial-gradient(ellipse 1000px 700px at 12% -10%, oklch(0.32 0.03 250 / 0.16), transparent 60%); pointer-events:none;"></div>
+  <div style="position:absolute; inset:-10%; opacity:0.035; mix-blend-mode:overlay; pointer-events:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%272%27 stitchTiles=%27stitch%27/></filter><rect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n%29%27/></svg>');"></div>
+
+  <main style="position:relative; z-index:1; max-width:1280px; margin:0 auto; padding:0 64px 140px;">
+
+    <section style="padding:170px 0 96px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.05s;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; letter-spacing:0.16em; text-transform:uppercase; color:oklch(0.6 0.035 235); margin-bottom:30px;">Investment Time Machine</div>
+      <h1 style="font-family:'Newsreader',serif; font-weight:500; font-size:clamp(2.3rem, 3.2vw + 1rem, 4.4rem); line-height:1.18; letter-spacing:-0.01em; margin:0; max-width:1180px; color:oklch(0.95 0.015 85);">
+        If you had invested <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.86em; letter-spacing:-0.02em; color:oklch(0.78 0.13 82); text-shadow: 0 0 {{ heroInvestedGlowPx }}px oklch(0.78 0.13 82 / 0.85); transition: text-shadow 0.6s ease;">{{ heroInvested }}</span> in <span style="font-style:italic;">Apple</span> <span style="font-family:'IBM Plex Mono',monospace; font-size:0.56em; letter-spacing:0.05em; color:oklch(0.6 0.035 235);">(AAPL)</span> between May&nbsp;14, 2020 and Dec&nbsp;3, 2024, your investment would be worth <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.86em; letter-spacing:-0.02em; color:oklch(0.78 0.13 82); text-shadow: 0 0 {{ heroFinalGlowPx }}px oklch(0.78 0.13 82 / 0.85); transition: text-shadow 0.6s ease;">{{ heroFinalFig }}</span> today.
+      </h1>
+    </section>
+
+    <section style="display:flex; gap:72px; padding:38px 0; border-top:1px solid oklch(1 0 0 / 0.09); border-bottom:1px solid oklch(1 0 0 / 0.09); animation: sectionRise 0.35s ease-out both; animation-delay: 0.12s;">
+      <sc-for list="{{ statItems }}" as="item" hint-placeholder-count="3">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:12px;">{{ item.label }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:30px; font-weight:600; color:{{ item.valueColor }}; text-shadow: 0 0 {{ item.glowPx }}px oklch(0.78 0.13 82 / 0.7); transition: text-shadow 0.6s ease;">{{ item.value }}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="padding:96px 0 40px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.19s;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:28px;">Growth of $1,000</div>
+      <svg width="100%" height="420" viewBox="0 0 900 340" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="darkFillGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="oklch(0.78 0.13 82 / 0.35)"></stop>
+            <stop offset="100%" stop-color="oklch(0.78 0.13 82 / 0)"></stop>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="300" x2="900" y2="300" stroke="oklch(0.6 0.035 235)" stroke-width="1" opacity="0.35"></line>
+        <line x1="0" y1="0" x2="0" y2="300" stroke="oklch(0.6 0.035 235)" stroke-width="1" opacity="0.35"></line>
+        <line x1="0" y1="220" x2="900" y2="220" stroke="oklch(0.6 0.035 235)" stroke-width="1" stroke-dasharray="3,5" opacity="0.5"></line>
+        <text x="4" y="212" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.6 0.035 235)">$1,000 invested</text>
+        <path d="M0,220 C38,230 76,260 114,250 C152,240 190,170 228,160 C266,150 304,201.7 342,190 C380,178.3 418,108.3 456,100 C494,91.7 532,150 570,140 C608,130 645.7,51.5 684,40 C722.3,28.5 761.3,60.7 800,71 L800,300 L0,300 Z" fill="url(#darkFillGrad)" style="opacity:0; animation: fadeInOpacity 0.7s ease 0.3s both;"></path>
+        <path d="M0,220 C38,230 76,260 114,250 C152,240 190,170 228,160 C266,150 304,201.7 342,190 C380,178.3 418,108.3 456,100 C494,91.7 532,150 570,140 C608,130 645.7,51.5 684,40 C722.3,28.5 761.3,60.7 800,71" fill="none" stroke="oklch(0.78 0.13 82)" stroke-width="2.5" pathLength="1" stroke-dasharray="1" style="stroke-dashoffset:1; animation: chartDraw 0.8s ease 0.3s both;"></path>
+        <circle cx="800" cy="71" r="14" fill="none" stroke="oklch(0.78 0.13 82)" stroke-width="1" opacity="0.35" style="transform-origin:800px 71px; transform: scale(0); animation: popScale 0.35s ease 1s both;"></circle>
+        <circle cx="800" cy="71" r="5" fill="oklch(0.78 0.13 82)" style="transform-origin:800px 71px; transform: scale(0); animation: popScale 0.35s ease 1s both;"></circle>
+        <text x="812" y="60" font-family="IBM Plex Mono, monospace" font-size="17" font-weight="600" fill="oklch(0.78 0.13 82)">$1,744.51</text>
+        <text x="0" y="322" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.6 0.035 235)">May 2020</text>
+        <text x="900" y="322" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.6 0.035 235)">Dec 2024</text>
+      </svg>
+    </section>
+
+    <section style="padding:112px 0 40px; display:grid; grid-template-columns:repeat(3,1fr); gap:56px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.26s;">
+      <div style="grid-column:1 / -1; font-family:'Newsreader',serif; font-style:italic; font-size:26px; color:oklch(0.95 0.015 85); margin-bottom:8px;">Why?</div>
+      <sc-for list="{{ whyItems }}" as="item" hint-placeholder-count="3">
+        <div>
+          <div style="font-family:'Public Sans',sans-serif; font-weight:600; font-size:15px; color:oklch(0.78 0.13 82); margin-bottom:12px;">{{ item.heading }}</div>
+          <div style="font-family:'Public Sans',sans-serif; font-size:15.5px; line-height:1.65; color:oklch(0.85 0.015 85);">{{ item.body }}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="padding:112px 0 60px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.33s;">
+      <details class="itm-proof" style="border-top:1px solid oklch(1 0 0 / 0.09); padding-top:28px;">
+        <summary style="cursor:pointer; list-style:none; font-family:'Public Sans',sans-serif; font-weight:600; font-size:16px; color:oklch(0.95 0.015 85); display:flex; align-items:center; gap:10px;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:oklch(0.78 0.13 82);">＋</span>
+          The Proof — methodology &amp; data
+        </summary>
+        <div style="padding:28px 0 0 0; max-width:760px;">
+          <p style="font-family:'Public Sans',sans-serif; font-size:14.5px; line-height:1.7; color:oklch(0.72 0.02 80); margin:0 0 28px;">
+            Calculated on split-adjusted closing prices. Dividends were paid during this period but were not reinvested in this simulation — the total return shown reflects price movement alone. An inflation adjustment was requested, but CPI data was unavailable for this run, so all figures are nominal rather than real. Figures are illustrative and do not account for taxes or brokerage fees.
+          </p>
+          <div style="display:table; width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:13px;">
+            <div style="display:table-row">
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Date</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Event</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Price / Div</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Shares Held</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Value</div>
+            </div>
+            <sc-for list="{{ proofRows }}" as="row" hint-placeholder-count="6">
+              <div style="display:table-row">
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.date }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.event }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.price }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.shares }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.78 0.13 82); font-weight:600;">{{ row.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </details>
+    </section>
+
+  </main>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLight }}" hint-placeholder-val="{{ false }}">
+<div style="position:relative; min-height:100vh; background: oklch(0.975 0.008 85); color: oklch(0.2 0.015 50); font-family:'Public Sans',sans-serif; overflow:hidden;">
+
+  <div style="position:absolute; inset:0; background: radial-gradient(ellipse 900px 600px at 12% -8%, oklch(0.9 0.02 60 / 0.5), transparent 60%); pointer-events:none;"></div>
+  <div style="position:absolute; inset:-10%; opacity:0.025; mix-blend-mode:multiply; pointer-events:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n2%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%272%27 stitchTiles=%27stitch%27/></filter><rect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n2%29%27/></svg>');"></div>
+
+  <main style="position:relative; z-index:1; max-width:1280px; margin:0 auto; padding:0 64px 140px;">
+
+    <section style="padding:170px 0 96px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.05s;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; letter-spacing:0.16em; text-transform:uppercase; color:oklch(0.45 0.02 50); margin-bottom:30px;">Investment Time Machine</div>
+      <h1 style="font-family:'Newsreader',serif; font-weight:500; font-size:clamp(2.3rem, 3.2vw + 1rem, 4.4rem); line-height:1.18; letter-spacing:-0.01em; margin:0; max-width:1180px; color:oklch(0.2 0.015 50);">
+        If you had invested <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.86em; letter-spacing:-0.02em; color:oklch(0.4 0.12 30); text-shadow: 0 0 {{ heroInvestedGlowPx }}px oklch(0.4 0.12 30 / 0.5); transition: text-shadow 0.6s ease;">{{ heroInvested }}</span> in <span style="font-style:italic;">Apple</span> <span style="font-family:'IBM Plex Mono',monospace; font-size:0.56em; letter-spacing:0.05em; color:oklch(0.45 0.02 50);">(AAPL)</span> between May&nbsp;14, 2020 and Dec&nbsp;3, 2024, your investment would be worth <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.86em; letter-spacing:-0.02em; color:oklch(0.4 0.12 30); text-shadow: 0 0 {{ heroFinalGlowPx }}px oklch(0.4 0.12 30 / 0.5); transition: text-shadow 0.6s ease;">{{ heroFinalFig }}</span> today.
+      </h1>
+    </section>
+
+    <section style="display:flex; gap:72px; padding:38px 0; border-top:1px solid oklch(0 0 0 / 0.1); border-bottom:1px solid oklch(0 0 0 / 0.1); animation: sectionRise 0.35s ease-out both; animation-delay: 0.12s;">
+      <sc-for list="{{ statItems }}" as="item" hint-placeholder-count="3">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.45 0.02 50); margin-bottom:12px;">{{ item.label }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:30px; font-weight:600; color:{{ item.valueColorLight }}; text-shadow: 0 0 {{ item.glowPx }}px oklch(0.4 0.12 30 / 0.45); transition: text-shadow 0.6s ease;">{{ item.value }}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="padding:96px 0 40px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.19s;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.45 0.02 50); margin-bottom:28px;">Growth of $1,000</div>
+      <svg width="100%" height="420" viewBox="0 0 900 340" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="lightFillGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="oklch(0.4 0.12 30 / 0.22)"></stop>
+            <stop offset="100%" stop-color="oklch(0.4 0.12 30 / 0)"></stop>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="300" x2="900" y2="300" stroke="oklch(0.45 0.02 50)" stroke-width="1" opacity="0.4"></line>
+        <line x1="0" y1="0" x2="0" y2="300" stroke="oklch(0.45 0.02 50)" stroke-width="1" opacity="0.4"></line>
+        <line x1="0" y1="220" x2="900" y2="220" stroke="oklch(0.45 0.02 50)" stroke-width="1" stroke-dasharray="3,5" opacity="0.55"></line>
+        <text x="4" y="212" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.45 0.02 50)">$1,000 invested</text>
+        <path d="M0,220 C38,230 76,260 114,250 C152,240 190,170 228,160 C266,150 304,201.7 342,190 C380,178.3 418,108.3 456,100 C494,91.7 532,150 570,140 C608,130 645.7,51.5 684,40 C722.3,28.5 761.3,60.7 800,71 L800,300 L0,300 Z" fill="url(#lightFillGrad)" style="opacity:0; animation: fadeInOpacity 0.7s ease 0.3s both;"></path>
+        <path d="M0,220 C38,230 76,260 114,250 C152,240 190,170 228,160 C266,150 304,201.7 342,190 C380,178.3 418,108.3 456,100 C494,91.7 532,150 570,140 C608,130 645.7,51.5 684,40 C722.3,28.5 761.3,60.7 800,71" fill="none" stroke="oklch(0.4 0.12 30)" stroke-width="2.5" pathLength="1" stroke-dasharray="1" style="stroke-dashoffset:1; animation: chartDraw 0.8s ease 0.3s both;"></path>
+        <circle cx="800" cy="71" r="14" fill="none" stroke="oklch(0.4 0.12 30)" stroke-width="1" opacity="0.3" style="transform-origin:800px 71px; transform: scale(0); animation: popScale 0.35s ease 1s both;"></circle>
+        <circle cx="800" cy="71" r="5" fill="oklch(0.4 0.12 30)" style="transform-origin:800px 71px; transform: scale(0); animation: popScale 0.35s ease 1s both;"></circle>
+        <text x="812" y="60" font-family="IBM Plex Mono, monospace" font-size="17" font-weight="600" fill="oklch(0.4 0.12 30)">$1,744.51</text>
+        <text x="0" y="322" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.45 0.02 50)">May 2020</text>
+        <text x="900" y="322" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.45 0.02 50)">Dec 2024</text>
+      </svg>
+    </section>
+
+    <section style="padding:112px 0 40px; display:grid; grid-template-columns:repeat(3,1fr); gap:56px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.26s;">
+      <div style="grid-column:1 / -1; font-family:'Newsreader',serif; font-style:italic; font-size:26px; color:oklch(0.2 0.015 50); margin-bottom:8px;">Why?</div>
+      <sc-for list="{{ whyItems }}" as="item" hint-placeholder-count="3">
+        <div>
+          <div style="font-family:'Public Sans',sans-serif; font-weight:600; font-size:15px; color:oklch(0.4 0.12 30); margin-bottom:12px;">{{ item.heading }}</div>
+          <div style="font-family:'Public Sans',sans-serif; font-size:15.5px; line-height:1.65; color:oklch(0.32 0.015 50);">{{ item.body }}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="padding:112px 0 60px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.33s;">
+      <details class="itm-proof" style="border-top:1px solid oklch(0 0 0 / 0.1); padding-top:28px;">
+        <summary style="cursor:pointer; list-style:none; font-family:'Public Sans',sans-serif; font-weight:600; font-size:16px; color:oklch(0.2 0.015 50); display:flex; align-items:center; gap:10px;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:oklch(0.4 0.12 30);">＋</span>
+          The Proof — methodology &amp; data
+        </summary>
+        <div style="padding:28px 0 0 0; max-width:760px;">
+          <p style="font-family:'Public Sans',sans-serif; font-size:14.5px; line-height:1.7; color:oklch(0.42 0.02 50); margin:0 0 28px;">
+            Calculated on split-adjusted closing prices. Dividends were paid during this period but were not reinvested in this simulation — the total return shown reflects price movement alone. An inflation adjustment was requested, but CPI data was unavailable for this run, so all figures are nominal rather than real. Figures are illustrative and do not account for taxes or brokerage fees.
+          </p>
+          <div style="display:table; width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:13px;">
+            <div style="display:table-row">
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.45 0.02 50); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(0 0 0 / 0.14);">Date</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.45 0.02 50); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(0 0 0 / 0.14);">Event</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.45 0.02 50); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(0 0 0 / 0.14);">Price / Div</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.45 0.02 50); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(0 0 0 / 0.14);">Shares Held</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.45 0.02 50); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(0 0 0 / 0.14);">Value</div>
+            </div>
+            <sc-for list="{{ proofRows }}" as="row" hint-placeholder-count="6">
+              <div style="display:table-row">
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(0 0 0 / 0.07); color:oklch(0.3 0.015 50);">{{ row.date }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(0 0 0 / 0.07); color:oklch(0.3 0.015 50);">{{ row.event }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(0 0 0 / 0.07); color:oklch(0.3 0.015 50);">{{ row.price }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(0 0 0 / 0.07); color:oklch(0.3 0.015 50);">{{ row.shares }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(0 0 0 / 0.07); color:oklch(0.4 0.12 30); font-weight:600;">{{ row.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </details>
+    </section>
+
+  </main>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ isLossPage }}" hint-placeholder-val="{{ false }}">
+<div style="position:relative; min-height:100vh; background: linear-gradient(160deg, #12151c 0%, #0d141f 55%, #0a0d13 100%); color: oklch(0.95 0.015 85); font-family:'Public Sans',sans-serif; overflow:hidden;">
+
+  <div style="position:absolute; inset:0; background: radial-gradient(ellipse 1000px 700px at 12% -10%, oklch(0.32 0.03 250 / 0.16), transparent 60%); pointer-events:none;"></div>
+  <div style="position:absolute; inset:-10%; opacity:0.035; mix-blend-mode:overlay; pointer-events:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n3%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%272%27 stitchTiles=%27stitch%27/></filter><rect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n3%29%27/></svg>');"></div>
+
+  <main style="position:relative; z-index:1; max-width:1280px; margin:0 auto; padding:0 64px 140px;">
+
+    <section style="padding:170px 0 96px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.05s;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; letter-spacing:0.16em; text-transform:uppercase; color:oklch(0.6 0.035 235); margin-bottom:30px;">Investment Time Machine</div>
+      <h1 style="font-family:'Newsreader',serif; font-weight:500; font-size:clamp(2.3rem, 3.2vw + 1rem, 4.4rem); line-height:1.18; letter-spacing:-0.01em; margin:0; max-width:1180px; color:oklch(0.95 0.015 85);">
+        If you had invested <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.86em; letter-spacing:-0.02em; color:oklch(0.78 0.13 82); text-shadow: 0 0 {{ lossInvestedGlowPx }}px oklch(0.78 0.13 82 / 0.85); transition: text-shadow 0.6s ease;">{{ lossInvested }}</span> in <span style="font-style:italic;">Apple</span> <span style="font-family:'IBM Plex Mono',monospace; font-size:0.56em; letter-spacing:0.05em; color:oklch(0.6 0.035 235);">(AAPL)</span> between Jan&nbsp;3, 2022 and Jan&nbsp;3, 2023, your investment would be worth <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:0.86em; letter-spacing:-0.02em; color:oklch(0.78 0.13 82); text-shadow: 0 0 {{ lossFinalGlowPx }}px oklch(0.78 0.13 82 / 0.85); transition: text-shadow 0.6s ease;">{{ lossFinalFig }}</span> today.
+      </h1>
+    </section>
+
+    <section style="display:flex; gap:72px; padding:38px 0; border-top:1px solid oklch(1 0 0 / 0.09); border-bottom:1px solid oklch(1 0 0 / 0.09); animation: sectionRise 0.35s ease-out both; animation-delay: 0.12s;">
+      <sc-for list="{{ lossStatItems }}" as="item" hint-placeholder-count="3">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:12px;">{{ item.label }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:30px; font-weight:600; color:{{ item.valueColor }}; text-shadow: 0 0 {{ item.glowPx }}px oklch(0.78 0.13 82 / 0.7); transition: text-shadow 0.6s ease;">{{ item.value }}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="padding:96px 0 40px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.19s;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:28px;">Value of $10,000 invested</div>
+      <svg width="100%" height="420" viewBox="0 0 900 340" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="lossFillGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="oklch(0.78 0.13 82 / 0.3)"></stop>
+            <stop offset="100%" stop-color="oklch(0.78 0.13 82 / 0)"></stop>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="300" x2="900" y2="300" stroke="oklch(0.6 0.035 235)" stroke-width="1" opacity="0.35"></line>
+        <line x1="0" y1="0" x2="0" y2="300" stroke="oklch(0.6 0.035 235)" stroke-width="1" opacity="0.35"></line>
+        <line x1="0" y1="110" x2="900" y2="110" stroke="oklch(0.6 0.035 235)" stroke-width="1" stroke-dasharray="3,5" opacity="0.5"></line>
+        <text x="4" y="102" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.6 0.035 235)">$10,000 invested</text>
+        <path d="M0,110 C60,125 120,95 180,140 C240,185 300,160 360,205 C420,250 480,215 540,235 C600,255 660,225 720,245 C760,258 785,250 800,255 L800,300 L0,300 Z" fill="url(#lossFillGrad)" style="opacity:0; animation: fadeInOpacity 0.7s ease 0.3s both;"></path>
+        <path d="M0,110 C60,125 120,95 180,140 C240,185 300,160 360,205 C420,250 480,215 540,235 C600,255 660,225 720,245 C760,258 785,250 800,255" fill="none" stroke="oklch(0.78 0.13 82)" stroke-width="2.5" pathLength="1" stroke-dasharray="1" style="stroke-dashoffset:1; animation: chartDraw 0.8s ease 0.3s both;"></path>
+        <circle cx="800" cy="255" r="14" fill="none" stroke="oklch(0.78 0.13 82)" stroke-width="1" opacity="0.35" style="transform-origin:800px 255px; transform: scale(0); animation: popScale 0.35s ease 1s both;"></circle>
+        <circle cx="800" cy="255" r="5" fill="oklch(0.78 0.13 82)" style="transform-origin:800px 255px; transform: scale(0); animation: popScale 0.35s ease 1s both;"></circle>
+        <text x="812" y="270" font-family="IBM Plex Mono, monospace" font-size="17" font-weight="600" fill="oklch(0.78 0.13 82)">$7,240.18</text>
+        <text x="0" y="322" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.6 0.035 235)">Jan 2022</text>
+        <text x="900" y="322" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="12" fill="oklch(0.6 0.035 235)">Jan 2023</text>
+      </svg>
+    </section>
+
+    <section style="padding:112px 0 40px; display:grid; grid-template-columns:repeat(3,1fr); gap:56px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.26s;">
+      <div style="grid-column:1 / -1; font-family:'Newsreader',serif; font-style:italic; font-size:26px; color:oklch(0.95 0.015 85); margin-bottom:8px;">Why?</div>
+      <sc-for list="{{ lossWhyItems }}" as="item" hint-placeholder-count="3">
+        <div>
+          <div style="font-family:'Public Sans',sans-serif; font-weight:600; font-size:15px; color:oklch(0.78 0.13 82); margin-bottom:12px;">{{ item.heading }}</div>
+          <div style="font-family:'Public Sans',sans-serif; font-size:15.5px; line-height:1.65; color:oklch(0.85 0.015 85);">{{ item.body }}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="padding:112px 0 60px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.33s;">
+      <details class="itm-proof" style="border-top:1px solid oklch(1 0 0 / 0.09); padding-top:28px;">
+        <summary style="cursor:pointer; list-style:none; font-family:'Public Sans',sans-serif; font-weight:600; font-size:16px; color:oklch(0.95 0.015 85); display:flex; align-items:center; gap:10px;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:oklch(0.78 0.13 82);">＋</span>
+          The Proof — methodology &amp; data
+        </summary>
+        <div style="padding:28px 0 0 0; max-width:760px;">
+          <p style="font-family:'Public Sans',sans-serif; font-size:14.5px; line-height:1.7; color:oklch(0.72 0.02 80); margin:0 0 28px;">
+            Calculated on split-adjusted closing prices. Dividends were paid during this period but were not reinvested in this simulation — the total return shown reflects price movement alone. An inflation adjustment was requested, but CPI data was unavailable for this run, so all figures are nominal rather than real. Figures are illustrative and do not account for taxes or brokerage fees.
+          </p>
+          <div style="display:table; width:100%; border-collapse:collapse; font-family:'IBM Plex Mono',monospace; font-size:13px;">
+            <div style="display:table-row">
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Date</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Event</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Price / Div</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Shares Held</div>
+              <div style="display:table-cell; text-align:left; padding:10px 12px; color:oklch(0.6 0.035 235); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; font-size:11px; border-bottom:1px solid oklch(1 0 0 / 0.12);">Value</div>
+            </div>
+            <sc-for list="{{ lossProofRows }}" as="row" hint-placeholder-count="4">
+              <div style="display:table-row">
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.date }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.event }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.price }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.85 0.015 85);">{{ row.shares }}</div>
+                <div style="display:table-cell; padding:10px 12px; border-bottom:1px solid oklch(1 0 0 / 0.06); color:oklch(0.78 0.13 82); font-weight:600;">{{ row.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </details>
+    </section>
+
+  </main>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSimPage }}" hint-placeholder-val="{{ false }}">
+<div style="position:relative; min-height:100vh; background: linear-gradient(160deg, #12151c 0%, #0d141f 55%, #0a0d13 100%); color: oklch(0.95 0.015 85); font-family:'Public Sans',sans-serif; overflow:hidden;">
+
+  <div style="position:absolute; inset:0; background: radial-gradient(ellipse 1000px 700px at 12% -10%, oklch(0.32 0.03 250 / 0.16), transparent 60%); pointer-events:none;"></div>
+  <div style="position:absolute; inset:-10%; opacity:0.035; mix-blend-mode:overlay; pointer-events:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n4%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%272%27 stitchTiles=%27stitch%27/></filter><rect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n4%29%27/></svg>');"></div>
+
+  <main style="position:relative; z-index:1; max-width:760px; margin:0 auto; padding:170px 64px 160px;">
+
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; letter-spacing:0.16em; text-transform:uppercase; color:oklch(0.6 0.035 235); margin-bottom:30px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.05s;">Investment Time Machine</div>
+
+    <h1 style="font-family:'Newsreader',serif; font-weight:500; font-size:clamp(2.2rem, 2.6vw + 1rem, 3.4rem); line-height:1.18; letter-spacing:-0.01em; margin:0 0 72px; color:oklch(0.95 0.015 85); animation: sectionRise 0.35s ease-out both; animation-delay: 0.1s;">
+      Run a historical simulation.
+    </h1>
+
+    <div style="display:flex; flex-direction:column; gap:44px; animation: sectionRise 0.35s ease-out both; animation-delay: 0.16s;">
+
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:12px;">Asset</div>
+        <input type="text" placeholder="Search a ticker or company — e.g. AAPL, Apple Inc." style="width:100%; box-sizing:border-box; background:transparent; border:none; border-bottom:1px solid oklch(1 0 0 / 0.16); padding:14px 2px; font-family:'Public Sans',sans-serif; font-size:18px; color:oklch(0.95 0.015 85); outline:none;" style-focus="border-bottom-color: oklch(0.78 0.13 82 / 0.8);"/>
+      </div>
+
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:12px;">Investment amount</div>
+        <div style="display:flex; align-items:baseline; gap:8px; border-bottom:1px solid oklch(1 0 0 / 0.16); padding:14px 2px;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:18px; color:oklch(0.6 0.035 235);">$</span>
+          <input type="text" placeholder="10,000.00" style="flex:1; background:transparent; border:none; padding:0; font-family:'IBM Plex Mono',monospace; font-size:18px; color:oklch(0.95 0.015 85); outline:none;" style-focus="color: oklch(0.78 0.13 82);"/>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:40px;">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:12px;">Start date</div>
+          <input type="date" style="width:100%; box-sizing:border-box; background:transparent; border:none; border-bottom:1px solid oklch(1 0 0 / 0.16); padding:14px 2px; font-family:'IBM Plex Mono',monospace; font-size:16px; color:oklch(0.95 0.015 85); outline:none; color-scheme:dark;" style-focus="border-bottom-color: oklch(0.78 0.13 82 / 0.8);"/>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:oklch(0.6 0.035 235); margin-bottom:12px;">End date</div>
+          <input type="date" style="width:100%; box-sizing:border-box; background:transparent; border:none; border-bottom:1px solid oklch(1 0 0 / 0.16); padding:14px 2px; font-family:'IBM Plex Mono',monospace; font-size:16px; color:oklch(0.95 0.015 85); outline:none; color-scheme:dark;" style-focus="border-bottom-color: oklch(0.78 0.13 82 / 0.8);"/>
+        </div>
+      </div>
+
+      <details class="itm-proof" style="border-top:1px solid oklch(1 0 0 / 0.09); padding-top:22px;">
+        <summary style="cursor:pointer; list-style:none; font-family:'Public Sans',sans-serif; font-weight:600; font-size:14.5px; color:oklch(0.85 0.015 85); display:flex; align-items:center; gap:10px;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:oklch(0.78 0.13 82);">＋</span>
+          More options
+        </summary>
+        <div style="padding:26px 0 4px 0; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 0; border-bottom:1px solid oklch(1 0 0 / 0.07); cursor:pointer;" onClick="{{ toggleDividends }}">
+            <div>
+              <div style="font-family:'Public Sans',sans-serif; font-size:15px; font-weight:500; color:oklch(0.9 0.015 85);">Dividends reinvested</div>
+              <div style="font-family:'Public Sans',sans-serif; font-size:13px; color:oklch(0.6 0.02 80); margin-top:3px;">Automatically reinvest cash dividends on ex-date</div>
+            </div>
+            <div style="width:42px; height:24px; border-radius:12px; background:{{ dividendsTrackColor }}; position:relative; transition: background 0.2s ease; flex-shrink:0;">
+              <div style="width:18px; height:18px; border-radius:50%; background:oklch(0.98 0.005 85); position:absolute; top:3px; left:{{ dividendsKnobLeft }}px; transition: left 0.2s ease;"></div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 0; cursor:pointer;" onClick="{{ toggleInflation }}">
+            <div>
+              <div style="font-family:'Public Sans',sans-serif; font-size:15px; font-weight:500; color:oklch(0.9 0.015 85);">Inflation adjustment</div>
+              <div style="font-family:'Public Sans',sans-serif; font-size:13px; color:oklch(0.6 0.02 80); margin-top:3px;">Show real returns alongside nominal, where CPI data is available</div>
+            </div>
+            <div style="width:42px; height:24px; border-radius:12px; background:{{ inflationTrackColor }}; position:relative; transition: background 0.2s ease; flex-shrink:0;">
+              <div style="width:18px; height:18px; border-radius:50%; background:oklch(0.98 0.005 85); position:absolute; top:3px; left:{{ inflationKnobLeft }}px; transition: left 0.2s ease;"></div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <button type="button" style="align-self:flex-start; margin-top:8px; padding:18px 44px; background:oklch(0.78 0.13 82); color:oklch(0.14 0.02 60); border:none; border-radius:2px; font-family:'Public Sans',sans-serif; font-weight:600; font-size:15.5px; letter-spacing:0.01em; cursor:pointer;" style-hover="background: oklch(0.82 0.13 82);">Run simulation</button>
+
+    </div>
+
+  </main>
+</div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1440, &quot;height&quot;: 1400}, &quot;theme&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;dark&quot;, &quot;light&quot;], &quot;default&quot;: &quot;dark&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Theme (Gain result only)&quot;}, &quot;page&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Gain result&quot;, &quot;Loss result&quot;, &quot;Simulator&quot;], &quot;default&quot;: &quot;Gain result&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Page&quot;}}">
+class Component extends DCLogic {
+  state = {
+    heroInvested: "$0,000.00",
+    heroFinalFig: "$0,000.00",
+    statFinalVal: "$0,000.00",
+    statReturnVal: "+00.00%",
+    statCagrVal: "+00.00%",
+    heroInvestedGlow: false,
+    heroFinalGlow: false,
+    statFinalGlow: false,
+    statReturnGlow: false,
+    statCagrGlow: false,
+
+    lossInvested: "$0,000.00",
+    lossFinalFig: "$0,000.00",
+    lossStatFinal: "$0,000.00",
+    lossStatReturn: "-00.00%",
+    lossStatCagr: "-00.00%",
+    lossInvestedGlow: false,
+    lossFinalGlow: false,
+    lossStatFinalGlow: false,
+    lossStatReturnGlow: false,
+    lossStatCagrGlow: false,
+
+    simDividendsReinvested: true,
+    simInflationAdjustment: false,
+  };
+
+  scramble(target, key, duration, glowKey) {
+    const start = performance.now();
+    const len = target.length;
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    const step = (now) => {
+      const raw = Math.min(1, (now - start) / duration);
+      const p = ease(raw);
+      const locked = Math.floor(p * len);
+      let out = "";
+      for (let i = 0; i < len; i++) {
+        const ch = target[i];
+        out += (i < locked || !/[0-9]/.test(ch)) ? ch : String(Math.floor(Math.random() * 10));
+      }
+      this.setState({ [key]: out });
+      if (raw < 1) {
+        requestAnimationFrame(step);
+      } else if (glowKey) {
+        this.setState({ [glowKey]: true });
+        setTimeout(() => this.setState({ [glowKey]: false }), 650);
+      }
+    };
+    requestAnimationFrame(step);
+  }
+
+  componentDidMount() {
+    // Gain page reveal — first figure starts within 100ms; everything settles well under 1s.
+    setTimeout(() => this.scramble("$1,000.00", "heroInvested", 600, "heroInvestedGlow"), 50);
+    setTimeout(() => this.scramble("$1,744.51", "heroFinalFig", 600, "heroFinalGlow"), 150);
+    setTimeout(() => this.scramble("$1,744.51", "statFinalVal", 450, "statFinalGlow"), 250);
+    setTimeout(() => this.scramble("+74.45%", "statReturnVal", 450, "statReturnGlow"), 350);
+    setTimeout(() => this.scramble("+12.99%", "statCagrVal", 450, "statCagrGlow"), 450);
+
+    // Loss page reveal — same cadence, same mechanism.
+    setTimeout(() => this.scramble("$10,000.00", "lossInvested", 600, "lossInvestedGlow"), 50);
+    setTimeout(() => this.scramble("$7,240.18", "lossFinalFig", 600, "lossFinalGlow"), 150);
+    setTimeout(() => this.scramble("$7,240.18", "lossStatFinal", 450, "lossStatFinalGlow"), 250);
+    setTimeout(() => this.scramble("-27.60%", "lossStatReturn", 450, "lossStatReturnGlow"), 350);
+    setTimeout(() => this.scramble("-27.58%", "lossStatCagr", 450, "lossStatCagrGlow"), 450);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const theme = this.props.theme ?? "dark";
+    const pageProp = this.props.page ?? "Gain result";
+    const pageKey = pageProp === "Loss result" ? "loss" : pageProp === "Simulator" ? "simulator" : "gain";
+
+    const ink = "oklch(0.95 0.015 85)";
+    const inkLight = "oklch(0.2 0.015 50)";
+    const negative = "oklch(0.66 0.1 32)";
+    const negativeLight = "oklch(0.5 0.12 32)";
+
+    return {
+      isDark: theme === "dark",
+      isLight: theme === "light",
+      isGainPage: pageKey === "gain",
+      isLossPage: pageKey === "loss",
+      isSimPage: pageKey === "simulator",
+
+      heroInvested: s.heroInvested,
+      heroFinalFig: s.heroFinalFig,
+      heroInvestedGlowPx: s.heroInvestedGlow ? 18 : 0,
+      heroFinalGlowPx: s.heroFinalGlow ? 22 : 0,
+
+      statItems: [
+        { label: "Final Value", value: s.statFinalVal, valueColor: ink, valueColorLight: inkLight, glowPx: s.statFinalGlow ? 16 : 0 },
+        { label: "Total Return", value: s.statReturnVal, valueColor: ink, valueColorLight: inkLight, glowPx: s.statReturnGlow ? 16 : 0 },
+        { label: "Annual Return (CAGR)", value: s.statCagrVal, valueColor: ink, valueColorLight: inkLight, glowPx: s.statCagrGlow ? 16 : 0 },
+      ],
+
+      whyItems: [
+        { heading: "Price appreciation", body: "Apple's share price nearly doubled over this stretch, propelled by expanding services revenue, a strong iPhone upgrade cycle, and sustained buyback-driven earnings growth." },
+        { heading: "Dividend contribution", body: "Apple paid quarterly dividends throughout this period, but this simulation does not reinvest them — they're excluded from the total return shown above. Reinvesting would have added a modest additional gain." },
+        { heading: "Inflation adjustment", body: "An inflation-adjusted view was requested for this run, but CPI data wasn't available, so the figures above are nominal rather than real. Real returns will appear once that data source is connected." },
+      ],
+
+      proofRows: [
+        { date: "2020-05-14", event: "Initial investment", price: "$1,000.00", shares: "12.82", value: "$1,000.00" },
+        { date: "2020-08-31", event: "4-for-1 stock split", price: "—", shares: "51.28", value: "$1,062.30" },
+        { date: "2021-02-05", event: "Dividend paid (not reinvested)", price: "$0.205/sh", shares: "51.28", value: "$1,486.20" },
+        { date: "2022-06-01", event: "Market correction", price: "—", shares: "51.28", value: "$1,180.40" },
+        { date: "2023-12-15", event: "Dividend paid (not reinvested)", price: "$0.24/sh", shares: "51.28", value: "$1,602.75" },
+        { date: "2024-12-03", event: "Final valuation", price: "—", shares: "51.28", value: "$1,744.51" },
+      ],
+
+      lossInvested: s.lossInvested,
+      lossFinalFig: s.lossFinalFig,
+      lossInvestedGlowPx: s.lossInvestedGlow ? 18 : 0,
+      lossFinalGlowPx: s.lossFinalGlow ? 22 : 0,
+
+      lossStatItems: [
+        { label: "Final Value", value: s.lossStatFinal, valueColor: ink, glowPx: s.lossStatFinalGlow ? 16 : 0 },
+        { label: "Total Return", value: s.lossStatReturn, valueColor: negative, glowPx: s.lossStatReturnGlow ? 16 : 0 },
+        { label: "Annual Return (CAGR)", value: s.lossStatCagr, valueColor: negative, glowPx: s.lossStatCagrGlow ? 16 : 0 },
+      ],
+
+      lossWhyItems: [
+        { heading: "Price depreciation", body: "AAPL declined alongside the broader 2022 technology sell-off, as rapidly rising interest rates compressed valuations for high-multiple growth stocks across the market." },
+        { heading: "Dividend contribution", body: "Apple paid quarterly dividends throughout this period, but this simulation does not reinvest them — they're excluded from the total return shown above." },
+        { heading: "Inflation adjustment", body: "An inflation-adjusted view was requested for this run, but CPI data wasn't available, so the figures above are nominal rather than real — the loss in real terms would be modestly larger." },
+      ],
+
+      lossProofRows: [
+        { date: "2022-01-03", event: "Initial investment", price: "$179.70", shares: "55.65", value: "$10,000.00" },
+        { date: "2022-06-16", event: "Cycle low", price: "$130.06", shares: "55.65", value: "$7,239.30" },
+        { date: "2022-10-13", event: "Partial recovery", price: "$142.41", shares: "55.65", value: "$7,925.10" },
+        { date: "2023-01-03", event: "Final valuation", price: "$126.36", shares: "55.65", value: "$7,240.18" },
+      ],
+
+      dividendsTrackColor: s.simDividendsReinvested ? "oklch(0.78 0.13 82 / 0.55)" : "oklch(1 0 0 / 0.14)",
+      dividendsKnobLeft: s.simDividendsReinvested ? 21 : 3,
+      inflationTrackColor: s.simInflationAdjustment ? "oklch(0.78 0.13 82 / 0.55)" : "oklch(1 0 0 / 0.14)",
+      inflationKnobLeft: s.simInflationAdjustment ? 21 : 3,
+      toggleDividends: () => this.setState((st) => ({ simDividendsReinvested: !st.simDividendsReinvested })),
+      toggleInflation: () => this.setState((st) => ({ simInflationAdjustment: !st.simInflationAdjustment })),
+    };
+  }
+}
+</script>
+</body>
+</html>

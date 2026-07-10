@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { GrowthOverTime, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
+import { GrowthOverTime, SupportingFacts, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
 import type { SimulationResponse } from '@/types/api';
 
 vi.mock('@/hooks/use-asset-detail', () => ({
@@ -8,6 +8,20 @@ vi.mock('@/hooks/use-asset-detail', () => ({
 }));
 
 const { useAssetDetail } = await import('@/hooks/use-asset-detail');
+
+function setReducedMotion(matches: boolean) {
+  window.matchMedia = (query: string) =>
+    ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
 
 const BASE_SIM: SimulationResponse = {
   id: 'sim-123',
@@ -83,6 +97,56 @@ describe('WhyExplanation', () => {
   });
 });
 
+describe('SupportingFacts', () => {
+  it('FD-018 rule 5: under reduced motion, every stat figure renders its final scrambled text on the very first render', () => {
+    setReducedMotion(true);
+    render(<SupportingFacts sim={BASE_SIM} />);
+
+    expect(screen.getByText('$2,500.00')).toBeInTheDocument();
+    expect(screen.getByText('+150.00%')).toBeInTheDocument();
+    expect(screen.getByText('+9.59%')).toBeInTheDocument();
+  });
+
+  it('applies the restrained negative tint to Total Return/CAGR for a loss, but never to Final Value', () => {
+    setReducedMotion(true);
+    const lossSim: SimulationResponse = {
+      ...BASE_SIM,
+      final_value: '724.02000000' as SimulationResponse['final_value'],
+      total_return_percentage: '-27.598000' as SimulationResponse['total_return_percentage'],
+      cagr_percentage: '-27.580000' as SimulationResponse['cagr_percentage'],
+    };
+    render(<SupportingFacts sim={lossSim} />);
+
+    const finalValue = screen.getByText('$724.02');
+    const totalReturn = screen.getByText('−27.60%');
+    const cagr = screen.getByText('−27.58%');
+
+    expect(finalValue.className).not.toMatch(/negative-tint/);
+    expect(totalReturn.className).toMatch(/negative-tint/);
+    expect(cagr.className).toMatch(/negative-tint/);
+  });
+
+  it('FD-018 rule 6: a gain and a loss get the identical motion/structure treatment — only the negative-tint color class differs, per direct instruction', () => {
+    setReducedMotion(true);
+    const gainSim = BASE_SIM;
+    const lossSim: SimulationResponse = {
+      ...BASE_SIM,
+      total_return_percentage: '-27.598000' as SimulationResponse['total_return_percentage'],
+      cagr_percentage: '-27.580000' as SimulationResponse['cagr_percentage'],
+    };
+
+    const { unmount } = render(<SupportingFacts sim={gainSim} />);
+    const gainReturnClass = screen.getByText('+150.00%').className;
+    unmount();
+
+    render(<SupportingFacts sim={lossSim} />);
+    const lossReturnClass = screen.getByText('−27.60%').className;
+
+    const withoutTint = (className: string) => className.replace(/\btext-negative-tint\b|\btext-ink-primary\b/g, '').trim();
+    expect(withoutTint(gainReturnClass)).toBe(withoutTint(lossReturnClass));
+  });
+});
+
 describe('GrowthOverTime', () => {
   it('renders the section landmark and delegates to the chart / its fallback', () => {
     render(<GrowthOverTime sim={{ ...BASE_SIM, growth_series: [] }} />);
@@ -99,7 +163,9 @@ describe('GrowthOverTime', () => {
 describe('TheProof', () => {
   it('is collapsed by default, never hidden', () => {
     render(<TheProof sim={BASE_SIM} />);
-    const summary = screen.getByText('Methodology, assumptions, and technical details');
+    const summary = screen.getByText(
+      (content, element) => element?.tagName === 'SUMMARY' && content.includes('The Proof — methodology & data')
+    );
     expect(summary.closest('details')).not.toHaveAttribute('open');
   });
 
@@ -136,7 +202,9 @@ describe('TheProof', () => {
     } as never);
     render(<TheProof sim={BASE_SIM} />);
 
-    const summary = screen.getByText('Methodology, assumptions, and technical details');
+    const summary = screen.getByText(
+      (content, element) => element?.tagName === 'SUMMARY' && content.includes('The Proof — methodology & data')
+    );
     const details = summary.closest('details') as HTMLDetailsElement;
     // jsdom does not implement native click-to-toggle on <summary>; set the
     // real `open` property and dispatch the native `toggle` event React's

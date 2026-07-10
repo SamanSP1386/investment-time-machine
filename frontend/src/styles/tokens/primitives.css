@@ -84,4 +84,81 @@
   --z-modal: 40;
   --z-toast: 50;
   --z-tooltip: 60;
+
+  /*
+   * M7 Phase 3D — Design Elevation. Every oklch() value below is ported
+   * verbatim from the founder-approved mockup
+   * (DOCUMENTS_AND_IDEAS/Investment Time Machine Results/Investment Time
+   * Machine.dc.html) — see Founder Decision 018 and ADR-044. Dark is the
+   * primary theme this pass (per direct instruction); light equivalents are
+   * ported alongside since the mockup already defines them, but no theme
+   * switcher work was done — the existing data-theme mechanism (ADR-005)
+   * is unchanged.
+   *
+   * These are declared as a distinct "elevated" namespace rather than
+   * overwriting --color-paper-dark/--color-ink-*-dark in place, because the
+   * old neutral values remain the correct choice for primitive components
+   * that were not part of this pass's restyle (Badge, generic Card
+   * boundaries elsewhere). semantic.css wires the elevated tokens into the
+   * app-shell-facing semantic names (--color-background, --color-ink-*,
+   * --color-border-hairline) for the dark theme specifically, so the
+   * elevation reads as "the whole app shell," not a bolted-on skin
+   * (STEP 4/FD-018 Scope) — see semantic.css's own comment.
+   */
+
+  /* Atmosphere — solid fallback + the mockup's gradient/wash, static only (FD-018 rule 4, no looping motion) */
+  --color-elevated-bg-dark: #0d141f; /* solid fallback: the 55% stop of the gradient below */
+  --gradient-elevated-bg-dark: linear-gradient(160deg, #12151c 0%, #0d141f 55%, #0a0d13 100%);
+  --gradient-elevated-wash-dark: radial-gradient(ellipse 1000px 700px at 12% -10%, oklch(0.32 0.03 250 / 0.16), transparent 60%);
+  --color-elevated-surface-dark: #141a24;
+
+  --color-elevated-bg-light: oklch(0.975 0.008 85);
+  --gradient-elevated-wash-light: radial-gradient(ellipse 900px 600px at 12% -8%, oklch(0.9 0.02 60 / 0.5), transparent 60%);
+  --color-elevated-surface-light: oklch(0.99 0.006 85);
+
+  /* Elevated ink — "cream ink" on dark, a warm near-black on light */
+  --color-elevated-ink-primary-dark: oklch(0.95 0.015 85);
+  --color-elevated-ink-secondary-dark: oklch(0.85 0.015 85);
+  --color-elevated-ink-tertiary-dark: oklch(0.72 0.02 80);
+  --color-elevated-ink-muted-dark: oklch(0.6 0.035 235);
+
+  --color-elevated-ink-primary-light: oklch(0.2 0.015 50);
+  --color-elevated-ink-secondary-light: oklch(0.32 0.015 50);
+  --color-elevated-ink-tertiary-light: oklch(0.42 0.02 50);
+  --color-elevated-ink-muted-light: oklch(0.45 0.02 50);
+
+  /* Accent — the mockup's single warm gold/amber, used for hero figures,
+     scramble glow, CTA, and Why/Proof accents. Deliberately NOT applied to
+     the Growth Chart's data line (see ADR-044): that stays
+     --color-chart-portfolio, the CVD-validated hue, per
+     frontend_design_system.md §3/§8's "never invent a new chart hue"
+     rule — a disclosed, deliberate non-port. */
+  --color-accent-dark: oklch(0.78 0.13 82);
+  --color-accent-light: oklch(0.4 0.12 30);
+
+  /* Restrained negative tint — percentage stat VALUES only, never the hero
+     sentence (STEP 3 direct instruction; identical motion regardless of
+     sign per FD-013/017/018 still applies — this is a color-only rule). */
+  --color-elevated-negative-dark: oklch(0.66 0.1 32);
+  --color-elevated-negative-light: oklch(0.5 0.12 32);
+
+  /* Hairlines on the elevated surface — a small scale, not a single value,
+     matching the mockup's own distinct strengths (section dividers vs.
+     input underlines vs. table rows). */
+  --color-elevated-hairline-dark: oklch(1 0 0 / 0.09);
+  --color-elevated-hairline-strong-dark: oklch(1 0 0 / 0.16);
+  --color-elevated-hairline-subtle-dark: oklch(1 0 0 / 0.06);
+
+  --color-elevated-hairline-light: oklch(0 0 0 / 0.1);
+  --color-elevated-hairline-strong-light: oklch(0 0 0 / 0.14);
+  --color-elevated-hairline-subtle-light: oklch(0 0 0 / 0.07);
+
+  /* Grain texture opacity — static, no animation anywhere (FD-018 rule 4) */
+  --grain-opacity-dark: 0.035;
+  --grain-opacity-light: 0.025;
+  /* The texture itself (shared by both themes — only opacity/blend-mode
+     differ, set in globals.css's .itm-elevated block): a fractal-noise SVG
+     data URI, ported from the mockup's inline background-image. Static,
+     never redrawn or animated. */
+  --grain-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }

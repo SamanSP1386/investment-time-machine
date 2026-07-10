@@ -16,6 +16,10 @@ export interface AssetSearchComboboxProps {
   error?: string;
   required?: boolean;
   placeholder?: string;
+  /** Merged onto the input element via `cn` (tailwind-merge) — lets a call
+   * site (e.g. the M7 Phase 3D Simulator restyle) override the default
+   * bordered-box input treatment without a component-level change. */
+  className?: string;
 }
 
 /**
@@ -25,7 +29,14 @@ export interface AssetSearchComboboxProps {
  * hook). An empty result set is a normal `200 OK` (docs/api_design.md),
  * rendered via `EmptyState`, never as an error.
  */
-export function AssetSearchCombobox({ label, onChange, error, required, placeholder }: AssetSearchComboboxProps) {
+export function AssetSearchCombobox({
+  label,
+  onChange,
+  error,
+  required,
+  placeholder,
+  className,
+}: AssetSearchComboboxProps) {
   const generatedId = useId();
   const inputId = `${generatedId}-input`;
   const listboxId = `${generatedId}-listbox`;
@@ -140,7 +151,8 @@ export function AssetSearchCombobox({ label, onChange, error, required, placehol
         onBlur={() => setIsOpen(false)}
         className={cn(
           'figure h-10 rounded-[var(--input-radius)] border border-[var(--input-border)] bg-surface px-3 text-sm text-ink-primary placeholder:text-ink-muted focus-visible:border-[var(--input-border-focus)]',
-          error && 'border-status-critical'
+          error && 'border-status-critical',
+          className
         )}
       />
       <span aria-live="polite" role="status" className="sr-only">

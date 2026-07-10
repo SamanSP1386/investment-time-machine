@@ -1,86 +1,98 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode } from 'react';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { useScramble } from '@/hooks/use-scramble';
 import { useSettleIn } from '@/hooks/use-settle-in';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDate } from '@/lib/format';
 import type { SimulationResponse } from '@/types/api';
 
 /**
- * The Results Reading Experience's hero (M7 Phase 3B.2): the worked-example
- * sentence, "if you had invested X in Y, starting on Z — here's what
- * happened." Every other section on the page (`results-sections.tsx`) is
- * supporting evidence for this sentence, never competing with it — no card,
- * no border, no badge, no color, nothing but typography, whitespace, and
- * rhythm carrying the hierarchy.
+ * The Results Reading Experience's hero (M7 Phase 3B.2; restyled M7 Phase
+ * 3D — Design Elevation, FD-018/ADR-044): the worked-example sentence, "if
+ * you had invested X in Y, starting on Z — here's what happened." Every
+ * other section on the page (`results-sections.tsx`) is supporting evidence
+ * for this sentence, never competing with it — no card, no border, no
+ * badge, nothing but typography, whitespace, and rhythm carrying the
+ * hierarchy.
  *
  * Renders the sentence and every child section immediately on data arrival
- * (Founder Decision 017, superseding the M7 Phase 3B.1 staged
- * composing→pause→reveal timeline this component originally implemented —
- * see `docs/ARCHITECTURE_DECISIONS.md` ADR-041). The only motion permitted
- * is a single ~200ms opacity/translate settle on the sentence itself,
- * played once on mount via `useSettleIn`, fully disabled under
- * `prefers-reduced-motion`. No composing phase, no pause, no reveal
- * choreography, no skip affordance — there is nothing to skip.
+ * (Founder Decision 017) as one flowing serif sentence (matching the
+ * approved mockup's "serif display sentence with mono figures" pattern),
+ * with the two answer-bearing figures (the invested amount, the final
+ * value) set in the mono figure typeface and running FD-018 rule 1's
+ * one-shot digits-only scramble/settle. The surrounding prose is never
+ * gated behind the scramble — it is present, complete, and in the
+ * accessible tree from the very first render (`aria-label` always carries
+ * the final, non-scrambling sentence text, independent of what's
+ * mid-animation visually). The only other motion is the pre-existing single
+ * ~200ms opacity/translate settle on the whole sentence, played once on
+ * mount via `useSettleIn`, fully disabled under `prefers-reduced-motion`
+ * (Founder Decision 017/ADR-041, unchanged by this pass).
  */
 
-interface SentenceLine {
-  text: string;
-  /** The two figures the sentence exists to report — rendered at the large "Hero Figure" size (BRAND_CONSTITUTION §6), everything else supports them. */
-  emphasize?: boolean;
-}
+const FIGURE_GLOW_PX = '20px';
 
-function sentenceLines(sim: SimulationResponse): SentenceLine[] {
-  const answerValue = sim.final_value !== null ? formatCurrency(sim.final_value) : 'Not available';
-  return [
-    { text: 'If you had invested' },
-    { text: formatCurrency(sim.investment_amount), emphasize: true },
-    { text: `in ${sim.asset_symbol}` },
-    { text: `between ${formatDate(sim.start_date)}` },
-    { text: `and ${formatDate(sim.end_date)}` },
-    { text: 'your investment would be worth' },
-    { text: `${answerValue} today.`, emphasize: true },
-  ];
+function ScrambleFigure({
+  value,
+  active,
+  duration,
+  delay,
+}: {
+  value: string;
+  active: boolean;
+  duration: number;
+  delay: number;
+}) {
+  const { text, glow } = useScramble(value, active, { duration, delay });
+  return (
+    <span
+      className="figure scramble-figure font-semibold text-accent"
+      style={{ '--scramble-glow-px': glow ? FIGURE_GLOW_PX : '0px' } as CSSProperties}
+    >
+      {text}
+    </span>
+  );
 }
-
-const LINE_SIZE = 'text-2xl font-medium text-ink-primary sm:text-3xl';
-const FIGURE_SIZE = 'figure text-4xl font-semibold text-ink-primary sm:text-6xl';
 
 export function OpeningSequenceHeading({ sim, children }: { sim: SimulationResponse; children: ReactNode }) {
   const reducedMotion = useReducedMotion();
-  const settled = useSettleIn(!reducedMotion);
+  const active = !reducedMotion;
+  const settled = useSettleIn(active);
 
-  const lines = sentenceLines(sim);
-  const fullSentenceText = lines.map((line) => line.text).join(' ');
+  const investedText = formatCurrency(sim.investment_amount);
+  const answerText = sim.final_value !== null ? formatCurrency(sim.final_value) : 'Not available';
+  const fullSentenceText = `If you had invested ${investedText} in ${sim.asset_symbol} between ${formatDate(sim.start_date)} and ${formatDate(sim.end_date)}, your investment would be worth ${answerText} today.`;
+  // Punctuation matches the approved mockup exactly: a comma before "your
+  // investment," none after the asset symbol.
 
   return (
     <div className="flex flex-col gap-10 sm:gap-14">
       <div className="flex flex-col gap-6 sm:gap-8">
         {/* Section 1 — a very small label. Nothing more. */}
-        <div className="flex flex-col gap-2">
-          <p className="figure text-xs font-medium tracking-wide text-ink-muted uppercase">Simulation result</p>
-          <div className="h-px w-12 bg-border-gridline" aria-hidden />
-        </div>
+        <p className="kicker">Investment Time Machine</p>
 
         {/*
          * Section 2 — the Worked Example, the page's hero. `aria-label`
-         * guarantees a screen reader gets the sentence with correct word
-         * spacing regardless of how the visual line breaks are marked up;
-         * the visible text is identical, present from first paint.
+         * guarantees a screen reader gets the complete, always-correct
+         * sentence regardless of the scrambled digits mid-animation inside
+         * it — the visible text and the accessible name are decoupled by
+         * design, matching FD-018 rule 1's "the surrounding sentence text
+         * renders immediately and is never gated."
          */}
         <h1
           aria-label={fullSentenceText}
           className={cn(
-            'flex flex-col gap-1 sm:gap-2 transition duration-[var(--duration-transition)] ease-in',
+            'max-w-4xl font-serif text-[clamp(2rem,3vw+1rem,3.5rem)] leading-[1.18] font-medium tracking-tight text-ink-primary transition duration-[var(--duration-transition)] ease-in',
             settled ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
           )}
         >
-          {lines.map((line) => (
-            <span key={line.text} className={line.emphasize ? FIGURE_SIZE : LINE_SIZE}>
-              {line.text}
-            </span>
-          ))}
+          If you had invested{' '}
+          <ScrambleFigure value={investedText} active={active} duration={600} delay={0} /> in{' '}
+          <span className="italic">{sim.asset_symbol}</span> between {formatDate(sim.start_date)} and{' '}
+          {formatDate(sim.end_date)}, your investment would be worth{' '}
+          <ScrambleFigure value={answerText} active={active} duration={600} delay={100} /> today.
         </h1>
       </div>
 

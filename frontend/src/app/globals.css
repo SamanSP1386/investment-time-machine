@@ -29,6 +29,7 @@
   --color-ink-secondary: var(--color-ink-secondary);
   --color-ink-muted: var(--color-ink-muted);
   --color-border-hairline: var(--color-border-hairline);
+  --color-border-hairline-strong: var(--color-border-hairline-strong);
   --color-border-gridline: var(--color-border-gridline);
 
   --color-primary: var(--color-primary);
@@ -47,6 +48,10 @@
   --color-ai-surface: var(--color-ai-surface);
   --color-ai-border: var(--color-ai-border);
 
+  /* M7 Phase 3D — Design Elevation (FD-018, ADR-044) */
+  --color-accent: var(--color-accent);
+  --color-negative-tint: var(--color-negative-tint);
+
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
@@ -54,8 +59,16 @@
   --shadow-raised: var(--shadow-raised);
   --shadow-overlay: var(--shadow-overlay);
 
-  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'JetBrains Mono', monospace;
+  /*
+   * Font stack, M7 Phase 3D — Design Elevation (FD-018, ADR-044): Public
+   * Sans (body) and IBM Plex Mono (figures/mono) replace Inter/JetBrains
+   * Mono; Newsreader (display serif) is new — self-hosted via
+   * next/font/google in layout.tsx, no external font CDN at runtime. See
+   * docs/ARCHITECTURE_DECISIONS.md ADR-044 for the bundle-size note.
+   */
+  --font-sans: var(--font-public-sans), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, 'IBM Plex Mono', monospace;
+  --font-serif: var(--font-newsreader), Georgia, 'Times New Roman', serif;
 
   /* Three-tier breakpoints matching frontend_design_system.md §12 exactly
      (mobile <640, tablet 640-1024, desktop 1024-1440, wide >=1440) rather
@@ -83,9 +96,166 @@ body {
 /*
  * Every currency/percentage/date figure uses tabular numerals by default
  * (BRAND_CONSTITUTION.md §6) — a correctness rule, not a style preference.
+ * M7 Phase 3D (FD-018/ADR-044): figures also render in the mono figure
+ * typeface (IBM Plex Mono) app-wide, matching the approved mockup's
+ * "serif sentence, mono figures" pattern — a measured artifact, not prose.
  */
 .figure {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The refined label style (M7 Phase 3D, FD-018/ADR-044), replacing the
+ * repeated `text-xs font-medium tracking-wide text-ink-muted uppercase`
+ * utility string at each call site with one shared class — mono, small,
+ * tracked, muted, matching the approved mockup's kicker/axis/table-header
+ * treatment exactly (`Investment Time Machine.dc.html`'s repeated
+ * `font-family:'IBM Plex Mono'; font-size:11-12.5px; letter-spacing:0.1em;
+ * text-transform:uppercase` pattern).
+ */
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+/*
+ * FD-018 rule 1's "single brief glow pulse on settle" — a text-shadow
+ * transition, driven by `useScramble`'s returned `glow` boolean (each call
+ * site sets `--scramble-glow-px` inline; 0 when not settled/glowing).
+ * `prefers-reduced-motion`'s existing global override (above) already
+ * collapses this transition's duration to ~0, and useScramble itself never
+ * sets `glow: true` when `active` is false, so reduced motion gets neither
+ * the transition nor the glow value — belt and suspenders, not two
+ * independent mechanisms that could drift apart.
+ */
+.scramble-figure {
+  --scramble-glow-px: 0px;
+  transition: text-shadow 650ms ease;
+  text-shadow: 0 0 var(--scramble-glow-px) var(--color-accent);
+}
+
+/*
+ * The elevated atmosphere (M7 Phase 3D, FD-018/ADR-044) — scoped to the
+ * Results and Simulator screens only (STEP 4), not the root/dev-playground
+ * pages, so "leave the stale root page as-is" holds literally. Wiring
+ * happens through the semantic custom-property names
+ * (--color-background, --color-ink-primary/secondary/muted, --color-border-hairline) already used
+ * by every Tailwind utility on this page (bg-background, text-ink-primary,
+ * ...) — a component nested here needs no change to pick up the new
+ * palette, the same "layer, don't rewrite" approach semantic.css's own
+ * theme-switching already uses. Light is the default block (matching this
+ * codebase's existing light-default/dark-override convention); dark is
+ * layered on top the same two ways semantic.css's own theme switch is
+ * (prefers-color-scheme, guarded by :not([data-theme='light']), and the
+ * explicit [data-theme='dark'] override) — dark is the primary theme this
+ * pass (direct instruction), so in practice almost every visit renders the
+ * dark block below.
+ *
+ * FD-018 rule 4 — static atmosphere only, no looping animation anywhere:
+ * the wash and grain layers below are plain, non-animated background
+ * images. See --grain-texture below for the shared noise asset (opacity
+ * and blend mode differ per theme; the texture itself does not).
+ */
+.itm-elevated {
+  position: relative;
+  isolation: isolate;
+  --color-background: var(--color-elevated-bg-light);
+  --color-surface: var(--color-elevated-surface-light);
+  --color-ink-primary: var(--color-elevated-ink-primary-light);
+  --color-ink-secondary: var(--color-elevated-ink-secondary-light);
+  --color-ink-muted: var(--color-elevated-ink-muted-light);
+  --color-border-hairline: var(--color-elevated-hairline-light);
+  --color-border-hairline-strong: var(--color-elevated-hairline-strong-light);
+  --color-accent: var(--color-accent-light);
+  --color-negative-tint: var(--color-elevated-negative-light);
+  /* The primary/CTA button remaps to the accent pair inside an elevated
+     surface (the Simulator's "Run simulation" button, matching the
+     mockup's single-accent design language) — Button's own code is
+     unchanged; it already reads --color-primary/--color-primary-foreground. */
+  --color-primary: var(--color-accent-light);
+  --color-primary-hover: color-mix(in oklch, var(--color-accent-light) 85%, white);
+  --color-primary-foreground: var(--color-elevated-bg-light);
+  /* The mockup's sharper CTA corner (2px, vs. the base design system's
+     6px) — theme-independent, so set once here rather than in each
+     light/dark block below. */
+  --button-radius: 2px;
+  background-color: var(--color-elevated-bg-light);
+}
+
+.itm-elevated::before,
+.itm-elevated::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.itm-elevated::before {
+  inset: 0;
+  z-index: -2;
+  background-image: var(--gradient-elevated-wash-light);
+}
+
+.itm-elevated::after {
+  inset: -10%;
+  z-index: -1;
+  opacity: var(--grain-opacity-light);
+  mix-blend-mode: multiply;
+  background-image: var(--grain-texture);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .itm-elevated {
+    --color-background: var(--color-elevated-bg-dark);
+    --color-surface: var(--color-elevated-surface-dark);
+    --color-ink-primary: var(--color-elevated-ink-primary-dark);
+    --color-ink-secondary: var(--color-elevated-ink-secondary-dark);
+    --color-ink-muted: var(--color-elevated-ink-muted-dark);
+    --color-border-hairline: var(--color-elevated-hairline-dark);
+    --color-border-hairline-strong: var(--color-elevated-hairline-strong-dark);
+    --color-accent: var(--color-accent-dark);
+    --color-negative-tint: var(--color-elevated-negative-dark);
+    --color-primary: var(--color-accent-dark);
+    --color-primary-hover: color-mix(in oklch, var(--color-accent-dark) 85%, white);
+    --color-primary-foreground: var(--color-elevated-bg-dark);
+    background-color: var(--color-elevated-bg-dark);
+    background-image: var(--gradient-elevated-bg-dark);
+  }
+  :root:not([data-theme='light']) .itm-elevated::before {
+    background-image: var(--gradient-elevated-wash-dark);
+  }
+  :root:not([data-theme='light']) .itm-elevated::after {
+    opacity: var(--grain-opacity-dark);
+    mix-blend-mode: overlay;
+  }
+}
+
+:root[data-theme='dark'] .itm-elevated {
+  --color-background: var(--color-elevated-bg-dark);
+  --color-surface: var(--color-elevated-surface-dark);
+  --color-ink-primary: var(--color-elevated-ink-primary-dark);
+  --color-ink-secondary: var(--color-elevated-ink-secondary-dark);
+  --color-ink-muted: var(--color-elevated-ink-muted-dark);
+  --color-border-hairline: var(--color-elevated-hairline-dark);
+  --color-border-hairline-strong: var(--color-elevated-hairline-strong-dark);
+  --color-accent: var(--color-accent-dark);
+  --color-negative-tint: var(--color-elevated-negative-dark);
+  --color-primary: var(--color-accent-dark);
+  --color-primary-hover: color-mix(in oklch, var(--color-accent-dark) 85%, white);
+  --color-primary-foreground: var(--color-elevated-bg-dark);
+  background-color: var(--color-elevated-bg-dark);
+  background-image: var(--gradient-elevated-bg-dark);
+}
+:root[data-theme='dark'] .itm-elevated::before {
+  background-image: var(--gradient-elevated-wash-dark);
+}
+:root[data-theme='dark'] .itm-elevated::after {
+  opacity: var(--grain-opacity-dark);
+  mix-blend-mode: overlay;
 }
 
 /* Visible focus ring everywhere, never `outline: none` with no replacement. */

@@ -37,6 +37,18 @@
 
   --color-ai-surface: var(--color-ai-surface-light);
   --color-ai-border: var(--color-ai-border-light);
+
+  /*
+   * M7 Phase 3D — Design Elevation (FD-018, ADR-044). Base, non-elevated
+   * fallbacks so --color-accent/--color-negative-tint are always valid
+   * tokens app-wide; `.itm-elevated` (globals.css) overrides both with the
+   * mockup's ported oklch values inside the Results/Simulator surfaces
+   * only. Outside that scope these fall back to the existing brand/status
+   * vocabulary rather than resolving to nothing.
+   */
+  --color-accent: var(--color-primary);
+  --color-negative-tint: var(--color-status-critical);
+  --color-border-hairline-strong: var(--color-border-hairline);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -63,6 +75,10 @@
 
     --color-ai-surface: var(--color-ai-surface-dark);
     --color-ai-border: var(--color-ai-border-dark);
+
+    --color-accent: var(--color-primary);
+    --color-negative-tint: var(--color-status-critical);
+    --color-border-hairline-strong: var(--color-border-hairline);
   }
 }
 
@@ -89,4 +105,8 @@
 
   --color-ai-surface: var(--color-ai-surface-dark);
   --color-ai-border: var(--color-ai-border-dark);
+
+  --color-accent: var(--color-primary);
+  --color-negative-tint: var(--color-status-critical);
+  --color-border-hairline-strong: var(--color-border-hairline);
 }

@@ -75,10 +75,25 @@ describe('SimulationResultClient', () => {
 
   it('renders the worked-example sentence as the hero, with the reading order Sections 1-2, 4-7 all present and rendered immediately, for a completed simulation', () => {
     queryState = { data: BASE_SIM, isPending: false, isError: false, error: null, isFetching: false };
+    // This test asserts on final figure text, not scramble motion (FD-018
+    // rule 1 has its own dedicated tests, see reduced-motion.test.ts) —
+    // reduced motion renders every scrambled figure at its final value
+    // immediately (rule 5's hard gate), which is what this test wants.
+    window.matchMedia = (query: string) =>
+      ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList;
     render(<SimulationResultClient id="sim-123" />);
 
     // Section 1 — a tiny kicker label, nothing more.
-    expect(screen.getByText('Simulation result')).toBeInTheDocument();
+    expect(screen.getByText('Investment Time Machine')).toBeInTheDocument();
     expect(screen.queryByText('completed')).not.toBeInTheDocument();
 
     // Section 2 — the hero sentence, the page's only real headline. Present
@@ -86,7 +101,7 @@ describe('SimulationResultClient', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveAttribute(
       'aria-label',
-      'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025 your investment would be worth $2,500.00 today.'
+      'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025, your investment would be worth $2,500.00 today.'
     );
 
     // Section 4 — Supporting Facts, plain label/value pairs, never a bordered card grid.
@@ -109,7 +124,9 @@ describe('SimulationResultClient', () => {
     expect(screen.queryByText('Inflation adjustment')).not.toBeInTheDocument();
 
     // Section 7 — The Proof, collapsed by default, folding in the former Snapshot/Technical Details content.
-    const proofSummary = screen.getByText('Methodology, assumptions, and technical details');
+    const proofSummary = screen.getByText(
+      (content, element) => element?.tagName === 'SUMMARY' && content.includes('The Proof — methodology & data')
+    );
     expect(proofSummary.closest('details')).not.toHaveAttribute('open');
     expect(screen.getByText('sim-123')).toBeInTheDocument();
     expect(screen.getByText('v2')).toBeInTheDocument();
