@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { GrowthOverTime, WhyExplanation } from '@/components/simulation-result/results-sections';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { GrowthOverTime, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
 import type { SimulationResponse } from '@/types/api';
+
+vi.mock('@/hooks/use-asset-detail', () => ({
+  useAssetDetail: vi.fn(() => ({ data: undefined, isPending: true, isError: false })),
+}));
+
+const { useAssetDetail } = await import('@/hooks/use-asset-detail');
 
 const BASE_SIM: SimulationResponse = {
   id: 'sim-123',
@@ -20,26 +26,41 @@ const BASE_SIM: SimulationResponse = {
   cagr_percentage: '9.594448' as SimulationResponse['cagr_percentage'],
   inflation_adjusted_final_value: null,
   disclosed_splits: [],
-  growth_series: [],
+  growth_series: [
+    { point_date: '2015-01-01', value: '1000.00000000' as SimulationResponse['growth_series'][number]['value'] },
+    { point_date: '2025-01-01', value: '2500.00000000' as SimulationResponse['growth_series'][number]['value'] },
+  ],
   calculation_version: 'v2',
   error_message: null,
   created_at: '2026-07-18T00:00:00Z',
 };
 
 describe('WhyExplanation', () => {
-  it('states plainly that dividends were not reinvested when include_dividends is false', () => {
+  it('describes price appreciation including the shares this investment purchased', () => {
+    render(<WhyExplanation sim={BASE_SIM} />);
+    expect(
+      screen.getByText(/moved from \$100\.00 to \$250\.00 over this period, carrying the 10\.00 shares/)
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to generic price-appreciation copy when initial/final price are unavailable', () => {
+    render(<WhyExplanation sim={{ ...BASE_SIM, initial_price: null, final_price: null }} />);
+    expect(screen.getByText(/share price moving over this period is the single largest driver/)).toBeInTheDocument();
+  });
+
+  it('states plainly that dividends were excluded by choice when include_dividends is false', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, include_dividends: false }} />);
-    expect(screen.getByText(/did not reinvest dividends/)).toBeInTheDocument();
+    expect(screen.getByText(/did not reinvest dividends, by choice/)).toBeInTheDocument();
   });
 
-  it('explains dividend reinvestment when include_dividends is true', () => {
+  it('explains dividend reinvestment, hedged with "any... if any occurred", when include_dividends is true', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, include_dividends: true }} />);
-    expect(screen.getByText(/were reinvested/)).toBeInTheDocument();
+    expect(screen.getByText(/Any dividends AAPL paid during this period were reinvested automatically/)).toBeInTheDocument();
   });
 
-  it('states plainly that the result is nominal when adjust_for_inflation is false', () => {
+  it('omits the inflation paragraph entirely when adjustment was not requested, rather than showing filler', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, adjust_for_inflation: false }} />);
-    expect(screen.getByText(/shown in nominal dollars — it is not adjusted for inflation/)).toBeInTheDocument();
+    expect(screen.queryByText('Inflation adjustment')).not.toBeInTheDocument();
   });
 
   it('reports the inflation-adjusted figure when adjust_for_inflation is true and the value is available', () => {
@@ -52,38 +73,96 @@ describe('WhyExplanation', () => {
         }}
       />
     );
+    expect(screen.getByText('Inflation adjustment')).toBeInTheDocument();
     expect(screen.getByText(/represents \$2,100\.00 in today's purchasing power/)).toBeInTheDocument();
   });
 
   it('states the CPI data gap plainly when adjust_for_inflation is true but the value is unavailable', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, adjust_for_inflation: true, inflation_adjusted_final_value: null }} />);
-    expect(screen.getByText(/CPI data needed for this period wasn't available/)).toBeInTheDocument();
-  });
-
-  it('falls back to generic price-appreciation copy when initial/final price are unavailable', () => {
-    render(<WhyExplanation sim={{ ...BASE_SIM, initial_price: null, final_price: null }} />);
-    expect(screen.getByText(/share price moving over this period is the single largest driver/)).toBeInTheDocument();
+    expect(screen.getByText(/CPI data needed for this exact period wasn't available/)).toBeInTheDocument();
   });
 });
 
 describe('GrowthOverTime', () => {
-  it('states the growth-series data gap plainly (KI-021) when growth_series is empty', () => {
+  it('renders the section landmark and delegates to the chart / its fallback', () => {
     render(<GrowthOverTime sim={{ ...BASE_SIM, growth_series: [] }} />);
-    expect(screen.getByText(/isn.t available for this simulation yet/)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Growth over time' })).toBeInTheDocument();
+    expect(screen.getByText(/day-by-day growth chart isn.t available/)).toBeInTheDocument();
   });
 
-  it('reports the point count once growth_series is actually populated', () => {
-    render(
-      <GrowthOverTime
-        sim={{
-          ...BASE_SIM,
-          growth_series: [
-            { point_date: '2015-01-01', value: '1000.00000000' as SimulationResponse['growth_series'][number]['value'] },
-            { point_date: '2015-01-02', value: '1010.00000000' as SimulationResponse['growth_series'][number]['value'] },
-          ],
-        }}
-      />
-    );
-    expect(screen.getByText('2 data points recorded across the simulated period.')).toBeInTheDocument();
+  it('renders the chart summary once growth_series is populated', () => {
+    render(<GrowthOverTime sim={BASE_SIM} />);
+    expect(screen.getByText(/This chart traces the value of this investment/)).toBeInTheDocument();
+  });
+});
+
+describe('TheProof', () => {
+  it('is collapsed by default, never hidden', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    const summary = screen.getByText('Methodology, assumptions, and technical details');
+    expect(summary.closest('details')).not.toHaveAttribute('open');
+  });
+
+  it('explains methodology: close_price policy and the 365.25-day CAGR convention, sourced from simulation_formulas.md', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    expect(screen.getByText(/never an adjusted-close shortcut/)).toBeInTheDocument();
+    expect(screen.getByText(/365\.25-day-per-year/)).toBeInTheDocument();
+  });
+
+  it('states assumptions: exact-date prices, dividend timing, and the CPI as-of lookup', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    expect(screen.getByText(/never silently shifted to the nearest trading day/)).toBeInTheDocument();
+    expect(screen.getByText(/on their ex-dividend date, in the order they occurred/)).toBeInTheDocument();
+    expect(screen.getByText(/most recent CPI reading on or before/)).toBeInTheDocument();
+  });
+
+  it('shows provenance: calculation version, simulation ID, and created timestamp', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    expect(screen.getByText('v2')).toBeInTheDocument();
+    expect(screen.getByText('sim-123')).toBeInTheDocument();
+    expect(screen.getByText('2026-07-18T00:00:00Z')).toBeInTheDocument();
+  });
+
+  it('does not fetch the data source until the disclosure is actually opened', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    expect(useAssetDetail).toHaveBeenCalledWith('AAPL', false);
+  });
+
+  it('fetches and renders the data source once the disclosure is opened', () => {
+    vi.mocked(useAssetDetail).mockReturnValue({
+      data: { data_source: 'yfinance' } as never,
+      isPending: false,
+      isError: false,
+    } as never);
+    render(<TheProof sim={BASE_SIM} />);
+
+    const summary = screen.getByText('Methodology, assumptions, and technical details');
+    const details = summary.closest('details') as HTMLDetailsElement;
+    // jsdom does not implement native click-to-toggle on <summary>; set the
+    // real `open` property and dispatch the native `toggle` event React's
+    // onToggle listens for, matching what a real browser does on click.
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+
+    expect(useAssetDetail).toHaveBeenLastCalledWith('AAPL', true);
+  });
+
+  it('renders the accessible growth-chart data table with real formatted values', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    // Scoped to the table itself: Recharts appends a persistent, hidden
+    // #recharts_measurement_span directly to document.body (outside the
+    // React tree RTL's cleanup() unmounts) that can coincidentally contain
+    // the same date text from an earlier test's chart in this same file —
+    // a real Recharts quirk, not a bug in this component.
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Jan 1, 2015')).toBeInTheDocument();
+    expect(within(table).getByText('Jan 1, 2025')).toBeInTheDocument();
+    expect(table).toHaveTextContent('$2,500.00');
+  });
+
+  it('states plainly when no growth-series data is available, rather than an empty table', () => {
+    render(<TheProof sim={{ ...BASE_SIM, growth_series: [] }} />);
+    expect(screen.getByText('No growth-series data is available for this simulation.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });

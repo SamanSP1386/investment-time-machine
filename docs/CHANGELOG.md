@@ -4,6 +4,35 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.13.0] — 2026-07-24 — M7 Phase 3C-3: Growth Chart, Why, and The Proof
+
+### Added
+- `frontend/src/components/simulation-result/growth-chart.tsx` — the Results page's Growth Chart: a single-hue Recharts line (identical treatment for a gain or a loss), quiet axes, split-date markers, and three honest non-crashing states (empty series, single-point series, normal).
+- `frontend/src/components/simulation-result/chart-plot-value.ts` — `toChartPlotNumber`, the one disclosed, narrowly-scoped exception to this codebase's "never convert a `DecimalString` to a JS number" rule, used exclusively for Recharts' plotting geometry.
+- `frontend/src/hooks/use-asset-detail.ts` — lazy `GET /api/v1/assets/{symbol}` fetch backing The Proof's new "Data source" provenance line, enabled only once the disclosure is opened.
+- The Why section's full three-paragraph explanation (price appreciation including shares purchased; dividend contribution; inflation adjustment) and The Proof's expanded Methodology (the `close_price` policy, the 365.25-day CAGR convention), Assumptions (exact-date prices, dividend timing, the CPI as-of lookup), Provenance (data source, calculation version, simulation ID, created timestamp), and an accessible, keyboard-navigable growth-data `<table>` — the chart's text alternative.
+- `docs/ARCHITECTURE_DECISIONS.md` **ADR-043** (the Growth Chart's implementation choices in full).
+- New tests: `growth-chart.test.tsx`, `chart-plot-value.test.ts`, `use-asset-detail.test.tsx`, plus rewritten coverage in `results-sections.test.tsx`.
+
+### Changed
+- `frontend/src/components/simulation-result/results-sections.tsx::GrowthOverTime` now renders `GrowthChart` against the real, persisted `growth_series` (Founder Decision 014/KI-021, M7 Phase 3C-2) instead of the prior "not yet available" placeholder.
+- `WhyExplanation`'s inflation paragraph is now omitted entirely when `adjust_for_inflation` is false, rather than rendered with filler copy — a direct behavior change from the M7 Phase 3B.2 stub.
+- `frontend/vitest.setup.ts` — added a `ResizeObserver` stub and a fixed `getBoundingClientRect` override, required for Recharts to render under jsdom.
+
+### Fixed
+- N/A — no defect fixed this pass; a planned feature completed.
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A. The dividend paragraph's originally-specified third state ("this asset paid no dividends in this range") is a disclosed, deliberate scope decision, not implemented — `SimulationResponse` exposes no dividend-event signal, and deriving one would require frontend-side financial arithmetic this codebase's guardrails (ADR-029/033) forbid. See ADR-043.
+
+### Security
+- N/A. No new attack surface — the chart and new sections render only data already returned elsewhere by the API; `useAssetDetail` calls an existing, unauthenticated, already-implemented endpoint. The one numeric-coercion exception (`toChartPlotNumber`) is scoped to chart pixel geometry only, verified never to influence a displayed figure, comparison, or calculation.
+
+---
+
 ## [0.12.0] — 2026-07-23 — Growth Series Persistence (Founder Decision 014) + KI-016 Verification
 
 ### Added

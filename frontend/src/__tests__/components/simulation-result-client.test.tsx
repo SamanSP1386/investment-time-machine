@@ -18,6 +18,10 @@ vi.mock('@/hooks/use-simulation', () => ({
   useSimulation: () => ({ ...queryState, refetch: refetchMock }),
 }));
 
+vi.mock('@/hooks/use-asset-detail', () => ({
+  useAssetDetail: () => ({ data: undefined, isPending: true, isError: false }),
+}));
+
 const BASE_SIM: SimulationResponse = {
   id: 'sim-123',
   status: 'completed',
@@ -35,7 +39,13 @@ const BASE_SIM: SimulationResponse = {
   cagr_percentage: '9.594448' as SimulationResponse['cagr_percentage'],
   inflation_adjusted_final_value: null,
   disclosed_splits: [],
-  growth_series: [],
+  // Post-Founder Decision 014 (KI-021 resolved), a completed simulation's
+  // GET reliably includes a real, persisted growth_series — reflected here
+  // rather than the pre-M7-Phase-3C-2 empty-array default.
+  growth_series: [
+    { point_date: '2015-01-01', value: '1000.00000000' as SimulationResponse['growth_series'][number]['value'] },
+    { point_date: '2025-01-01', value: '2500.00000000' as SimulationResponse['growth_series'][number]['value'] },
+  ],
   calculation_version: 'v2',
   error_message: null,
   created_at: '2026-07-18T00:00:00Z',
@@ -87,13 +97,16 @@ describe('SimulationResultClient', () => {
     expect(screen.getByText('Annual Return (CAGR)')).toBeInTheDocument();
     expect(screen.getByText('+9.59%')).toBeInTheDocument();
 
-    // Section 5 — Growth Over Time, honest "not yet available" (KI-021).
-    expect(screen.getByText(/day-by-day view of this investment.s path isn.t available/)).toBeInTheDocument();
+    // Section 5 — Growth Over Time, now backed by a real, persisted series (KI-021 resolved).
+    expect(screen.getByText(/This chart traces the value of this investment/)).toBeInTheDocument();
 
-    // Section 6 — Why, three plain-English paragraphs.
+    // Section 6 — Why. Price appreciation and dividend contribution always
+    // render; inflation adjustment is omitted here since BASE_SIM did not
+    // request it (adjust_for_inflation: false) — filler copy for an
+    // unrequested choice is deliberately not shown (M7 Phase 3C-3).
     expect(screen.getByText('Price appreciation')).toBeInTheDocument();
     expect(screen.getByText('Dividend contribution')).toBeInTheDocument();
-    expect(screen.getByText('Inflation adjustment')).toBeInTheDocument();
+    expect(screen.queryByText('Inflation adjustment')).not.toBeInTheDocument();
 
     // Section 7 — The Proof, collapsed by default, folding in the former Snapshot/Technical Details content.
     const proofSummary = screen.getByText('Methodology, assumptions, and technical details');
