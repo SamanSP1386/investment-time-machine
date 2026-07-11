@@ -27,9 +27,8 @@ describe('ErrorState', () => {
 
   it('collapses request id / error code behind a "Technical details" disclosure, closed by default', () => {
     render(<ErrorState title="Something went wrong" requestId="req-123" errorCode="INTERNAL_SERVER_ERROR" />);
-    const details = screen.getByText('Technical details').closest('details');
-    expect(details).not.toBeNull();
-    expect(details).not.toHaveAttribute('open');
+    const trigger = screen.getByRole('button', { name: 'Technical details' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText(/req-123/)).toBeInTheDocument();
     expect(screen.getByText(/INTERNAL_SERVER_ERROR/)).toBeInTheDocument();
   });

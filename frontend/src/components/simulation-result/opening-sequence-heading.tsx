@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type ReactNode } from 'react';
+import { useAssetDetail } from '@/hooks/use-asset-detail';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useScramble } from '@/hooks/use-scramble';
 import { useSettleIn } from '@/hooks/use-settle-in';
@@ -56,22 +57,49 @@ function ScrambleFigure({
   );
 }
 
+/**
+ * Task F.23 (M7 Phase 3D-1) — the hero names the asset by its real display
+ * name when one is available ("Apple Inc. (AAPL)"), falling back to the
+ * ticker alone the moment it isn't (still loading, request failed, or the
+ * asset genuinely has no distinct display name) — never a blocking wait
+ * for this specific fetch: `AssetDetail` is not part of `SimulationResponse`
+ * itself, so it's fetched here directly (eagerly, unlike The Proof's own
+ * lazy `useAssetDetail` call — that one only backs a collapsed disclosure,
+ * this one backs the hero sentence itself, which FD-017 renders
+ * immediately and unconditionally regardless of this fetch's own state).
+ */
+function useAssetLabel(symbol: string): string {
+  const { data } = useAssetDetail(symbol, true);
+  if (data?.name && data.name !== symbol) {
+    return `${data.name} (${symbol})`;
+  }
+  return symbol;
+}
+
 export function OpeningSequenceHeading({ sim, children }: { sim: SimulationResponse; children: ReactNode }) {
   const reducedMotion = useReducedMotion();
   const active = !reducedMotion;
   const settled = useSettleIn(active);
+  const assetLabel = useAssetLabel(sim.asset_symbol);
 
   const investedText = formatCurrency(sim.investment_amount);
   const answerText = sim.final_value !== null ? formatCurrency(sim.final_value) : 'Not available';
-  const fullSentenceText = `If you had invested ${investedText} in ${sim.asset_symbol} between ${formatDate(sim.start_date)} and ${formatDate(sim.end_date)}, your investment would be worth ${answerText} today.`;
+  const fullSentenceText = `If you had invested ${investedText} in ${assetLabel} between ${formatDate(sim.start_date)} and ${formatDate(sim.end_date)}, your investment would be worth ${answerText} today.`;
   // Punctuation matches the approved mockup exactly: a comma before "your
-  // investment," none after the asset symbol.
+  // investment," none after the asset name/ticker.
 
   return (
     <div className="flex flex-col gap-10 sm:gap-14">
       <div className="flex flex-col gap-6 sm:gap-8">
-        {/* Section 1 — a very small label. Nothing more. */}
-        <p className="kicker">Investment Time Machine</p>
+        {/*
+         * Section 1 — a very small label. Nothing more. "Simulation
+         * result," not the product wordmark — `AppHeader` (M7 Phase 3D-1,
+         * task A.1) already carries brand identity on every product route,
+         * so repeating it here would be the same kind of redundant
+         * eyebrow the Why/Why? duplication fix (task 10) already removed
+         * elsewhere on this page.
+         */}
+        <p className="kicker">Simulation result</p>
 
         {/*
          * Section 2 — the Worked Example, the page's hero. `aria-label`
@@ -89,9 +117,8 @@ export function OpeningSequenceHeading({ sim, children }: { sim: SimulationRespo
           )}
         >
           If you had invested{' '}
-          <ScrambleFigure value={investedText} active={active} duration={600} delay={0} /> in{' '}
-          <span className="italic">{sim.asset_symbol}</span> between {formatDate(sim.start_date)} and{' '}
-          {formatDate(sim.end_date)}, your investment would be worth{' '}
+          <ScrambleFigure value={investedText} active={active} duration={600} delay={0} /> in {assetLabel} between{' '}
+          {formatDate(sim.start_date)} and {formatDate(sim.end_date)}, your investment would be worth{' '}
           <ScrambleFigure value={answerText} active={active} duration={600} delay={100} /> today.
         </h1>
       </div>

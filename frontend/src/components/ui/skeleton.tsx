@@ -3,14 +3,17 @@ import { cn } from '@/lib/utils';
 
 /**
  * Shaped like the final layout it stands in for, never a generic spinner
- * (frontend_design_system.md §10). `animate-pulse` is frozen by the global
- * prefers-reduced-motion override in globals.css.
+ * (frontend_design_system.md §10). Uses `.skeleton-shimmer` (globals.css) —
+ * a one-shot, two-pass sweep, never Tailwind's `animate-pulse` (infinite by
+ * default, a direct FD-018 motion-law violation) — frozen to its static
+ * resting color under `prefers-reduced-motion` by the same global override
+ * every other animation in this app uses.
  */
 export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       aria-hidden="true"
-      className={cn('animate-pulse rounded-[var(--skeleton-radius)] bg-border-gridline', className)}
+      className={cn('skeleton-shimmer rounded-[var(--skeleton-radius)]', className)}
       {...props}
     />
   );

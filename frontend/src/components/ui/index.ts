@@ -2,6 +2,7 @@ export * from './button';
 export * from './input';
 export * from './card';
 export * from './badge';
+export * from './disclosure';
 export * from './skeleton';
 export * from './empty-state';
 export * from './error-state';

@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { ErrorState } from '@/components/ui/error-state';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ProductShell } from '@/components/shell/product-shell';
 import { OpeningSequenceHeading } from '@/components/simulation-result/opening-sequence-heading';
 import { GrowthOverTime, SupportingFacts, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
 import { useSimulation } from '@/hooks/use-simulation';
@@ -33,6 +36,44 @@ function workedExampleSentence(sim: SimulationResponse): string {
     return `${opening} — here's what we're calculating.`;
   }
   return `${opening} — here's what happened when we tried to calculate it.`;
+}
+
+/**
+ * A skeleton shaped like the completed Results layout (hero sentence,
+ * Supporting Facts row, chart) — never a generic spinner
+ * (frontend_design_system.md §10) — so the page never visibly jumps once
+ * the real content arrives. `.skeleton-shimmer` (globals.css) sweeps at
+ * most twice, then stops (FD-018 — no infinite/ambient animation); under
+ * `prefers-reduced-motion` the two passes complete imperceptibly and every
+ * block just reads as its static resting color.
+ */
+function ResultsSkeleton() {
+  return (
+    <div role="status" aria-live="polite" className="flex flex-col gap-10 sm:gap-14">
+      <span className="sr-only">Loading simulation…</span>
+      <div aria-hidden className="flex flex-col gap-6 sm:gap-8">
+        <Skeleton className="h-3 w-40" />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-9 w-full max-w-2xl sm:h-12" />
+          <Skeleton className="h-9 w-3/4 max-w-xl sm:h-12" />
+        </div>
+      </div>
+      <div aria-hidden className="flex flex-col gap-14 sm:gap-20">
+        <div className="grid grid-cols-1 gap-8 border-t border-b border-border-hairline py-8 sm:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col gap-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-8 w-32" />
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-48 w-full sm:h-64" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** Every input the user actually chose, unconditionally renderable regardless of status. */
@@ -74,8 +115,11 @@ function SimulationSnapshot({ sim }: { sim: SimulationResponse }) {
 /** Simulation ID, calculation version, created timestamp — collapsed, never hidden (docs/EXPERIENCE_CONSTITUTION.md §5). */
 function TechnicalDetails({ sim }: { sim: SimulationResponse }) {
   return (
-    <details className="rounded-[var(--card-radius)] border border-border-hairline p-4">
-      <summary className="cursor-pointer text-sm font-medium text-ink-primary select-none">Technical details</summary>
+    <Disclosure
+      className="rounded-[var(--card-radius)] border border-border-hairline p-4"
+      summaryClassName="text-sm font-medium text-ink-primary"
+      summary="Technical details"
+    >
       <dl className="figure mt-4 flex flex-col gap-2 text-xs text-ink-secondary">
         <div className="flex flex-col gap-0.5">
           <dt className="kicker">Simulation ID</dt>
@@ -90,7 +134,7 @@ function TechnicalDetails({ sim }: { sim: SimulationResponse }) {
           <dd>{sim.created_at}</dd>
         </div>
       </dl>
-    </details>
+    </Disclosure>
   );
 }
 
@@ -111,7 +155,16 @@ function CopyLinkButton() {
 
   return (
     <Button variant="secondary" size="sm" onClick={handleCopy}>
-      {copied ? 'Link copied' : 'Copy link'}
+      {copied ? (
+        <>
+          <svg aria-hidden viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 fill-none stroke-current stroke-2">
+            <path d="M3 8.5 6.5 12 13 4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Link copied
+        </>
+      ) : (
+        'Copy link'
+      )}
     </Button>
   );
 }
@@ -135,7 +188,7 @@ function RunAnotherSimulationLink() {
   return (
     <Link
       href="/simulator"
-      className="text-sm font-medium text-accent underline-offset-4 hover:underline"
+      className="text-sm font-medium text-accent underline-offset-4 transition-colors duration-[var(--duration-micro)] hover:underline"
     >
       Run another simulation
     </Link>
@@ -147,18 +200,16 @@ export function SimulationResultClient({ id }: { id: string }) {
 
   if (isPending) {
     return (
-      <main className="itm-elevated mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center p-6 sm:p-10">
-        <p role="status" aria-live="polite" className="text-sm text-ink-secondary">
-          Loading simulation…
-        </p>
-      </main>
+      <ProductShell contentClassName="max-w-[1120px] px-6 py-16 sm:px-10 sm:py-24">
+        <ResultsSkeleton />
+      </ProductShell>
     );
   }
 
   if (isError) {
     const errorCopy = getErrorCopy(error instanceof ApiError ? error.code : 'INTERNAL_SERVER_ERROR');
     return (
-      <main className="itm-elevated mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6 sm:p-10">
+      <ProductShell contentClassName="max-w-2xl flex flex-col gap-8 p-6 sm:p-10">
         <ErrorState
           title={errorCopy.title}
           description={errorCopy.description}
@@ -166,13 +217,16 @@ export function SimulationResultClient({ id }: { id: string }) {
           errorCode={error instanceof ApiError ? error.code : undefined}
           action={<RunAnotherSimulationLink />}
         />
-      </main>
+      </ProductShell>
     );
   }
 
   if (sim.status === 'completed') {
     return (
-      <main className="itm-elevated mx-auto flex min-h-screen max-w-[1120px] flex-col px-6 py-16 sm:px-10 sm:py-24">
+      <ProductShell
+        calculationVersion={sim.calculation_version}
+        contentClassName="max-w-[1120px] flex flex-col px-6 py-16 sm:px-10 sm:py-24"
+      >
         <OpeningSequenceHeading sim={sim}>
           <SupportingFacts sim={sim} />
           <GrowthOverTime sim={sim} />
@@ -183,12 +237,12 @@ export function SimulationResultClient({ id }: { id: string }) {
             <CopyLinkButton />
           </div>
         </OpeningSequenceHeading>
-      </main>
+      </ProductShell>
     );
   }
 
   return (
-    <main className="itm-elevated mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6 sm:p-10">
+    <ProductShell contentClassName="max-w-2xl flex flex-col gap-8 p-6 sm:p-10">
       <ResultHeader sim={sim} />
 
       {sim.status === 'pending' ? (
@@ -218,6 +272,6 @@ export function SimulationResultClient({ id }: { id: string }) {
         <RunAnotherSimulationLink />
         <CopyLinkButton />
       </div>
-    </main>
+    </ProductShell>
   );
 }

@@ -178,9 +178,8 @@ describe('SimulationForm', () => {
     mutationState.error = new ApiError({ code: 'MISSING_HISTORICAL_DATA', message: 'internal', request_id: 'req-42' });
     render(<SimulationForm />);
 
-    const details = screen.getByText('Technical details').closest('details');
-    expect(details).not.toBeNull();
-    expect(details).not.toHaveAttribute('open');
+    const trigger = screen.getByRole('button', { name: 'Technical details' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('req-42', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('MISSING_HISTORICAL_DATA', { exact: false })).toBeInTheDocument();
   });

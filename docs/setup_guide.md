@@ -98,23 +98,45 @@ FRED requires a free API key (`FRED_API_KEY` in `.env`) — get one at https://f
 
 `yfinance==0.2.44`'s internal crumb/cookie negotiation can get rate-limited (HTTP 429) by Yahoo, breaking ingestion for every symbol identically, inside or outside Docker (root-caused and tracked as `docs/KNOWN_ISSUES.md` KI-044). This is **not** a Docker networking issue and there is no header/config fix for it — it clears on its own once the rate limit resets, on an unpredictable schedule.
 
-To unblock **manual frontend/Simulator testing** without waiting on that, use `--provider dev_seed` — a small, deterministic, clearly-synthetic fixture provider built for exactly this:
+To unblock **manual frontend/Simulator testing** without waiting on that, use `--provider dev_seed` — a small, deterministic, clearly-synthetic fixture provider built for exactly this. As of M7 Phase 3D-1 (Craft & Coherence, task F), the recommended way to seed it is the one-shot operator script, which seeds every fixture symbol with a correct display name in a single, idempotent, re-runnable command:
 
 ```bash
 cd backend
-python -m app.ingestion.cli prices AAPL --provider dev_seed --asset-type stock --start 2020-01-01 --end 2024-12-31
-python -m app.ingestion.cli prices SPY  --provider dev_seed --asset-type etf   --start 2020-01-01 --end 2024-12-31
-python -m app.ingestion.cli prices BTC-USD --provider dev_seed --asset-type crypto --name "Bitcoin (dev seed)" --start 2020-01-01 --end 2024-12-31
+python -m app.ingestion.seed_dev_data
+python -m app.ingestion.seed_dev_data --dry-run   # preview only, no writes
 ```
+
+This seeds all **seven** fixture symbols (`app/ingestion/seed_dev_data.py::SEED_ASSETS`), each chosen to cover a distinct simulation scenario the frontend needs fixture data for:
+
+| Symbol | Display name | Type | Scenario |
+|---|---|---|---|
+| `AAPL` | Apple Inc. | stock | Plain gain (the original fixture symbol) |
+| `SPY` | SPDR S&P 500 ETF Trust | etf | Plain gain, ETF |
+| `BTC-USD` | Bitcoin | crypto | Plain gain, crypto |
+| `KO` | The Coca-Cola Company | stock | Dividend payer (fixed synthetic quarterly amount) |
+| `PTON` | Peloton Interactive, Inc. | stock | **Overall loss** — the one deliberately negative-drift symbol |
+| `TSLA` | Tesla, Inc. | stock | Disclosed stock split (a single fixed-date 3-for-1 event) |
+| `QQQ` | Invesco QQQ Trust | etf | Plain gain, a second ETF |
+
+The individual per-symbol CLI invocation still works identically for a one-off symbol or a custom date range:
+
+```bash
+python -m app.ingestion.cli prices AAPL --provider dev_seed --asset-type stock --name "Apple Inc." --start 2020-01-01 --end 2024-12-31
+```
+
+**Always pass `--name`** when using the per-symbol CLI form directly — `get_or_create_asset` only sets `name`/`asset_type` when a symbol's `Asset` row is first created, never on an already-existing row (see the caveat below), so omitting `--name` permanently stamps the raw ticker as the display name for that symbol until something corrects it.
 
 **`dev_seed` is development/test only, and its data must never be treated as real provider data:**
 
-- It only serves three fixed symbols (`AAPL`, `SPY`, `BTC-USD`) at deliberately round, obviously-fake price levels (e.g. AAPL starts at $100.00) — it never attempts to approximate real historical prices, so nobody could mistake it for real market data even seen out of context.
+- It serves a small, fixed set of symbols (see the table above) at deliberately round, obviously-fake price levels (e.g. AAPL starts at $100.00) — it never attempts to approximate real historical prices, so nobody could mistake it for real market data even seen out of context.
 - Every asset it creates is stamped `data_source = "dev_seed"` in the database — the same column real providers populate — never disguised as `"yfinance"` or `"coingecko"`. Check `GET /api/v1/assets/{symbol}` and confirm `data_source` before trusting any local data as "real."
 - It refuses to run (raises at construction) unless `ENVIRONMENT` is `development`, `test`, or `testing` — it cannot be reached in a production deployment, even by mistake.
 - It goes through the exact same normalization/validation/repository/audit pipeline every real provider does (see ADR-035) — it is not a raw SQL insert or a bypass of ingestion's own correctness checks, only a different source of raw records.
+- As of this pass, `KO` also produces dividend records and `TSLA` also discloses one stock-split event (`DevSeedProvider.fetch_dividends`/`fetch_splits`) — every other symbol still produces prices only, matching the original fixture's scope.
 
-**If a symbol already exists in your local DB from an earlier failed `yfinance`/`coingecko` attempt**, `get_or_create_asset` will *not* update its `data_source` — it only sets that column when the row is first created. If you seed a symbol that already has a stale `Asset` row from a previously-failed real-provider attempt, check `data_source` after seeding; if it still shows the old provider name instead of `"dev_seed"`, you'll need to delete that asset's rows (`historical_prices`, `dividends`, `stock_splits`, then `assets`) and re-run the seed command so the label is set correctly on creation. See ADR-035's "Tradeoffs" section for the full explanation.
+**If a symbol already exists in your local DB with the wrong name** (e.g. `AAPL` seeded before this pass, stuck with `name = "AAPL"` rather than "Apple Inc."), `get_or_create_asset` will *not* fix it — it only sets `name`/`asset_type` when the row is first created. `python -m app.ingestion.seed_dev_data` corrects this directly for every symbol in its fixed `SEED_ASSETS` list (a scoped, explicit `UPDATE`, not a general ingestion-repository behavior change) — just re-run it. This is separate from the `data_source` staleness case below, which still requires a manual row delete.
+
+**If a symbol already exists in your local DB from an earlier failed `yfinance`/`coingecko` attempt**, `get_or_create_asset` will *not* update its `data_source` either — it only sets that column when the row is first created. If you seed a symbol that already has a stale `Asset` row from a previously-failed real-provider attempt, check `data_source` after seeding; if it still shows the old provider name instead of `"dev_seed"`, you'll need to delete that asset's rows (`historical_prices`, `dividends`, `stock_splits`, then `assets`) and re-run the seed command so the label is set correctly on creation. See ADR-035's "Tradeoffs" section for the full explanation.
 
 ## Environment variables
 

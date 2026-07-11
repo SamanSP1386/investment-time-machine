@@ -122,7 +122,7 @@ export function AssetSearchCombobox({
       <label htmlFor={inputId} className="text-sm font-medium text-ink-primary">
         {label}
         {required ? (
-          <span aria-hidden className="ml-0.5 text-status-critical">
+          <span aria-hidden className="ml-1 text-xs text-ink-muted">
             *
           </span>
         ) : null}
@@ -150,8 +150,8 @@ export function AssetSearchCombobox({
         }}
         onBlur={() => setIsOpen(false)}
         className={cn(
-          'figure h-10 rounded-[var(--input-radius)] border border-[var(--input-border)] bg-surface px-3 text-sm text-ink-primary placeholder:text-ink-muted focus-visible:border-[var(--input-border-focus)]',
-          error && 'border-status-critical',
+          'figure h-10 rounded-[var(--input-radius)] border border-[var(--input-border)] bg-surface px-3 text-sm text-ink-primary transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)] placeholder:text-ink-muted focus-visible:border-[var(--input-border-focus)]',
+          error && 'border-[var(--input-border-invalid)]',
           className
         )}
       />
@@ -159,7 +159,7 @@ export function AssetSearchCombobox({
         {liveMessage}
       </span>
       {error ? (
-        <p id={errorId} role="alert" className="text-xs text-status-critical">
+        <p id={errorId} role="alert" className="text-xs text-status-serious">
           {error}
         </p>
       ) : null}

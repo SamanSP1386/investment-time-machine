@@ -6,6 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Disclosure } from '@/components/ui/disclosure';
 import { ErrorState } from '@/components/ui/error-state';
 import { AssetSearchCombobox } from './asset-search-combobox';
 import { useCreateSimulation } from '@/hooks/use-simulation';
@@ -67,9 +68,9 @@ function ToggleField({
       <input type="checkbox" className="peer sr-only" {...inputProps} />
       <span
         aria-hidden
-        className="relative h-6 w-[42px] shrink-0 rounded-full bg-border-hairline-strong transition-colors duration-200 peer-checked:bg-accent peer-checked:[&>span]:translate-x-[18px] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--focus-ring-color)]"
+        className="relative h-6 w-[42px] shrink-0 rounded-full bg-border-hairline-strong transition-colors duration-150 ease-out peer-checked:bg-accent peer-checked:[&>span]:translate-x-[18px] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--focus-ring-color)]"
       >
-        <span className="absolute top-[3px] left-[3px] h-[18px] w-[18px] rounded-full bg-surface transition-transform duration-200" />
+        <span className="absolute top-[3px] left-[3px] h-[18px] w-[18px] rounded-full bg-surface transition-transform duration-150 ease-out" />
       </span>
     </label>
   );
@@ -138,7 +139,7 @@ export function SimulationForm() {
     : null;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-11">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-12">
       <Controller
         name="asset_symbol"
         control={control}
@@ -253,13 +254,11 @@ export function SimulationForm() {
         convenience.
       </p>
 
-      <details className="border-t border-border-hairline pt-6">
-        <summary className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-ink-primary select-none">
-          <span className="figure text-accent" aria-hidden>
-            +
-          </span>
-          More options
-        </summary>
+      <Disclosure
+        className="border-t border-border-hairline pt-6"
+        summaryClassName="text-sm font-semibold text-ink-primary"
+        summary="More options"
+      >
         <div className="mt-2 flex flex-col">
           <ToggleField
             label="Reinvest dividends"
@@ -272,7 +271,7 @@ export function SimulationForm() {
             {...register('adjust_for_inflation')}
           />
         </div>
-      </details>
+      </Disclosure>
 
       {errorCopy ? (
         <ErrorState
@@ -283,7 +282,7 @@ export function SimulationForm() {
         />
       ) : null}
 
-      <Button type="submit" loading={createSimulation.isPending || isNavigating} className="mt-2 self-start px-11">
+      <Button type="submit" loading={createSimulation.isPending || isNavigating} className="mt-2 self-start px-12">
         {createSimulation.isPending || isNavigating ? 'Calculating historical returns…' : 'Run simulation'}
       </Button>
     </form>

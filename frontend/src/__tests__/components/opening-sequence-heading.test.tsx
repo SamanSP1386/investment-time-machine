@@ -1,7 +1,17 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { OpeningSequenceHeading } from '@/components/simulation-result/opening-sequence-heading';
 import type { SimulationResponse } from '@/types/api';
+
+// The hero sentence eagerly fetches the asset's display name (task F.23) —
+// mocked here as never-resolved (ticker-only fallback) so these tests stay
+// focused on the sentence/motion behavior they actually assert, matching
+// results-sections.test.tsx's own established mock shape for this hook.
+vi.mock('@/hooks/use-asset-detail', () => ({
+  useAssetDetail: vi.fn(() => ({ data: undefined, isPending: true, isError: false })),
+}));
+
+const { useAssetDetail } = await import('@/hooks/use-asset-detail');
 
 const BASE_SIM: SimulationResponse = {
   id: 'sim-123',
@@ -73,7 +83,7 @@ describe('OpeningSequenceHeading', () => {
       </OpeningSequenceHeading>
     );
 
-    expect(screen.getByText('Investment Time Machine')).toBeInTheDocument();
+    expect(screen.getByText('Simulation result')).toBeInTheDocument();
     expect(screen.queryByText('completed')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
@@ -166,5 +176,25 @@ describe('OpeningSequenceHeading', () => {
     // class of any kind (EXPERIENCE_CONSTITUTION.md §6/§7, FD-013/017/018).
     expect(investedFigure.className).toBe(finalFigure.className);
     expect(investedFigure.className).not.toMatch(/negative-tint/);
+  });
+
+  it('task F.23: renders the asset\'s real display name plus ticker once resolved, and falls back to the ticker alone until then', () => {
+    vi.mocked(useAssetDetail).mockReturnValue({
+      data: { symbol: 'AAPL', name: 'Apple Inc.', asset_type: 'stock', currency: 'USD', data_source: 'dev_seed', is_active: true, exchange: null },
+      isPending: false,
+      isError: false,
+    } as never);
+
+    render(
+      <OpeningSequenceHeading sim={BASE_SIM}>
+        <div data-testid="child-content">child</div>
+      </OpeningSequenceHeading>
+    );
+
+    expect(screen.getByText(/Apple Inc\. \(AAPL\)/)).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveAttribute('aria-label', expect.stringContaining('Apple Inc. (AAPL)'));
+
+    vi.mocked(useAssetDetail).mockReturnValue({ data: undefined, isPending: true, isError: false } as never);
   });
 });

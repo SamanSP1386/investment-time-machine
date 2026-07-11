@@ -180,6 +180,22 @@ body {
   --color-primary: var(--color-accent-light);
   --color-primary-hover: color-mix(in oklch, var(--color-accent-light) 85%, white);
   --color-primary-foreground: var(--color-elevated-bg-light);
+  /*
+   * Found live (task A.4 verification): --focus-ring-color/--input-border-
+   * focus are each declared exactly once, at components.css's plain
+   * `:root { ...: var(--color-primary); }` — a custom property's `var()`
+   * reference resolves at that declaration's OWN computed-value time, then
+   * the *resolved* value inherits statically down the tree. Re-declaring
+   * --color-primary inside .itm-elevated (above) does NOT make an
+   * already-elsewhere-declared property dynamically "re-follow" it — only
+   * a property re-declared at this same scope gets a fresh resolution
+   * here. Without this explicit re-declaration, every focus ring and
+   * every focused input's border inside an elevated surface silently kept
+   * rendering the base navy brand color instead of accent gold, invisible
+   * in every check that wasn't an actual live keyboard-focus screenshot.
+   */
+  --focus-ring-color: var(--color-accent-light);
+  --input-border-focus: var(--color-accent-light);
   /* The mockup's sharper CTA corner (2px, vs. the base design system's
      6px) — theme-independent, so set once here rather than in each
      light/dark block below. */
@@ -222,6 +238,8 @@ body {
     --color-primary: var(--color-accent-dark);
     --color-primary-hover: color-mix(in oklch, var(--color-accent-dark) 85%, white);
     --color-primary-foreground: var(--color-elevated-bg-dark);
+    --focus-ring-color: var(--color-accent-dark);
+    --input-border-focus: var(--color-accent-dark);
     background-color: var(--color-elevated-bg-dark);
     background-image: var(--gradient-elevated-bg-dark);
   }
@@ -247,6 +265,8 @@ body {
   --color-primary: var(--color-accent-dark);
   --color-primary-hover: color-mix(in oklch, var(--color-accent-dark) 85%, white);
   --color-primary-foreground: var(--color-elevated-bg-dark);
+  --focus-ring-color: var(--color-accent-dark);
+  --input-border-focus: var(--color-accent-dark);
   background-color: var(--color-elevated-bg-dark);
   background-image: var(--gradient-elevated-bg-dark);
 }
@@ -258,10 +278,120 @@ body {
   mix-blend-mode: overlay;
 }
 
-/* Visible focus ring everywhere, never `outline: none` with no replacement. */
+/* Visible focus ring everywhere, never `outline: none` with no replacement.
+   --focus-ring-color already resolves to the accent hue inside .itm-elevated
+   (it reads --color-primary, which .itm-elevated remaps to accent — see
+   that class's own comment) — no separate override needed here. */
 :focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: 2px;
+}
+
+/*
+ * M7 Phase 3D-1 — Craft & Coherence (task A.4). Bespoke, static, theme-aware
+ * chrome: a tinted text-selection highlight, a themed scrollbar, and an
+ * autofill override so a browser's default yellow/white autofill flash
+ * never breaks the page's own palette. None of these are motion — they are
+ * static color/shape treatments, so FD-018's motion law doesn't apply to
+ * them at all.
+ */
+::selection {
+  background-color: color-mix(in oklch, var(--color-accent) 35%, transparent);
+  color: inherit;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hairline-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-hairline-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-muted);
+  background-clip: padding-box;
+}
+
+/*
+ * Autofill override (the -webkit-box-shadow technique — the only reliable
+ * cross-browser way to beat a browser's own forced autofill background,
+ * since -webkit-text-fill-color/background-color alone can be overridden
+ * back by the browser on every keystroke). The absurd 5000s transition
+ * delay is the standard trick that makes the color "swap" read as instant
+ * despite being implemented as a transition — not a real animation, so it
+ * is not gated by prefers-reduced-motion (there is nothing to reduce; it
+ * never repeats, never loops, and finishes long before anyone could
+ * perceive its literal duration).
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-ink-primary);
+  caret-color: var(--color-ink-primary);
+  box-shadow: 0 0 0 1000px var(--color-background) inset;
+  transition:
+    background-color 5000s ease-in-out 0s,
+    box-shadow 5000s ease-in-out 0s;
+}
+
+/*
+ * Native <input type="date"> theming (task B.6) — color-scheme flips the
+ * browser's own calendar-picker chrome (icon, popup) to match the current
+ * theme; accent-color tints whatever native controls the browser lets a
+ * page tint (support varies — Chromium honors it for the date picker's
+ * selected-day highlight, Firefox/Safari less consistently). Deliberately
+ * scoped to .itm-elevated only, matching every other elevated-surface-only
+ * treatment in this file; remaining native quirks (the calendar glyph's
+ * exact shape, popup internals) are real, disclosed limits of what a page
+ * can style on a native form control, not fought with a custom-built
+ * date-picker component.
+ */
+.itm-elevated input[type='date'] {
+  color-scheme: dark;
+  accent-color: var(--color-accent);
+}
+:root[data-theme='light'] .itm-elevated input[type='date'] {
+  color-scheme: light;
+}
+
+/*
+ * A one-shot skeleton shimmer (task E.19) — replaces Tailwind's
+ * `animate-pulse` (infinite by default, a direct FD-018 violation: "NO
+ * infinite/ambient animation"). Sweeps at most twice, then stops; under
+ * prefers-reduced-motion the global override above collapses the duration
+ * to ~0, so the two iterations complete imperceptibly and the block simply
+ * reads as its static resting color — no separate reduced-motion branch
+ * needed.
+ */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 150% 0;
+  }
+}
+.skeleton-shimmer {
+  background-color: var(--color-border-gridline);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-border-hairline-strong) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.1s ease-in-out 2;
 }
 
 /*

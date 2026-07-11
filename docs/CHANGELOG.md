@@ -4,6 +4,49 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.15.0] — 2026-07-25 — M7 Phase 3D-1: Craft & Coherence
+
+### Added
+- `src/components/shell/product-shell.tsx`, `app-header.tsx`, `app-footer.tsx` — the shared product-route shell: a minimal Newsreader wordmark + "Simulator" nav + hairline rule (sticky), a one-line footer (educational-purpose note, "Not financial advice," and the calculation version when one exists), and the **full-bleed elevated atmosphere**, moved here from each page's own content container so it covers the entire viewport at any width with no visible seam. Used by `/simulator` and every `/simulation/[id]` state.
+- `src/components/ui/disclosure.tsx` — the one shared disclosure primitive (rotating chevron, 150ms; a one-shot CSS grid-template-rows height/opacity reveal; `inert` while collapsed), replacing five independent native-`<details>` implementations across the app.
+- `src/app/icon.svg` — a real favicon (a small monogram echoing the Growth Chart's own endpoint-dot motif, in the brand accent), replacing the default Next.js favicon.
+- Dynamic per-simulation `<title>`/description on the Results page ("If you had invested $X in SYMBOL — Investment Time Machine"), via `generateMetadata`.
+- Themed `::selection`, a themed scrollbar, and a `-webkit-autofill` override (`globals.css`) — bespoke, static, theme-aware chrome.
+- A one-shot skeleton shimmer (`.skeleton-shimmer`, ≤2 passes) replacing Tailwind's infinite `animate-pulse` — a direct FD-018 violation caught and fixed this pass — plus a full `ResultsSkeleton` matching the completed layout's shape for the Results page's pending state.
+- `backend/app/ingestion/seed_dev_data.py` — a one-shot operator script seeding the full `dev_seed` fixture (all 7 symbols) with correct display names in one idempotent command, correcting any already-seeded row's stale name/type directly (`get_or_create_asset` only sets these on first creation).
+- Four new `dev_seed` fixture symbols (`DevSeedProvider`): KO (dividend payer), PTON (the one deliberately negative-drift, overall-loss symbol), TSLA (a disclosed stock split), QQQ (a second ETF) — plus new `fetch_dividends`/`fetch_splits` capability methods.
+- `docs/ARCHITECTURE_DECISIONS.md` **ADR-045** (the `ProductShell` full-bleed architecture, the shared `Disclosure` primitive, a real CSS custom-property re-declaration bug found and fixed live, the chart's Y-axis domain/label-position fixes, and the dividend-date/weekend-mismatch fix).
+- `docs/frontend_design_system.md` §15–16 — the enforceable Component State System and Accent Discipline rules this pass's own work is documented against.
+- New/updated tests: `disclosure.test.tsx`, new `button.test.tsx` cases (reduced-motion spinner omission, press compression), new `growth-chart.test.tsx` cases (decimation target, endpoint label flip, sparse Y-axis), `backend/tests/ingestion/test_providers_dev_seed.py` (11 cases covering every new fixture symbol/capability, including a regression guard for the dividend-date fix).
+
+### Changed
+- Every interactive primitive (`Button`, `Input`, `AssetSearchCombobox`, the Simulator's toggle switches) now has an explicit default/hover/focus-visible/active/disabled state, per `docs/frontend_design_system.md` §15.
+- Form-validation invalid state and the required-field marker now use a warm, muted tone (`--color-status-serious`/`--input-border-invalid`, `text-ink-muted`) — `--color-status-critical` and the harsh red asterisk are reserved from this pass forward for hard system/API errors only, never routine field validation.
+- `ErrorState`'s icon is now neutral (`text-ink-muted`), not `--color-status-critical` red — "no red alarm panels" for a calm, explanatory error voice even on a genuine failure.
+- Accent usage tightened app-wide (`docs/frontend_design_system.md` §16): the Why section's three sub-headings, every disclosure's trigger glyph, and The Proof's growth-data table Value column are no longer accent-colored — accent is now scarce, reserved for hero figures, primary interactive chrome (via the existing `--color-primary` remap), and key data marks only.
+- The Results hero's kicker reverted from "Investment Time Machine" to "Simulation result" (and the Simulator's from "Investment Time Machine" to "Historical simulation") — the new `AppHeader` wordmark now owns brand identity; repeating it in the page kicker was a duplication this pass's own label-language audit caught, the same class of fix as the Why/Why? duplication from M7 Phase 3D.
+- The hero sentence now names the asset by its real display name plus ticker ("Apple Inc. (AAPL)"), fetched via `useAssetDetail`, falling back to the ticker alone until resolved — the italic ticker-only treatment from M7 Phase 3D is removed.
+- The Growth Chart's decimation (~150–200 drawn points, disclosed in the caption when it applies), endpoint-label side-flip (long values no longer clip against the chart's edge), sparse hairline-only mono Y-axis ticks, and a redesigned tooltip (dark elevated surface, mono figures, a kicker-style date label, a styled crosshair, a 120ms reduced-motion-safe fade).
+- The Growth Chart's Y-axis domain is now explicitly padded around the actual data range (found live: Recharts' `Area` component otherwise defaults to including a zero baseline, wasting up to half the chart's height on a series that never approaches zero) and the invested-amount baseline label now flips sides dynamically so it never collides with the price line (found live on a loss trajectory specifically, where the invested amount is the series' own maximum).
+- `docs/setup_guide.md`'s `dev_seed` section — the recommended seeding command, the full 7-symbol table, and the corrected-name/re-seed guidance.
+
+### Fixed
+- Tailwind's `animate-pulse` (infinite by default) on `Skeleton` — a direct, previously-unnoticed FD-018 motion-law violation.
+- `--focus-ring-color`/`--input-border-focus` silently rendering the base brand navy instead of the elevated accent inside `.itm-elevated` — a genuine CSS custom-property cascade bug (a `var()` reference resolves once, at its own declaration's scope, not dynamically per descendant), found only by a real keyboard-focus screenshot, not by code review or the unit test suite.
+- `DevSeedProvider.fetch_dividends` generating ex-dividend dates that could land on a weekend, with no matching price row — making any dividend-reinvestment simulation crossing such a date fail with `MISSING_HISTORICAL_DATA`. Found live, running a real KO simulation.
+- The Growth Chart's wasted vertical space and invested-amount label collision (see Changed above).
+
+### Removed
+- N/A.
+
+### Deprecated
+- N/A.
+
+### Security
+- N/A. No new attack surface — this pass is presentational/craft work plus a local-development-only fixture data extension (`dev_seed`, already gated to non-production environments). No new input, endpoint, or calculation.
+
+---
+
 ## [0.14.0] — 2026-07-25 — M7 Phase 3D: Design Elevation
 
 ### Added

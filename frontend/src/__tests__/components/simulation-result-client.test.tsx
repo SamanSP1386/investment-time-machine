@@ -92,8 +92,9 @@ describe('SimulationResultClient', () => {
       }) as MediaQueryList;
     render(<SimulationResultClient id="sim-123" />);
 
-    // Section 1 — a tiny kicker label, nothing more.
-    expect(screen.getByText('Investment Time Machine')).toBeInTheDocument();
+    // Section 1 — a tiny kicker label, nothing more (the product wordmark
+    // now lives in AppHeader, not repeated here).
+    expect(screen.getByText('Simulation result')).toBeInTheDocument();
     expect(screen.queryByText('completed')).not.toBeInTheDocument();
 
     // Section 2 — the hero sentence, the page's only real headline. Present
@@ -124,10 +125,8 @@ describe('SimulationResultClient', () => {
     expect(screen.queryByText('Inflation adjustment')).not.toBeInTheDocument();
 
     // Section 7 — The Proof, collapsed by default, folding in the former Snapshot/Technical Details content.
-    const proofSummary = screen.getByText(
-      (content, element) => element?.tagName === 'SUMMARY' && content.includes('The Proof — methodology & data')
-    );
-    expect(proofSummary.closest('details')).not.toHaveAttribute('open');
+    const proofTrigger = screen.getByRole('button', { name: 'The Proof — methodology & data' });
+    expect(proofTrigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('sim-123')).toBeInTheDocument();
     expect(screen.getByText('v2')).toBeInTheDocument();
   });

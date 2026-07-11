@@ -1,7 +1,16 @@
-
 'use client';
 
-import { Area, ComposedChart, Line, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import {
+  Area,
+  ComposedChart,
+  Line,
+  ReferenceDot,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { toChartPlotNumber } from './chart-plot-value';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useSettleIn } from '@/hooks/use-settle-in';
@@ -16,47 +25,52 @@ import {
 import type { DisclosedSplit, GrowthSeriesPoint, SimulationResponse } from '@/types/api';
 
 /**
- * The Growth Chart (M7 Phase 3C-3, Founder Decision 014's `growth_series`
- * finally has data to render; visually upgraded M7 Phase 3D — Design
- * Elevation, FD-018/ADR-044). Evidence for the worked-example sentence
- * above it — never its own headline: no card chrome, quiet axes, one hue
- * (`--color-chart-portfolio`) regardless of whether the trajectory is a
- * gain or a loss (EXPERIENCE_CONSTITUTION.md §6/§7 — identical visual
- * treatment regardless of a result's sign; BRAND_CONSTITUTION.md §3 —
- * chart-data hues carry meaning, never UI chrome, and a hue is never
- * reused to "moralize" a result). M7 Phase 3D adds the mockup's gradient
- * area fill, an invested-amount baseline reference line, and an endpoint
- * marker with an on-chart final-value label — deliberately in the SAME
- * validated `--color-chart-portfolio` hue the line already used, not the
- * mockup's own warm accent color: BRAND_CONSTITUTION.md §7 and
- * frontend_design_system.md §3/§8 both treat the chart-data palette as a
- * closed, CVD-validated set that a UI accent must never be substituted
- * into, and this task's own instructions never asked for that specific
- * substitution — see ADR-044 for the full reasoning. Everything else
- * (decimation, split markers, tooltip, the accessible table, and the
- * `toChartPlotNumber` boundary) is unchanged.
+ * The Growth Chart — the flagship data asset of the Results page (M7 Phase
+ * 3C-3; visually upgraded M7 Phase 3D Design Elevation, FD-018/ADR-044;
+ * refined to a craft finish M7 Phase 3D-1, task D). Evidence for the
+ * worked-example sentence above it — never its own headline: no card
+ * chrome, quiet axes, one hue (`--color-chart-portfolio`) regardless of
+ * whether the trajectory is a gain or a loss (EXPERIENCE_CONSTITUTION.md
+ * §6/§7 — identical visual treatment regardless of a result's sign;
+ * BRAND_CONSTITUTION.md §3 — chart-data hues carry meaning, never UI
+ * chrome, and a hue is never reused to "moralize" a result). Deliberately
+ * in the SAME validated `--color-chart-portfolio` hue throughout, not the
+ * mockup's own warm accent color — see ADR-044.
  *
- * Motion: per Founder Decision 013/017 (superseding the older, pre-FD-017
- * "chart line draws in once" language in frontend_design_system.md §8–9,
- * written before that ruling existed), this chart gets no draw-on
- * choreography. Recharts' own line-draw animation is disabled outright
- * (`isAnimationActive={false}`); the only motion is the same single ~200ms
- * settle already used for the hero sentence (`useSettleIn`), fully static
- * under `prefers-reduced-motion` via the same mechanism. FD-018 rule 3
- * authorizes a one-shot chart draw-in as a pattern the Experience
- * Constitution permits; it does not by itself reopen this specific,
- * already-shipped `isAnimationActive={false}` decision — unchanged this
- * pass, on purpose.
+ * Motion: per Founder Decision 013/017, this chart gets no draw-on
+ * choreography; the only entrance motion is the same single ~200ms settle
+ * already used for the hero sentence (`useSettleIn`). The one addition this
+ * pass (task D.17) is the tooltip's own 120ms fade, gated on
+ * `prefers-reduced-motion` via Recharts' own `isAnimationActive` prop —
+ * hover/focus feedback, not decoration, matching FD-018's explicit
+ * carve-out for state-communicating motion.
  *
  * Every displayed figure (tooltip, split disclosure, the accessible
- * summary sentence, the new baseline/endpoint labels) is formatted from
- * the ORIGINAL `DecimalString` via `src/lib/format` — never from the JS
- * number `toChartPlotNumber` produces for Recharts' own plotting geometry
- * (see that module's doc comment and ADR-043/ADR-044 for why that
- * conversion is safe and disclosed; ADR-044 also notes this file now calls
- * it at a second site, for the baseline's Y position, still the same one
- * audited function).
+ * summary sentence, the baseline/endpoint labels) is formatted from the
+ * ORIGINAL `DecimalString` via `src/lib/format` — never from the JS number
+ * `toChartPlotNumber` produces for Recharts' own plotting geometry (see
+ * that module's doc comment and ADR-043/ADR-044). The Y-axis's sparse tick
+ * labels are the one narrow, disclosed exception to that rule (see
+ * `formatAxisTick` below) — Recharts' own scale algorithm computes round
+ * reference values with no corresponding real data point/DecimalString to
+ * format instead.
  */
+
+/** Task D.14 — decimation tightened to ~150-200 drawn points so the line
+ * reads as a clean editorial curve rather than a dense zig-zag on a
+ * multi-year daily series; every raw point remains in The Proof's
+ * accessible table regardless (that table reads `sim.growth_series`
+ * directly, never this decimated array). No prior decimation algorithm
+ * existed in this codebase to "adjust the threshold" of — this pass
+ * introduces it fresh, at this target. */
+const MAX_DRAWN_POINTS = 175;
+
+/** Task D.15 — an endpoint label this long risks clipping against the
+ * chart's right edge (the endpoint, by definition, is always the
+ * rightmost plotted point) — e.g. "$1,234,567.89" (13 chars). Flip to a
+ * left-anchored label instead of adding unbounded right margin for every
+ * chart regardless of its actual values. */
+const ENDPOINT_LABEL_FLIP_THRESHOLD = 10;
 
 interface PlotPoint {
   point_date: string;
@@ -70,6 +84,56 @@ function toPlotPoints(series: GrowthSeriesPoint[]): PlotPoint[] {
     plotValue: toChartPlotNumber(point.value),
     rawValue: point.value,
   }));
+}
+
+/** Evenly-spaced index sampling — always keeps the first and last point (so
+ * the drawn line's own endpoints exactly match the accessible table's and
+ * the worked-example sentence's), plus any point landing on a disclosed
+ * split date (so a split marker is never silently dropped by the stride).
+ * Selects WHICH already-computed points to draw; derives no new value. */
+function decimatePoints(points: PlotPoint[], keepDates: Set<string>): PlotPoint[] {
+  // eslint-disable-next-line no-restricted-syntax -- array-length comparison, not a DecimalString comparison (ADR-033).
+  if (points.length <= MAX_DRAWN_POINTS) return points;
+
+  const step = Math.ceil(points.length / MAX_DRAWN_POINTS);
+  const kept = new Map<string, PlotPoint>();
+  // eslint-disable-next-line no-restricted-syntax -- array-index loop bound, not a DecimalString comparison (ADR-033).
+  for (let i = 0; i < points.length; i += step) {
+    kept.set(points[i].point_date, points[i]);
+  }
+  const last = points[points.length - 1];
+  kept.set(last.point_date, last);
+  for (const point of points) {
+    if (keepDates.has(point.point_date)) {
+      kept.set(point.point_date, point);
+    }
+  }
+
+  return Array.from(kept.values()).sort((a, b) => {
+    // eslint-disable-next-line no-restricted-syntax -- fixed-width ISO date-string comparison, not a DecimalString comparison (ADR-033).
+    if (a.point_date < b.point_date) return -1;
+    // eslint-disable-next-line no-restricted-syntax -- fixed-width ISO date-string comparison, not a DecimalString comparison (ADR-033).
+    if (a.point_date > b.point_date) return 1;
+    return 0;
+  });
+}
+
+/**
+ * Formats a Y-axis TICK value for display — a round reference number
+ * Recharts' own scale algorithm computed (never a specific data point, so
+ * there is no corresponding original `DecimalString` to format instead).
+ * Scoped to axis-label display only: never compared, never traced back to
+ * a specific point, rounded to whole dollars (a coarse reference scale,
+ * not a precise displayed figure) — the same disclosed-exception shape
+ * `chart-plot-value.ts` already established for the opposite direction.
+ */
+function formatAxisTick(value: number): string {
+  const rounded = Math.round(value);
+  // eslint-disable-next-line no-restricted-syntax -- sign check on a Recharts-computed axis-scale number, not a DecimalString comparison (ADR-033).
+  const sign = rounded < 0 ? '−' : '';
+  const digits = Math.abs(rounded).toString();
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${sign}$${grouped}`;
 }
 
 /** `true` for a forward split (e.g. 4-for-1, ratio > 1); `false` otherwise (a reverse split, ratio < 1 — rare, but not fabricated as a "1-for-N" figure this codebase cannot safely derive without banned arithmetic; see the fallback phrasing below). */
@@ -127,33 +191,46 @@ interface TooltipPayloadEntry {
   payload: PlotPoint;
 }
 
-/** Reads the ORIGINAL DecimalString off the hovered point's payload — never Recharts' own internal plotted number — so the tooltip is exactly as Decimal-safe as every other figure on this page. */
+/**
+ * Task D.17 — redesigned to the editorial language: a dark elevated
+ * surface (already automatic — `bg-surface`/`border-border-hairline`
+ * resolve through `.itm-elevated`'s token remap), mono figures, a kicker
+ * date label. Reads the ORIGINAL `DecimalString` off the hovered point's
+ * payload — never Recharts' own internal plotted number — so the tooltip
+ * is exactly as Decimal-safe as every other figure on this page.
+ */
 function ChartTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayloadEntry[] }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0]?.payload;
   if (!point) return null;
   return (
-    <div className="rounded-[var(--radius-sm)] border border-border-hairline bg-surface px-3 py-2 shadow-[var(--shadow-raised)]">
-      <p className="text-xs text-ink-muted">{formatDate(point.point_date)}</p>
-      <p className="figure text-sm font-medium text-ink-primary">{formatCurrency(point.rawValue)}</p>
+    <div className="rounded-[var(--radius-sm)] border border-border-hairline bg-surface px-3.5 py-2.5 shadow-[var(--shadow-raised)]">
+      <p className="kicker">{formatDate(point.point_date)}</p>
+      <p className="figure mt-1 text-sm font-semibold text-ink-primary">{formatCurrency(point.rawValue)}</p>
     </div>
   );
 }
 
 function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean }) {
-  const points = toPlotPoints(sim.growth_series);
+  const reducedMotion = useReducedMotion();
+  const allPoints = toPlotPoints(sim.growth_series);
+  const splitDates = new Set(sim.disclosed_splits.map((split) => split.split_date));
+  const points = decimatePoints(allPoints, splitDates);
   const pointDates = new Set(points.map((p) => p.point_date));
   // Only disclose a marker for a split whose date lands on an actual
   // plotted price point — Recharts' category-axis ReferenceLine requires an
   // exact category match to render at all; a split whose date doesn't
   // resolve to a price row in this range is still disclosed in plain
   // language below regardless (never silently dropped), just without a
-  // visual marker.
+  // visual marker. `decimatePoints` already guarantees a split date
+  // survives decimation whenever it exists in the full series.
   const markedSplits = sim.disclosed_splits.filter((split) => pointDates.has(split.split_date));
 
-  const first = points[0];
-  const last = points[points.length - 1];
-  const summary = `This chart traces the value of this investment from ${formatCurrency(first.rawValue)} on ${formatDate(first.point_date)} to ${formatCurrency(last.rawValue)} on ${formatDate(last.point_date)}, across ${points.length} data points.`;
+  const first = allPoints[0];
+  const last = allPoints[allPoints.length - 1];
+  // eslint-disable-next-line no-restricted-syntax -- array-length comparison, not a DecimalString comparison (ADR-033).
+  const wasDecimated = allPoints.length > points.length;
+  const summary = `This chart traces the value of this investment from ${formatCurrency(first.rawValue)} on ${formatDate(first.point_date)} to ${formatCurrency(last.rawValue)} on ${formatDate(last.point_date)}, across ${allPoints.length} data points${wasDecimated ? ` (a smoothed line of ${points.length} is drawn for readability — every point is available in the table below)` : ''}.`;
 
   // Baseline reference — the invested amount, matching the mockup's dashed
   // "$X invested" line. The second (and, per ADR-044, last) call site for
@@ -163,6 +240,19 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
   const investedPlotValue = toChartPlotNumber(sim.investment_amount);
   const investedLabel = `${formatCurrency(sim.investment_amount, { decimals: 0 })} invested`;
   const endpointLabel = formatCurrency(last.rawValue);
+  // eslint-disable-next-line no-restricted-syntax -- string-length comparison, not a DecimalString comparison (ADR-033).
+  const endpointLabelFlipped = endpointLabel.length > ENDPOINT_LABEL_FLIP_THRESHOLD;
+  // The baseline sits near the top of the plotted domain for a loss (the
+  // invested amount is the series' own maximum) and near the bottom for a
+  // gain — found live (task D verification): anchoring its label on the
+  // side with no headroom made it collide with the price line's own
+  // starting point, regardless of Y-axis padding. Flip the label to
+  // whichever side actually has room, mirroring endpointLabelFlipped's own
+  // pattern. Both values are already-disclosed toChartPlotNumber outputs
+  // (chart geometry only), so a plain numeric comparison here is the same
+  // category of safe, narrow exception the rest of this file already uses.
+  // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only comparison of two toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
+  const isNetGain = last.plotValue >= investedPlotValue;
 
   return (
     <div
@@ -176,7 +266,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
           to narrate SVG geometry. */}
       <div aria-hidden className="h-48 w-full sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 8, right: 72, bottom: 8, left: 8 }}>
+          <ComposedChart data={points} margin={{ top: 8, right: endpointLabelFlipped ? 16 : 84, bottom: 8, left: 4 }}>
             <defs>
               <linearGradient id="growthAreaFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" style={{ stopColor: 'var(--color-chart-portfolio)' }} stopOpacity={0.28} />
@@ -191,7 +281,43 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
               tickLine={false}
               minTickGap={48}
             />
-            <Tooltip content={<ChartTooltip />} />
+            {/* Task D.16 — a sparse (3-4 tick), hairline-only mono Y-axis. No
+                axis line drawn (axisLine=false) — the tick text alone is
+                the "hairline," matching this chart's quiet, no-chrome
+                language; formatAxisTick's own doc comment discloses why a
+                plain number formatter is safe here.
+
+                An explicit, padded domain (found necessary live — task D's
+                verification pass): Recharts' Area component defaults to
+                including a zero baseline, which on a chart whose real
+                range never approaches zero (e.g. $1,000-$1,900) wastes
+                most of the plotted height. The 8% padding on both ends
+                also gives the invested-amount reference line's label room
+                to render without clipping against the plot's own edge — a
+                real, observed collision on a loss trajectory, where the
+                invested amount IS the series' own maximum, sitting
+                exactly at the domain boundary with zero headroom
+                otherwise. */}
+            <YAxis
+              dataKey="plotValue"
+              axisLine={false}
+              tickLine={false}
+              tickCount={4}
+              width={68}
+              tick={{ fontSize: 11, fill: 'var(--color-ink-muted)', fontFamily: 'var(--font-mono)' }}
+              tickFormatter={formatAxisTick}
+              domain={[
+                (dataMin: number) => Math.floor(Math.min(dataMin, investedPlotValue) * 0.92),
+                (dataMax: number) => Math.ceil(Math.max(dataMax, investedPlotValue) * 1.08),
+              ]}
+            />
+            <Tooltip
+              content={<ChartTooltip />}
+              cursor={{ stroke: 'var(--color-ink-muted)', strokeDasharray: '2 3' }}
+              isAnimationActive={!reducedMotion}
+              animationDuration={120}
+              animationEasing="ease-out"
+            />
             <ReferenceLine
               y={investedPlotValue}
               stroke="var(--color-ink-muted)"
@@ -199,7 +325,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
               ifOverflow="extendDomain"
               label={{
                 value: investedLabel,
-                position: 'insideTopLeft',
+                position: isNetGain ? 'insideTopLeft' : 'insideBottomLeft',
                 fill: 'var(--color-ink-muted)',
                 fontSize: 11,
                 fontFamily: 'var(--font-mono)',
@@ -227,7 +353,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
               stroke="var(--color-chart-portfolio)"
               strokeWidth={1.75}
               dot={false}
-              activeDot={{ r: 3 }}
+              activeDot={{ r: 4, fill: 'var(--color-chart-portfolio)', stroke: 'var(--color-background)', strokeWidth: 2 }}
               isAnimationActive={false}
             />
             <ReferenceDot
@@ -238,7 +364,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
               stroke="none"
               label={{
                 value: endpointLabel,
-                position: 'right',
+                position: endpointLabelFlipped ? 'left' : 'right',
                 fill: 'var(--color-chart-portfolio)',
                 fontSize: 13,
                 fontWeight: 600,

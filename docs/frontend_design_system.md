@@ -251,3 +251,41 @@ This direction is a natural visual expression of the backend's own four non-nego
 6. Layer in Asset Explorer, Simulation History, and Auth screens.
 7. Run a full accessibility and responsive QA pass against §11–12 of this document as a literal checklist, not a vibe check.
 8. Hold a design review checkpoint before declaring M7 complete, matching the M4/M5/M6 precedent of review-then-approve-then-ship.
+
+---
+
+## 15. Component State System (M7 Phase 3D-1 — Craft & Coherence)
+
+Added after the M7 Phase 3D Design Elevation shipped a visual direction but left individual component *states* under-specified. Every interactive element in this codebase must define its default/hover/focus-visible/active/disabled states explicitly — this section is the enforceable checklist a code reviewer should hold a new or changed component against, not aspirational prose. All transitions here are 120–200ms, ease-out, transform/opacity/color only, matching FD-018's explicit carve-out ("Hover/press/focus feedback is state communication and is permitted and expected").
+
+| State | Rule | Reference implementation |
+|---|---|---|
+| **Default** | Resting appearance uses only semantic tokens (never a primitive directly) so it adapts correctly inside `.itm-elevated` with zero component-level change. | Every primitive in `src/components/ui/` |
+| **Hover** | A background/color luminance shift only — never a scale, lift, or shadow-grow (`frontend_design_system.md` §6's border-first elevation model forbids the latter). | `Button`'s `hover:bg-primary-hover`, `AssetSearchCombobox`'s option `hover:bg-background` |
+| **Focus-visible** | The global `:focus-visible { outline: 2px solid var(--focus-ring-color) }` (`globals.css`) — never `outline: none` without an equivalent replacement. `--focus-ring-color`/`--input-border-focus` are **re-declared inside `.itm-elevated`** (not just `--color-primary`) — a real bug found live during this pass: a custom property's `var()` reference resolves once, at its own declaration's scope, and then inherits as a static value; re-declaring `--color-primary` alone does *not* make an already-declared-elsewhere property "re-follow" it. Any future token that composes another token via `var()` and needs to vary per elevated/non-elevated context must be re-declared at `.itm-elevated` directly, the same way. | `globals.css`'s `.itm-elevated` block (all three light/dark variants) |
+| **Active/pressed** | A firm ~0.98 scale compression, ~120ms — never a bounce or scale-up (BRAND_CONSTITUTION.md §8: "confidence reads as an immediate, certain response, not a springy one"). | `Button`'s `active:scale-[0.98]` |
+| **Disabled** | Reduced opacity + `pointer-events: none` — never removed from the DOM or visually identical to enabled. | `Button`'s `disabled:pointer-events-none disabled:opacity-50` |
+| **Working/loading** | A label change is the primary signal (e.g. "Calculating historical returns…"); a spinner icon is a genuine, narrow exception to FD-018's no-loop rule — it may only spin while a real request is in flight, and is omitted outright (not frozen) under `prefers-reduced-motion`, so the loading state degrades to a static label change with no motion at all. | `Button`'s `loading` prop, gated on `useReducedMotion()` |
+| **Invalid (form validation)** | A warm tone (`--color-status-serious`, exposed as `--input-border-invalid`) — **never** `--color-status-critical`, which is reserved from this pass forward for hard system/API errors (`ErrorState`) only. This is a real, disclosed semantic split from the previous single shared "error red." | `Input`/`AssetSearchCombobox`'s `border-[var(--input-border-invalid)]` |
+| **Required marker** | A muted, small glyph (`text-ink-muted`, reduced size) — never the harsh default red asterisk, which reads as an alarm for a routine, expected state. | `Input`/`AssetSearchCombobox`'s label asterisk |
+| **Toggle (on/off)** | A 150ms thumb transition, track color shifts to accent when on — built on a real, native `<input type="checkbox">` (visually hidden via `sr-only`, never `display:none`, never removed from the tab order). | `ToggleField`, `simulation-form.tsx` |
+| **Disclosure (open/closed)** | A rotating chevron (150ms) plus a one-shot CSS grid-template-rows (`0fr`→`1fr`) height/opacity transition — never native `<details>`'s instant snap, never scroll-linked, never looping. Content stays in the DOM while collapsed (`inert`, not unmounted) so it's never "hidden," only visually collapsed. **Every disclosure in the product uses this one shared primitive** — `Disclosure` (`src/components/ui/disclosure.tsx`) — not a bespoke per-screen implementation. | `Disclosure`, used by Supporting Facts' "Source," The Proof, Simulator's "More options," Results' "Technical details," and `ErrorState`'s "Technical details" |
+| **Copied/confirmed (one-shot feedback)** | A brief, static label + icon swap (e.g. "Copy link" → a checkmark + "Link copied") that reverts after a few seconds — a one-shot state change, never a repeating or looping affordance. | `CopyLinkButton`, `simulation-result-client.tsx` |
+
+## 16. Accent Discipline (M7 Phase 3D-1 — Craft & Coherence)
+
+The single warm accent hue (`--color-accent`, ported from the founder-approved mockup) is **scarce by design** — its entire value as a signal depends on it appearing rarely enough that every appearance reads as meaningful. This section is the enforceable allowlist; anything not on it should default to plain ink, not accent.
+
+**Accent may appear for:**
+1. **Hero figures** — the two answer-bearing figures in the Results page's worked-example sentence (the invested amount, the final value), including their one-shot scramble glow.
+2. **Primary interactive chrome** — via the existing `--color-primary` → `--color-accent` remap inside `.itm-elevated` (`globals.css`), which is why the Simulator's CTA button, the Results page's text links ("Run another simulation"), and every focus ring inside an elevated surface are all accent-colored through **one shared mechanism**, not scattered per-component accent classes. This is a fifth category beyond the four literal ones this section originally named, and is deliberately unified rather than hand-applied — a future primary-action element should reach for `variant="primary"`/the `--color-primary` token, never `text-accent`/`bg-accent` directly, so it inherits this same single point of control.
+3. **Key, singular data marks** — e.g. a single stat's glow-on-settle pulse.
+
+**Accent must NOT appear for:**
+- Repeated decorative headings (the Why section's three sub-headings were accent-colored in the original M7 Phase 3D pass and are now plain `text-ink-primary` — three accent headings on one screen was scarcity-breaking overuse, not "key data").
+- Disclosure trigger glyphs (the mockup's accent "+" mark is now a neutral `text-ink-muted` chevron via the shared `Disclosure` primitive — a decorative affordance icon is not a hero figure or a primary action).
+- Repeated table columns (The Proof's growth-data table Value column was accent-colored per-row in the original pass — dozens of accent cells in a scrollable table is the clearest possible violation of "scarce by design," now plain `text-ink-primary`).
+- **The Growth Chart's data line, fill, or endpoint marker** — deliberately kept the CVD-validated `--color-chart-portfolio` hue (§3), never accent, per `docs/ARCHITECTURE_DECISIONS.md` ADR-044's own reasoning: the chart-data palette is a closed, validated set a UI accent must never be substituted into, regardless of how visually tempting a mockup's literal color choice is.
+- Negative/loss values — those use `--color-negative-tint` (a separate, restrained warm tone), never accent and never `--color-status-critical`.
+
+A useful working test before adding a new accent usage: *if this appeared five times on the same screen, would it still feel special?* If the honest answer is no, it isn't a hero figure, a primary action, or a key data mark — it's decoration, and belongs in plain ink instead.

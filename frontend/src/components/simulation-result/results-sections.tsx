@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties } from 'react';
 import { GrowthChart } from './growth-chart';
+import { Disclosure } from '@/components/ui/disclosure';
 import { useAssetDetail } from '@/hooks/use-asset-detail';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useScramble } from '@/hooks/use-scramble';
@@ -64,10 +65,9 @@ function Fact({
       >
         {text}
       </dd>
-      <details className="text-xs text-ink-muted">
-        <summary className="cursor-pointer select-none">Source</summary>
-        <p className="figure mt-1">{source}</p>
-      </details>
+      <Disclosure className="text-xs text-ink-muted" chevronClassName="h-3 w-3" summary="Source">
+        <p className="figure pt-1">{source}</p>
+      </Disclosure>
     </div>
   );
 }
@@ -133,11 +133,19 @@ export function GrowthOverTime({ sim }: { sim: SimulationResponse }) {
   );
 }
 
-/** One educational paragraph, personalized to this simulation's own values — never a generic, unanchored explainer. Heading styled per the mockup's accent-colored, semibold treatment. */
+/**
+ * One educational paragraph, personalized to this simulation's own values —
+ * never a generic, unanchored explainer. M7 Phase 3D-1 (Craft & Coherence,
+ * task 11 — accent discipline): the heading is plain ink, not accent —
+ * three accent-colored headings on one screen was scarcity-breaking
+ * overuse the mockup's own single-hero-figure restraint doesn't license;
+ * accent is reserved for hero figures, primary interactive chrome, and key
+ * data marks, not a repeated decorative heading treatment.
+ */
 function WhyParagraph({ heading, children }: { heading: string; children: string }) {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-accent">{heading}</h3>
+      <h3 className="text-sm font-semibold text-ink-primary">{heading}</h3>
       <p className="max-w-prose text-[15.5px] leading-relaxed text-ink-secondary">{children}</p>
     </div>
   );
@@ -194,8 +202,15 @@ function inflationText(sim: SimulationResponse): string | null {
  * Section 6 — Why. Deterministic, template-composed from this exact
  * simulation's own fields — never AI-generated, per direct instruction.
  * Voice: a former quant who now teaches (BRAND_CONSTITUTION.md §2) — calm,
- * precise, no hype. Laid out as the mockup's three-column grid under one
- * italic serif "Why?" title (M7 Phase 3D).
+ * precise, no hype. Laid out as the mockup's three-column grid.
+ *
+ * M7 Phase 3D-1 (Craft & Coherence, task 10): the mono kicker IS the one
+ * section-label pattern everywhere else on this page — a second, redundant
+ * italic serif "Why?" title directly beneath it was the one place this
+ * page said the same thing twice. Dropped, not renamed: the kicker alone
+ * already carries the section's identity, exactly like Supporting Facts,
+ * Growth Over Time, and The Proof each do with nothing more than their own
+ * kicker.
  */
 export function WhyExplanation({ sim }: { sim: SimulationResponse }) {
   const reducedMotion = useReducedMotion();
@@ -210,10 +225,7 @@ export function WhyExplanation({ sim }: { sim: SimulationResponse }) {
         settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
       )}
     >
-      <div className="flex flex-col gap-2">
-        <SectionKicker>Why</SectionKicker>
-        <h2 className="font-serif text-xl text-ink-primary italic">Why?</h2>
-      </div>
+      <SectionKicker>Why</SectionKicker>
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
         <WhyParagraph heading="Price appreciation">{priceAppreciationText(sim)}</WhyParagraph>
         <WhyParagraph heading="Dividend contribution">{dividendText(sim)}</WhyParagraph>
@@ -259,7 +271,7 @@ function GrowthDataTable({ sim }: { sim: SimulationResponse }) {
               <td className="border-b border-border-hairline px-3 py-1.5 text-ink-secondary">
                 {formatDate(point.point_date)}
               </td>
-              <td className="border-b border-border-hairline px-3 py-1.5 text-accent">
+              <td className="border-b border-border-hairline px-3 py-1.5 text-ink-primary">
                 {formatCurrency(point.value)}
               </td>
             </tr>
@@ -276,9 +288,11 @@ function GrowthDataTable({ sim }: { sim: SimulationResponse }) {
  * 365.25-day CAGR convention — sourced from docs/simulation_formulas.md),
  * assumptions (exact-date prices, dividend timing convention, the CPI
  * as-of lookup), provenance (data source, calculation version, simulation
- * ID, created timestamp), and the accessible growth-chart data table. The
- * disclosure summary carries the mockup's small accent "+" mark (M7 Phase
- * 3D) — a static glyph, not an icon font, so it needs no additional asset.
+ * ID, created timestamp), and the accessible growth-chart data table. Uses
+ * the shared `Disclosure` primitive (M7 Phase 3D-1, task B.8) — a neutral
+ * rotating chevron, not the mockup's accent "+" (task 11's accent-scarcity
+ * cleanup: a decorative glyph on every disclosure trigger across the page
+ * was accent overuse, not a key data mark).
  */
 export function TheProof({ sim }: { sim: SimulationResponse }) {
   const [open, setOpen] = useState(false);
@@ -293,16 +307,12 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
         settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
       )}
     >
-      <details
+      <Disclosure
         className="border-t border-border-hairline pt-7"
-        onToggle={(event) => setOpen(event.currentTarget.open)}
+        summaryClassName="text-sm font-semibold text-ink-primary"
+        onOpenChange={setOpen}
+        summary="The Proof — methodology & data"
       >
-        <summary className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-ink-primary select-none">
-          <span className="figure text-accent" aria-hidden>
-            +
-          </span>
-          The Proof — methodology &amp; data
-        </summary>
         <div className="mt-7 flex flex-col gap-8 text-sm text-ink-secondary">
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Methodology</h3>
@@ -385,7 +395,7 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
             <GrowthDataTable sim={sim} />
           </div>
         </div>
-      </details>
+      </Disclosure>
     </section>
   );
 }

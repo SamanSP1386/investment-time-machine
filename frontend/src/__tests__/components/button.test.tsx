@@ -29,4 +29,35 @@ describe('Button', () => {
     await userEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
   });
+
+  it('shows a spinning working-state icon while loading, when motion is allowed', () => {
+    const { container } = render(<Button loading>Submitting</Button>);
+    expect(container.querySelector('.animate-spin')).toBeInTheDocument();
+  });
+
+  it('task B.5: under reduced motion, omits the spinner entirely — a static label change only, never a frozen mid-spin icon', () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList;
+
+    const { container } = render(<Button loading>Calculating historical returns…</Button>);
+    expect(container.querySelector('.animate-spin')).not.toBeInTheDocument();
+    expect(screen.getByRole('button')).toHaveTextContent('Calculating historical returns…');
+
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it('presses with a firm ~0.98 scale compression, never a bounce/scale-up', () => {
+    render(<Button>Run simulation</Button>);
+    expect(screen.getByRole('button').className).toMatch(/active:scale-\[0\.98\]/);
+  });
 });

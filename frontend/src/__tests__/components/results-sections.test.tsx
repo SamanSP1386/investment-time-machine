@@ -163,10 +163,10 @@ describe('GrowthOverTime', () => {
 describe('TheProof', () => {
   it('is collapsed by default, never hidden', () => {
     render(<TheProof sim={BASE_SIM} />);
-    const summary = screen.getByText(
-      (content, element) => element?.tagName === 'SUMMARY' && content.includes('The Proof — methodology & data')
-    );
-    expect(summary.closest('details')).not.toHaveAttribute('open');
+    const trigger = screen.getByRole('button', { name: 'The Proof — methodology & data' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    // Never hidden — the methodology text is already in the DOM, just collapsed.
+    expect(screen.getByText(/never an adjusted-close shortcut/)).toBeInTheDocument();
   });
 
   it('explains methodology: close_price policy and the 365.25-day CAGR convention, sourced from simulation_formulas.md', () => {
@@ -202,15 +202,8 @@ describe('TheProof', () => {
     } as never);
     render(<TheProof sim={BASE_SIM} />);
 
-    const summary = screen.getByText(
-      (content, element) => element?.tagName === 'SUMMARY' && content.includes('The Proof — methodology & data')
-    );
-    const details = summary.closest('details') as HTMLDetailsElement;
-    // jsdom does not implement native click-to-toggle on <summary>; set the
-    // real `open` property and dispatch the native `toggle` event React's
-    // onToggle listens for, matching what a real browser does on click.
-    details.open = true;
-    fireEvent(details, new Event('toggle'));
+    const trigger = screen.getByRole('button', { name: 'The Proof — methodology & data' });
+    fireEvent.click(trigger);
 
     expect(useAssetDetail).toHaveBeenLastCalledWith('AAPL', true);
   });

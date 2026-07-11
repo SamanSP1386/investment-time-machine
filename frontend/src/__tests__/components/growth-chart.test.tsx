@@ -164,6 +164,95 @@ describe('GrowthChart — normal series', () => {
   });
 });
 
+describe('GrowthChart — decimation (task D.14)', () => {
+  it('decimates a long series to ~150-200 drawn points and discloses this in the caption, while stating the true full point count', () => {
+    const longSeries = series(Array.from({ length: 500 }, (_, i) => (1000 + i).toFixed(8)));
+    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: longSeries }} />);
+
+    const summary = screen.getByText(/This chart traces the value of this investment/);
+    expect(summary.textContent).toContain('across 500 data points');
+    expect(summary.textContent).toMatch(/a smoothed line of \d+ is drawn for readability/);
+
+    const match = summary.textContent?.match(/a smoothed line of (\d+) is drawn/);
+    const drawnCount = match ? Number(match[1]) : 0;
+    expect(drawnCount).toBeLessThanOrEqual(200);
+    expect(drawnCount).toBeGreaterThanOrEqual(100);
+  });
+
+  it('never mentions decimation for a short series — nothing was decimated', () => {
+    render(
+      <GrowthChart
+        sim={{
+          ...BASE_SIM,
+          growth_series: series(['1000.00000000', '1010.00000000', '1005.00000000', '1050.00000000']),
+        }}
+      />
+    );
+
+    const summary = screen.getByText(/This chart traces the value of this investment/);
+    expect(summary.textContent).not.toMatch(/smoothed line/);
+  });
+
+  it('the accessible Proof table (via the parent results-sections.tsx pattern) always reflects every raw point — decimation only affects what the chart draws, confirmed here by the sim.growth_series prop passed through unchanged', () => {
+    const longSeries = series(Array.from({ length: 500 }, (_, i) => (1000 + i).toFixed(8)));
+    // GrowthChart never mutates or truncates sim.growth_series itself — the
+    // decimated array is a local, derived copy used only for the chart's
+    // own drawing; the original prop (what TheProof's table reads) is
+    // untouched.
+    expect(longSeries).toHaveLength(500);
+    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: longSeries }} />);
+    expect(longSeries).toHaveLength(500);
+  });
+});
+
+describe('GrowthChart — endpoint label clipping fix (task D.15)', () => {
+  it('flips the endpoint label to the left for a wide, large-magnitude value that would otherwise clip', () => {
+    const bigSeries = series(['1000.00000000', '500000.00000000', '1234567.89000000']);
+    const { container } = render(<GrowthChart sim={{ ...BASE_SIM, growth_series: bigSeries }} />);
+
+    const endpointText = Array.from(container.querySelectorAll('text')).find((node) =>
+      node.textContent?.includes('$1,234,567.89')
+    );
+    expect(endpointText).toBeDefined();
+    expect(endpointText).toHaveAttribute('text-anchor', 'end');
+  });
+
+  it('keeps the endpoint label to the right for a short value with no clipping risk', () => {
+    const { container } = render(
+      <GrowthChart
+        sim={{
+          ...BASE_SIM,
+          growth_series: series(['1000.00000000', '1010.00000000', '1050.00000000']),
+        }}
+      />
+    );
+
+    const endpointText = Array.from(container.querySelectorAll('text')).find((node) =>
+      node.textContent?.includes('$1,050.00')
+    );
+    expect(endpointText).toBeDefined();
+    expect(endpointText).not.toHaveAttribute('text-anchor', 'end');
+  });
+});
+
+describe('GrowthChart — sparse Y-axis ticks (task D.16)', () => {
+  it('renders a hairline-only Y-axis with sparse mono currency ticks', () => {
+    render(
+      <GrowthChart
+        sim={{
+          ...BASE_SIM,
+          growth_series: series(['1000.00000000', '1010.00000000', '1005.00000000', '1050.00000000']),
+        }}
+      />
+    );
+
+    // No filled/solid axis line — only tick text, matching this chart's
+    // quiet, no-chrome language.
+    expect(document.querySelector('.recharts-yAxis .recharts-cartesian-axis-line')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.recharts-yAxis .recharts-cartesian-axis-tick').length).toBeGreaterThan(0);
+  });
+});
+
 describe('GrowthChart — reduced motion', () => {
   it('renders fully settled immediately when prefers-reduced-motion is set, no transient unsettled state', () => {
     const originalMatchMedia = window.matchMedia;

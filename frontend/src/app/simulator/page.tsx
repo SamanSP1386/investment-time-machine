@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Check } from 'lucide-react';
+import { ProductShell } from '@/components/shell/product-shell';
 import { SimulationForm } from '@/components/simulator/simulation-form';
 
 export const metadata: Metadata = {
@@ -28,9 +29,11 @@ const TRUST_INDICATORS = [
  */
 export default function SimulatorPage() {
   return (
-    <main className="itm-elevated mx-auto flex min-h-screen max-w-[760px] flex-col gap-14 px-6 py-20 sm:px-10 sm:py-28">
+    <ProductShell contentClassName="max-w-[760px] flex flex-col gap-14 px-6 py-20 sm:px-10 sm:py-28">
       <div className="flex flex-col gap-8">
-        <p className="kicker">Investment Time Machine</p>
+        {/* "Historical simulation," not the product wordmark — AppHeader
+            already carries brand identity on every product route. */}
+        <p className="kicker">Historical simulation</p>
         <h1 className="font-serif text-[clamp(2rem,2.5vw+1rem,2.75rem)] leading-tight font-medium text-ink-primary">
           Run a historical simulation.
         </h1>
@@ -49,6 +52,6 @@ export default function SimulatorPage() {
       </div>
 
       <SimulationForm />
-    </main>
+    </ProductShell>
   );
 }

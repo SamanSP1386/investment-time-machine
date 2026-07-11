@@ -15,6 +15,17 @@
 
   --input-border: var(--color-border-hairline);
   --input-border-focus: var(--color-primary);
+  /*
+   * M7 Phase 3D-1 (Craft & Coherence, task B.6/E.21): form-validation
+   * invalid state uses a warm tone, --color-status-serious (already the
+   * status palette's warm orange, "missing-data/partial-result" per
+   * BRAND_CONSTITUTION §7), deliberately distinct from
+   * --color-status-critical — reserved from now on for hard system/API
+   * errors (ErrorState), never a single field's own validation message.
+   * This is a real, disclosed semantic split: previously both cases shared
+   * the same critical-red token.
+   */
+  --input-border-invalid: var(--color-status-serious);
 
   --focus-ring-width: 2px;
   --focus-ring-color: var(--color-primary);
