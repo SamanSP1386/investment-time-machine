@@ -29,12 +29,12 @@ const TRUST_INDICATORS = [
  */
 export default function SimulatorPage() {
   return (
-    <ProductShell contentClassName="max-w-[760px] flex flex-col gap-14 px-6 py-20 sm:px-10 sm:py-28">
+    <ProductShell contentClassName="max-w-[860px] flex flex-col gap-14 px-6 py-20 sm:px-10 sm:py-28">
       <div className="flex flex-col gap-8">
         {/* "Historical simulation," not the product wordmark — AppHeader
             already carries brand identity on every product route. */}
         <p className="kicker">Historical simulation</p>
-        <h1 className="font-serif text-[clamp(2rem,2.5vw+1rem,2.75rem)] leading-tight font-medium text-ink-primary">
+        <h1 className="font-serif text-[clamp(2rem,2.8vw+1rem,3.25rem)] leading-tight font-medium text-ink-primary">
           Run a historical simulation.
         </h1>
         <p className="max-w-prose text-sm text-ink-secondary">

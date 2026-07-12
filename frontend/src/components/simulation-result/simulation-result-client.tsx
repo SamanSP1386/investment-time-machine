@@ -207,7 +207,7 @@ export function SimulationResultClient({ id }: { id: string }) {
 
   if (isPending) {
     return (
-      <ProductShell contentClassName="max-w-[1120px] px-6 py-16 sm:px-10 sm:py-24">
+      <ProductShell contentClassName="max-w-[1200px] px-6 py-16 sm:px-10 sm:py-24">
         <ResultsSkeleton />
       </ProductShell>
     );
@@ -232,7 +232,7 @@ export function SimulationResultClient({ id }: { id: string }) {
     return (
       <ProductShell
         calculationVersion={sim.calculation_version}
-        contentClassName="max-w-[1120px] flex flex-col px-6 py-16 sm:px-10 sm:py-24"
+        contentClassName="max-w-[1200px] flex flex-col px-6 py-16 sm:px-10 sm:py-24"
       >
         <div
           className={cn(entrance.active && ['entrance-dissolve', entrance.dissolved && 'entrance-dissolve-settled'])}

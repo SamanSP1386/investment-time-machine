@@ -11,5 +11,5 @@ export { asDecimalString, groupDecimalString, isNegativeDecimalString, roundDeci
 export { compareDecimalStrings } from './compare-decimal-string';
 export { formatCurrency, type FormatCurrencyOptions } from './currency';
 export { formatPercentage } from './percentage';
-export { formatDate, formatDateRange } from './date';
+export { formatDate, formatDateRange, formatDateTime } from './date';
 export { formatNullableCurrency, formatNullablePercentage, type UnavailableReason } from './nullable';

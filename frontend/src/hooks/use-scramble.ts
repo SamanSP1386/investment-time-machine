@@ -3,15 +3,33 @@
 import { useEffect, useState } from 'react';
 
 /**
- * FD-018 rule 1 — a digits-only scramble/settle on a financial figure,
- * ported from the approved mockup's own `Component.scramble()`
- * (`DOCUMENTS_AND_IDEAS/Investment Time Machine Results/Investment Time
- * Machine.dc.html`). Runs exactly once per mount: progressive left-to-right
- * character lock, ease-out, non-digit characters (`$`, `,`, `.`, `%`, `+`,
- * `−`, spaces, letters) never cycle — they are locked from the very first
- * frame, only digits scramble. On completion, `glow` is `true` for 650ms
- * (a caller-driven text-shadow pulse, never intensity-scaled by sign — see
- * FD-018 rule 6) and then settles back to `false`.
+ * How often the still-cycling (unlocked) digits re-randomize, in ms — a
+ * scramble that re-rolls every animation frame (~16ms) reads as an
+ * illegible blur rather than a legible "cycling digits" effect. FD-018.1
+ * (M7 Phase 3D-3, item 3): slowed to a readable "tick" rate, independent of
+ * the overall duration/easing (which still governs how many characters are
+ * locked at any given moment, via `eased`).
+ */
+const CYCLE_TICK_MS = 55;
+
+/**
+ * FD-018 rule 1, amended by FD-018.1 (M7 Phase 3D-3, item 3) — a digits-only
+ * scramble/settle on a financial figure, originally ported from the
+ * approved mockup's own `Component.scramble()`. Runs exactly once per
+ * mount: progressive left-to-right character lock, ease-out, non-digit
+ * characters (`$`, `,`, `.`, `%`, `+`, `−`, spaces, letters) never cycle —
+ * they are locked from the very first frame, only digits scramble.
+ *
+ * FD-018.1 adds: the still-cycling digits render at a legible ~55ms tick
+ * rate (not a full-framerate blur) and get a subtle, constant accent glow
+ * WHILE cycling (`cycling: true`) — not only the brighter pulse after
+ * settle (`glow: true` for 650ms, unchanged in kind, just now visually
+ * distinct from the in-progress glow a caller applies at a lower
+ * intensity). Both glow states are caller-rendered (this hook only reports
+ * phase booleans), so the exact glow pixel/opacity value stays a per-call-
+ * site concern (hero figures vs. supporting stats use different
+ * intensities) — never intensity-scaled by a result's sign (FD-018 rule 6,
+ * unchanged).
  *
  * `active` is captured once via a lazy `useState` initializer, mirroring
  * `useSettleIn`'s established pattern (ADR-041) — a later
@@ -26,11 +44,12 @@ export function useScramble(
   target: string,
   active: boolean,
   { duration, delay = 0 }: { duration: number; delay?: number }
-): { text: string; glow: boolean } {
+): { text: string; glow: boolean; cycling: boolean } {
   const [wasActive] = useState(active);
   const [state, setState] = useState(() => ({
     text: wasActive ? scrambleAt(target, 0) : target,
     glow: false,
+    cycling: wasActive,
   }));
 
   useEffect(() => {
@@ -41,6 +60,7 @@ export function useScramble(
     let rafId = 0;
     let startTimeoutId = 0;
     let glowTimeoutId = 0;
+    let lastTick = -1;
 
     function step(startTime: number) {
       rafId = requestAnimationFrame(() => {
@@ -52,15 +72,28 @@ export function useScramble(
         // raw === 1) — calling performance.now() again is the portable,
         // spec-safe way to measure elapsed time against a startTime that
         // was itself captured via performance.now().
-        const raw = Math.min(1, (performance.now() - startTime) / duration);
+        const elapsed = performance.now() - startTime;
+        const raw = Math.min(1, elapsed / duration);
         const eased = 1 - (1 - raw) ** 3;
         const done = raw === 1;
         if (!done) {
-          setState({ text: scrambleAt(target, eased), glow: false });
+          // Only actually re-render on a tick boundary (CYCLE_TICK_MS) —
+          // still checked every animation frame so the tick fires as close
+          // to on-time as the browser's own frame cadence allows, but the
+          // *content* of unlocked digits stays legible-still between ticks
+          // rather than re-rolling on every ~16ms frame.
+          const tick = Math.floor(elapsed / CYCLE_TICK_MS);
+          if (tick !== lastTick) {
+            lastTick = tick;
+            setState({ text: scrambleAt(target, eased), glow: false, cycling: true });
+          }
           step(startTime);
         } else {
-          setState({ text: target, glow: true });
-          glowTimeoutId = window.setTimeout(() => setState({ text: target, glow: false }), 650);
+          setState({ text: target, glow: true, cycling: false });
+          glowTimeoutId = window.setTimeout(
+            () => setState({ text: target, glow: false, cycling: false }),
+            650
+          );
         }
       });
     }

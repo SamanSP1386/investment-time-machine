@@ -30,6 +30,8 @@ capability methods — implementing them makes this provider satisfy the
 how to use; this provider previously implemented `PriceProvider` only.
 """
 
+import math
+import random
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -52,22 +54,44 @@ _FIXTURE_BASE_PRICES: dict[str, Decimal] = {
     "QQQ": Decimal("350.00"),
 }
 
-# Per-symbol daily linear drift, added to base_price once per calendar day
-# elapsed (including weekends — matching the original formula's day_index
-# semantics exactly, unchanged for AAPL/SPY/BTC-USD so nothing that already
-# depends on their existing fixture values shifts). PTON is the one
-# deliberately negative-drift symbol added this pass, giving the frontend a
-# real overall-loss simulation to test against, rather than only ever
-# fabricating a gain.
-_DAILY_DRIFT: dict[str, Decimal] = {
-    "AAPL": Decimal("0.05"),
-    "SPY": Decimal("0.05"),
-    "BTC-USD": Decimal("0.05"),
-    "KO": Decimal("0.02"),
-    "PTON": Decimal("-0.06"),
-    "TSLA": Decimal("0.08"),
-    "QQQ": Decimal("0.06"),
+# M7 Phase 3D-3 (founder review round 2, item 1): replaces the original
+# `_DAILY_DRIFT` linear-plus-square-wave formula (`price = (base + day_index
+# * drift) * (1.01 or 0.99, alternating every 5 trading days)`), which
+# produced a visibly periodic saw-tooth/oscillator curve — values genuinely
+# repeated to the cent on a fixed 10-trading-day cycle, and a founder
+# reviewing a real chart correctly called the result "useless." Replaced
+# with a proper geometric random walk with drift: each symbol gets an
+# annualized drift (expected return) and volatility, converted to daily
+# terms and applied as `price *= 1 + daily_drift + daily_vol * z` once per
+# trading day, `z` a standard-normal draw. This is the standard toy model
+# for a synthetic-but-plausible price path (geometric Brownian motion) — it
+# has no periodicity by construction and never repeats a value exactly.
+#
+# Values are illustrative fixture choices, not calibrated to any real
+# security: AAPL (steady, moderate-vol grower), SPY (broad-market
+# baseline), BTC-USD (very high vol, high expected return — crypto's real
+# character), KO (modest drift, low vol — the dividend payer), PTON (the
+# one deliberately negative-drift "loss" symbol), TSLA (high drift AND high
+# vol — the volatile grower), QQQ (growth-tilted ETF, moderate-high vol).
+_ANNUAL_DRIFT: dict[str, Decimal] = {
+    "AAPL": Decimal("0.18"),
+    "SPY": Decimal("0.10"),
+    "BTC-USD": Decimal("0.35"),
+    "KO": Decimal("0.06"),
+    "PTON": Decimal("-0.30"),
+    "TSLA": Decimal("0.20"),
+    "QQQ": Decimal("0.14"),
 }
+_ANNUAL_VOLATILITY: dict[str, Decimal] = {
+    "AAPL": Decimal("0.25"),
+    "SPY": Decimal("0.16"),
+    "BTC-USD": Decimal("0.75"),
+    "KO": Decimal("0.15"),
+    "PTON": Decimal("0.55"),
+    "TSLA": Decimal("0.55"),
+    "QQQ": Decimal("0.20"),
+}
+_TRADING_DAYS_PER_YEAR = 252
 
 # A negative-drift symbol over a long enough date range would otherwise cross
 # zero — clamped to a round, obviously-synthetic floor instead, never a
@@ -110,22 +134,31 @@ class DevSeedProvider:
         base_price = _FIXTURE_BASE_PRICES.get(symbol)
         if base_price is None:
             raise InvalidSymbolError(symbol, self.name)
-        daily_drift = _DAILY_DRIFT.get(symbol, Decimal("0.05"))
+        annual_drift = float(_ANNUAL_DRIFT.get(symbol, Decimal("0.10")))
+        annual_volatility = float(_ANNUAL_VOLATILITY.get(symbol, Decimal("0.20")))
+        daily_drift = annual_drift / _TRADING_DAYS_PER_YEAR
+        daily_volatility = annual_volatility / math.sqrt(_TRADING_DAYS_PER_YEAR)
+
+        # A fixed, symbol-derived seed (not `start`/`end`-derived) — the
+        # walk is deterministic and reproducible run-to-run, and two calls
+        # sharing a `start` date but different `end` dates produce identical
+        # overlapping prices (the same property the prior linear+day_index
+        # formula had), since `random.Random(str)`'s seeding algorithm is
+        # itself fixed/documented, not subject to PYTHONHASHSEED.
+        rng = random.Random(f"dev_seed_random_walk:{symbol}")
+        price = float(base_price)
 
         records: list[RawPriceRecord] = []
         current = start
-        day_index = 0
         while current <= end:
             # Weekdays only, matching how real equity/ETF data has no
-            # weekend rows. A small deterministic drift + oscillation (no
-            # randomness — every run of this provider produces byte-identical
-            # output for the same symbol/date-range) gives a non-degenerate
-            # return for CAGR/growth-chart testing, without ever attempting
-            # to resemble a real historical price series.
+            # weekend rows — and the random walk itself only steps on a
+            # trading day (no draw consumed for a skipped weekend), so
+            # `daily_drift`/`daily_volatility`'s /252 scaling is exact.
             if current.weekday() < 5:
-                drift = Decimal(day_index) * daily_drift
-                wobble = Decimal("1.01") if day_index % 10 < 5 else Decimal("0.99")
-                close = max(_MIN_CLOSE, (base_price + drift) * wobble)
+                z = rng.gauss(0.0, 1.0)
+                price = max(float(_MIN_CLOSE), price * (1 + daily_drift + daily_volatility * z))
+                close = Decimal(str(round(price, 2)))
                 open_price = close * Decimal("0.999")
                 high = close * Decimal("1.01")
                 low = close * Decimal("0.99")
@@ -142,7 +175,6 @@ class DevSeedProvider:
                     )
                 )
             current += timedelta(days=1)
-            day_index += 1
 
         return records
 

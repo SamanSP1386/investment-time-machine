@@ -4,6 +4,27 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.15.2] — 2026-07-27 — M7 Phase 3D-3: Founder Review Round 2
+
+### Fixed
+- **`dev_seed` prices were visibly periodic** (KI-049): the generator's `wobble = 1.01 if day_index % 10 < 5 else 0.99` produced a close price that repeated on a fixed 10-trading-day cycle, reading as an obvious sine/square-wave oscillator on the Growth Chart — a founder reviewing a real chart correctly called it "useless." Replaced with a deterministic geometric random walk with drift (fixed, symbol-derived seed; per-symbol annualized drift/volatility: AAPL steady ~18%/25%vol, SPY 10%/16%, BTC-USD 35%/75%vol, KO modest 6%/15%, PTON -30%/55% (the loss asset), TSLA 20%/55%, QQQ 14%/20%). No periodicity, no repeating values (verified: >200 distinct day-over-day % changes over a 5-year AAPL series), still byte-identical/reproducible run-to-run.
+- **The Proof's "Created" timestamp regression**: rendering `sim.created_at` raw (an unformatted ISO string, e.g. `2026-07-18T00:00:00Z`) instead of through `src/lib/format`, the one sanctioned formatting layer. Added `formatDateTime` (full ISO 8601 timestamp → `"Jul 18, 2026, 12:00 AM UTC"`) and wired it in.
+
+### Changed
+- **Content column widened** from 1120px to 1200px (Results/header/footer) and 760px to 860px (Simulator) — the founder found the prior width left "excessive dead margins," especially at 1920/2560px. Hero/display type scaled up proportionally (Results hero clamp ceiling 3.5rem → 4.25rem; Simulator H1 2.75rem → 3.25rem). Body prose stays capped at `max-w-prose` (65ch, well under the ~70-80ch ceiling) regardless. The Growth Chart is now allowed to bleed past the text column into the page's own horizontal padding gutter.
+- **Scramble v2** (Founder Decision 018.1, a founder-approved amendment to FD-018 rule 1): hero figures now run 900-1000ms (shipped 950ms, was 600ms), supporting stats 600-700ms (shipped 650ms, was 450ms) — long enough to actually read as legible cycling rather than a flash. Unlocked digits now re-randomize at a fixed ~55ms tick (was every animation frame, ~16ms — too fast to read as anything but a blur). A subtle, constant accent glow is now visible for the whole cycling phase, not only the brighter post-settle pulse. Every other FD-018 rule-1 guarantee (once per load, digits-only, `matchMedia`-gated reduced-motion, identical treatment regardless of sign) is unchanged.
+- **Supporting Facts simplified**: the per-stat "Source" disclosure (a formula toggle under each of Final Value/Total Return/CAGR) is removed — the founder found three per-stat toggles noisy. Facts are now clean label+figure only.
+- **The Proof restructured** for a non-technical reader: leads with a new "In plain terms" section (3-4 short, personalized bullets — what data was used, how dividends/inflation were handled, what was deliberately not done), followed by a Methodology tightened ~40% and now carrying the three formulas moved off the removed per-stat Source disclosures ("How each figure is computed"), Assumptions (tightened), a new visually-quieter "Technical record" sub-block (simulation ID, calculation version, data source, and the now-correctly-formatted Created timestamp), and the unchanged accessible growth-chart data table. Still collapsed by default.
+- **Growth Chart analytical upgrades**: (a) the area fill now splits at the invested-amount baseline — accent-toned above it, a muted `--color-chart-negative` tone below (the already-validated, CVD-safe diverging-pair hue this codebase's categorical palette reserved for exactly this; the price line itself is unchanged, still one hue regardless of sign); (b) a thin vertical crosshair tracks the cursor alongside the existing tooltip, with a 120ms fade-in, omitted entirely (not left unanimated) under reduced motion; (c) quiet, muted high/low markers label the series' own genuine extremes, with a combined date- and value-proximity guard so a marker near the endpoint in either dimension is omitted rather than crowding the endpoint's own label.
+
+### Deferred
+- **Item 6d (dividend-reinvestment tick marks)** — `SimulationResponse` exposes only `include_dividends: boolean`, no per-event reinvestment dates. Nothing real to mark without fabricating dates the API doesn't provide; per the task's own explicit instruction, marked deferred rather than faked.
+
+### Tests
+- New/updated: `test_providers_dev_seed.py` (periodicity regression guard, reproducibility, per-symbol volatility parameters, a new deterministic known-answer test replacing the old oscillator-formula one), `use-scramble.test.ts` (cycling/glow-phase behavior), `results-sections.test.tsx` ("In plain terms," formula list, Technical Record with formatted timestamp, no per-stat Source), `format.test.ts` (`formatDateTime`), `growth-chart.test.tsx` (split-fill area count, high/low marker labeling and both collision-avoidance guards). Full frontend suite: 264/265 (1 pre-existing skip). Backend suite: 303/303. `eslint`/`tsc`/`ruff`/`black` all clean. Production build clean with a `.env.local`-absent CI-parity check.
+
+---
+
 ## [0.15.1] — 2026-07-26 — M7 Phase 3D-2: Regression Fixes & Founder Design Review Refinements
 
 ### Fixed

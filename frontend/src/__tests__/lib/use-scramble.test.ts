@@ -68,4 +68,36 @@ describe('useScramble', () => {
     rerender({ value: `${TARGET}`.slice(0) });
     expect(result.current.text).toBe(firstRenderText);
   });
+
+  /**
+   * FD-018.1 (M7 Phase 3D-3, item 3): a subtle accent glow is now visible
+   * for the whole cycling phase, not only the post-settle pulse.
+   */
+  describe('FD-018.1 — cycling glow', () => {
+    it('reduced motion: never reports cycling, matching the existing zero-intermediate-state guarantee', () => {
+      const { result } = renderHook(() => useScramble(TARGET, false, { duration: 30 }));
+      expect(result.current.cycling).toBe(false);
+    });
+
+    it('active: reports cycling=true immediately (before the animation completes)', () => {
+      const { result } = renderHook(() => useScramble(TARGET, true, { duration: 200 }));
+      expect(result.current.cycling).toBe(true);
+      expect(result.current.glow).toBe(false);
+    });
+
+    it('active: cycling flips to false and glow flips to true the moment the animation settles', async () => {
+      const { result } = renderHook(() => useScramble(TARGET, true, { duration: 30 }));
+
+      await waitFor(() => expect(result.current.text).toBe(TARGET));
+      expect(result.current.cycling).toBe(false);
+      expect(result.current.glow).toBe(true);
+    });
+
+    it('active: the post-settle glow pulse itself turns off after its hold, leaving both flags false', async () => {
+      const { result } = renderHook(() => useScramble(TARGET, true, { duration: 30 }));
+      await waitFor(() => expect(result.current.glow).toBe(true));
+      await waitFor(() => expect(result.current.glow).toBe(false), { timeout: 1000 });
+      expect(result.current.cycling).toBe(false);
+    });
+  });
 });

@@ -9,7 +9,7 @@
 export function AppFooter({ calculationVersion }: { calculationVersion?: string }) {
   return (
     <footer className="border-t border-border-hairline">
-      <div className="mx-auto max-w-[1120px] px-6 py-6 sm:px-10">
+      <div className="mx-auto max-w-[1200px] px-6 py-6 sm:px-10">
         <p className="figure text-xs text-ink-muted">
           Investment Time Machine is an educational tool — not financial advice.
           {calculationVersion ? ` Calculation ${calculationVersion}.` : ''}

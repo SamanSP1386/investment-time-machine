@@ -34,6 +34,9 @@ import type { SimulationResponse } from '@/types/api';
  */
 
 const FIGURE_GLOW_PX = '20px';
+/** FD-018.1 (item 3) — a quieter, constant glow while the figure is still
+ * cycling, distinct from the brighter post-settle pulse above. */
+const FIGURE_CYCLING_GLOW_PX = '8px';
 
 function ScrambleFigure({
   value,
@@ -46,7 +49,8 @@ function ScrambleFigure({
   duration: number;
   delay: number;
 }) {
-  const { text, glow } = useScramble(value, active, { duration, delay });
+  const { text, glow, cycling } = useScramble(value, active, { duration, delay });
+  const glowPx = glow ? FIGURE_GLOW_PX : cycling ? FIGURE_CYCLING_GLOW_PX : '0px';
   return (
     <span
       // Sized down ~15% from the inherited serif size (0.85em) — a mono
@@ -57,7 +61,7 @@ function ScrambleFigure({
       // internal spaces, but keeps the money value atomic if it ever wraps
       // against neighboring inline text.
       className="figure scramble-figure font-semibold text-accent text-[0.85em] whitespace-nowrap"
-      style={{ '--scramble-glow-px': glow ? FIGURE_GLOW_PX : '0px' } as CSSProperties}
+      style={{ '--scramble-glow-px': glowPx } as CSSProperties}
     >
       {text}
     </span>
@@ -119,15 +123,25 @@ export function OpeningSequenceHeading({ sim, children }: { sim: SimulationRespo
         <h1
           aria-label={fullSentenceText}
           className={cn(
-            'max-w-4xl font-serif text-[clamp(2rem,3vw+1rem,3.5rem)] leading-[1.18] font-medium tracking-tight text-ink-primary transition duration-[var(--duration-transition)] ease-in',
+            // M7 Phase 3D-3 (item 2) — the clamp's ceiling raised from
+            // 3.5rem to 4.25rem and the vw coefficient from 3 to 3.4 so the
+            // hero actually keeps growing at 1920/2560px instead of hitting
+            // its cap early; max-w-4xl -> 5xl (896px -> 1024px) so the wider
+            // display size doesn't force awkwardly short line wraps.
+            'max-w-5xl font-serif text-[clamp(2rem,3.4vw+1rem,4.25rem)] leading-[1.18] font-medium tracking-tight text-ink-primary transition duration-[var(--duration-transition)] ease-in',
             settled ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
           )}
         >
+          {/* FD-018.1 (M7 Phase 3D-3, item 3): hero figures now run
+              900-1000ms (was 600ms) — long enough to actually read as a
+              legible cycling effect rather than a quick flash — with a
+              <=150ms stagger between the two (100ms here) so the second
+              figure's settle doesn't feel disconnected from the first. */}
           If you had invested{' '}
-          <ScrambleFigure value={investedText} active={active} duration={600} delay={0} /> in {assetLabel} between{' '}
+          <ScrambleFigure value={investedText} active={active} duration={950} delay={0} /> in {assetLabel} between{' '}
           <span className="whitespace-nowrap">{formatDate(sim.start_date)}</span> and{' '}
           <span className="whitespace-nowrap">{formatDate(sim.end_date)}</span>, your investment would be worth{' '}
-          <ScrambleFigure value={answerText} active={active} duration={600} delay={100} /> today.
+          <ScrambleFigure value={answerText} active={active} duration={950} delay={100} /> today.
         </h1>
       </div>
 

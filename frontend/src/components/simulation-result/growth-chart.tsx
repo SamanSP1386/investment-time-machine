@@ -27,21 +27,45 @@ import type { DisclosedSplit, GrowthSeriesPoint, SimulationResponse } from '@/ty
 /**
  * The Growth Chart — the flagship data asset of the Results page (M7 Phase
  * 3C-3; visually upgraded M7 Phase 3D Design Elevation, FD-018/ADR-044;
- * refined to a craft finish M7 Phase 3D-1, task D). Evidence for the
- * worked-example sentence above it — never its own headline: no card
- * chrome, quiet axes, one hue (`--color-chart-portfolio`) regardless of
- * whether the trajectory is a gain or a loss (EXPERIENCE_CONSTITUTION.md
- * §6/§7 — identical visual treatment regardless of a result's sign;
+ * refined to a craft finish M7 Phase 3D-1, task D; analytical upgrades M7
+ * Phase 3D-3, item 6). Evidence for the worked-example sentence above it —
+ * never its own headline: no card chrome, quiet axes, one hue
+ * (`--color-chart-portfolio`) for the PRICE LINE regardless of whether the
+ * trajectory is a gain or a loss (EXPERIENCE_CONSTITUTION.md §6/§7 —
+ * identical visual treatment regardless of a result's sign;
  * BRAND_CONSTITUTION.md §3 — chart-data hues carry meaning, never UI
  * chrome, and a hue is never reused to "moralize" a result). Deliberately
  * in the SAME validated `--color-chart-portfolio` hue throughout, not the
  * mockup's own warm accent color — see ADR-044.
  *
+ * M7 Phase 3D-3 item 6 adds three analytical layers, all applied by the
+ * SAME rule regardless of whether the simulation's own overall result is a
+ * gain or a loss (the rule is position-relative — above/below the invested
+ * baseline — never sign-of-the-final-result-relative, so FD-013/017's
+ * "identical treatment" guarantee is unbroken): (a) the area fill splits at
+ * the invested-amount baseline, accent-toned above it and a muted
+ * `--color-chart-negative` tone below (the already-validated,
+ * CVD-safe "diverging pair" hue this codebase's own categorical palette
+ * reserved for exactly this — `frontend_design_system.md` §3 — never a new,
+ * unvalidated color); (b) a thin vertical crosshair (`ChartCrosshair`)
+ * tracks the cursor alongside the existing tooltip; (c) quiet, muted
+ * high/low markers label the series' own genuine extremes. Item 6d
+ * (reinvestment-date tick marks) is explicitly DEFERRED, not implemented:
+ * `SimulationResponse` exposes only `include_dividends: boolean`, no
+ * per-event reinvestment dates — there is nothing real to mark without
+ * fabricating dates the API does not provide, which item 6's own
+ * instruction explicitly rules out ("if the API doesn't expose dividend
+ * dates, mark DEFERRED... rather than faking it").
+ *
  * Motion: per Founder Decision 013/017, this chart gets no draw-on
  * choreography; the only entrance motion is the same single ~200ms settle
- * already used for the hero sentence (`useSettleIn`). The one addition this
- * pass (task D.17) is the tooltip's own 120ms fade, gated on
- * `prefers-reduced-motion` via Recharts' own `isAnimationActive` prop —
+ * already used for the hero sentence (`useSettleIn`). Tooltip: a 120ms fade
+ * (task D.17), gated on `prefers-reduced-motion` via Recharts' own
+ * `isAnimationActive` prop. Crosshair (item 6b): a matching 120ms fade-IN
+ * (`.chart-crosshair`, `globals.css`) — fade-out is an instant unmount, a
+ * disclosed asymmetry (see that class's own comment) — omitted entirely
+ * under reduced motion (`cursor={false}`) rather than left unanimated, so
+ * the tooltip alone is what a reduced-motion reader sees on hover. Both are
  * hover/focus feedback, not decoration, matching FD-018's explicit
  * carve-out for state-communicating motion.
  *
@@ -83,6 +107,30 @@ function toPlotPoints(series: GrowthSeriesPoint[]): PlotPoint[] {
     point_date: point.point_date,
     plotValue: toChartPlotNumber(point.value),
     rawValue: point.value,
+  }));
+}
+
+/**
+ * A point augmented with the two clamped series the split-baseline fill
+ * (item 6a) plots: `aboveValue` never dips below the invested baseline
+ * (renders as a zero-height, invisible fill wherever the real line is
+ * below it), `belowValue` never rises above it. Two `<Area>`s sharing this
+ * same data, both anchored at the baseline via Recharts' own `baseValue`
+ * prop, produce a fill that is accent-toned above the line the user
+ * invested at and muted below it — without ever changing the price
+ * LINE's own single validated hue (ADR-044's "never substituted"
+ * constraint governs the line, not this new area-fill encoding).
+ */
+interface BaselineSplitPoint extends PlotPoint {
+  aboveValue: number;
+  belowValue: number;
+}
+
+function withBaselineSplit(points: PlotPoint[], investedPlotValue: number): BaselineSplitPoint[] {
+  return points.map((point) => ({
+    ...point,
+    aboveValue: Math.max(point.plotValue, investedPlotValue),
+    belowValue: Math.min(point.plotValue, investedPlotValue),
   }));
 }
 
@@ -134,6 +182,46 @@ function formatAxisTick(value: number): string {
   const digits = Math.abs(rounded).toString();
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${sign}$${grouped}`;
+}
+
+/**
+ * A compact "Mon YYYY" label for the high/low markers (item 6c) — the
+ * marker's own value is already the real `formatCurrency`-formatted
+ * `DecimalString` (a true data point, no exception needed); only the
+ * month/year portion is a narrow, chart-local display exception (same
+ * disclosed-exception shape as `formatAxisTick` above), since
+ * `src/lib/format`'s `formatDate` always spells out the day too and would
+ * make an already-small marker label crowd the plot.
+ */
+const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+function formatMonthYear(isoDate: string): string {
+  return MONTH_YEAR_FORMATTER.format(new Date(`${isoDate}T00:00:00Z`));
+}
+
+function daysBetween(isoDateA: string, isoDateB: string): number {
+  const msPerDay = 86_400_000;
+  return Math.abs(new Date(`${isoDateA}T00:00:00Z`).getTime() - new Date(`${isoDateB}T00:00:00Z`).getTime()) / msPerDay;
+}
+
+/**
+ * The series' own high/low points (item 6c) — found over the FULL,
+ * undecimated series (`allPoints`, not the drawn/decimated `points`), so
+ * the marker always lands on the trajectory's genuine extreme, never one
+ * decimation happened to keep or drop. Ties resolve to the earliest date
+ * (a plain `>`/`<` scan, first match wins), an arbitrary but deterministic
+ * choice — a genuine exact tie is already an edge case this fixture-only
+ * synthetic data can produce, real market data effectively never will.
+ */
+function findExtremePoints(allPoints: PlotPoint[]): { high: PlotPoint; low: PlotPoint } {
+  let high = allPoints[0];
+  let low = allPoints[0];
+  for (const point of allPoints) {
+    // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only comparison of toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
+    if (point.plotValue > high.plotValue) high = point;
+    // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only comparison of toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
+    if (point.plotValue < low.plotValue) low = point;
+  }
+  return { high, low };
 }
 
 /** `true` for a forward split (e.g. 4-for-1, ratio > 1); `false` otherwise (a reverse split, ratio < 1 — rare, but not fabricated as a "1-for-N" figure this codebase cannot safely derive without banned arithmetic; see the fallback phrasing below). */
@@ -211,11 +299,35 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: Tooltip
   );
 }
 
+/**
+ * Item 6b — a thin vertical hairline tracking the cursor, alongside the
+ * existing tooltip (unchanged). A custom Recharts `cursor` component
+ * (rather than the plain `{ stroke, strokeDasharray }` style object this
+ * file used previously) so it can carry its own `chart-crosshair` class —
+ * the fade transition itself lives in `globals.css`, gated the same way
+ * every other motion in this codebase is. Recharts supplies `points`
+ * (the cursor's own start/end geometry) and `height` to a custom cursor
+ * element; only `points[0].x` (the hovered X position) and `height` are
+ * needed to draw one straight vertical line spanning the plot.
+ */
+function ChartCrosshair({ points, height }: { points?: { x: number; y: number }[]; height?: number }) {
+  const x = points?.[0]?.x;
+  if (x === undefined || height === undefined) return null;
+  return (
+    <line className="chart-crosshair" x1={x} x2={x} y1={0} y2={height} stroke="var(--color-ink-muted)" strokeWidth={1} />
+  );
+}
+
 function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean }) {
   const reducedMotion = useReducedMotion();
   const allPoints = toPlotPoints(sim.growth_series);
+  // Item 6c — found over the full series, BEFORE decimation, and forced
+  // into `keepDates` below so decimation can never drop the genuine
+  // high/low the way it's free to drop any other interior point.
+  const { high, low } = findExtremePoints(allPoints);
   const splitDates = new Set(sim.disclosed_splits.map((split) => split.split_date));
-  const points = decimatePoints(allPoints, splitDates);
+  const keepDates = new Set([...splitDates, high.point_date, low.point_date]);
+  const points = decimatePoints(allPoints, keepDates);
   const pointDates = new Set(points.map((p) => p.point_date));
   // Only disclose a marker for a split whose date lands on an actual
   // plotted price point — Recharts' category-axis ReferenceLine requires an
@@ -254,6 +366,36 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
   // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only comparison of two toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
   const isNetGain = last.plotValue >= investedPlotValue;
 
+  // Item 6a — the split-baseline area fill's own data (built from the
+  // already-decimated `points`, matching what the Line/Area already draw).
+  const splitPoints = withBaselineSplit(points, investedPlotValue);
+
+  // Item 6c marker visibility — skipped whenever the high/low sits too
+  // close to the endpoint (or the plot's left edge) on EITHER axis: date
+  // (a fraction of the series' own total day-span) or value (a fraction of
+  // the series' own high-low range). Date alone isn't enough — found live,
+  // a near-monotonic loss trajectory whose true low landed several weeks
+  // before the endpoint but at an almost-identical Y position still
+  // crowded the endpoint label badly, since both labels render in the same
+  // bottom-right corner regardless of the weeks between their X positions.
+  // Collision avoidance by omission, the same approach `markedSplits`
+  // already uses above.
+  const totalSpanDays = Math.max(1, daysBetween(first.point_date, last.point_date));
+  const edgeGuardDays = Math.max(14, totalSpanDays * 0.04);
+  const valueSpan = Math.max(1e-9, high.plotValue - low.plotValue);
+  const valueGuard = valueSpan * 0.06;
+  function isFarEnoughFromEndpointAndStart(point: PlotPoint): boolean {
+    // eslint-disable-next-line no-restricted-syntax -- plain day-count/chart-geometry (number) comparisons, not a DecimalString comparison (ADR-033).
+    const farFromEndpointByDate = daysBetween(point.point_date, last.point_date) > edgeGuardDays;
+    // eslint-disable-next-line no-restricted-syntax -- plain day-count (number) comparison, not a DecimalString comparison (ADR-033).
+    const farFromStartByDate = daysBetween(point.point_date, first.point_date) > edgeGuardDays;
+    // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only (number) comparison of toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
+    const farFromEndpointByValue = Math.abs(point.plotValue - last.plotValue) > valueGuard;
+    return farFromEndpointByDate && farFromStartByDate && farFromEndpointByValue;
+  }
+  const showHighMarker = isFarEnoughFromEndpointAndStart(high);
+  const showLowMarker = isFarEnoughFromEndpointAndStart(low);
+
   return (
     <div
       className={cn(
@@ -263,14 +405,35 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
     >
       {/* Decorative relative to the text alternative immediately below — a
           screen reader gets the same information as prose, not an attempt
-          to narrate SVG geometry. */}
-      <div aria-hidden className="h-48 w-full sm:h-64">
+          to narrate SVG geometry. M7 Phase 3D-3 (item 2) — deliberately
+          allowed to bleed past the surrounding prose measure (a modest
+          negative margin into the page's own horizontal padding gutter,
+          not past the outer ProductShell column) so the flagship chart
+          reads as wider/more present than the text around it, per the
+          founder's explicit "chart may bleed slightly wider than text." */}
+      <div aria-hidden className="-mx-6 h-48 w-[calc(100%+3rem)] sm:-mx-10 sm:h-64 sm:w-[calc(100%+5rem)]">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 8, right: endpointLabelFlipped ? 16 : 84, bottom: 8, left: 4 }}>
+          <ComposedChart
+            data={splitPoints}
+            margin={{ top: 8, right: endpointLabelFlipped ? 16 : 84, bottom: 8, left: 4 }}
+          >
             <defs>
-              <linearGradient id="growthAreaFill" x1="0" y1="0" x2="0" y2="1">
+              {/* Item 6a — two fills, split at the invested-amount baseline:
+                  accent-toned above it, a muted cool tone below. The
+                  already-validated `--color-chart-negative` diverging-pair
+                  hue (frontend_design_system.md §3's "reserved for the
+                  diverging pair — loss/negative territory") at the SAME low
+                  opacity the original single fill used — "muted" is the low
+                  opacity, not a hue outside this chart's closed, CVD-
+                  validated palette (ADR-044). The price LINE itself is
+                  unchanged — still one hue, always, regardless of sign. */}
+              <linearGradient id="growthAreaFillAbove" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" style={{ stopColor: 'var(--color-chart-portfolio)' }} stopOpacity={0.28} />
                 <stop offset="100%" style={{ stopColor: 'var(--color-chart-portfolio)' }} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="growthAreaFillBelow" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style={{ stopColor: 'var(--color-chart-negative)' }} stopOpacity={0} />
+                <stop offset="100%" style={{ stopColor: 'var(--color-chart-negative)' }} stopOpacity={0.22} />
               </linearGradient>
             </defs>
             <XAxis
@@ -313,7 +476,12 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
             />
             <Tooltip
               content={<ChartTooltip />}
-              cursor={{ stroke: 'var(--color-ink-muted)', strokeDasharray: '2 3' }}
+              // Item 6b — a thin vertical hairline (ChartCrosshair) rather
+              // than the previous dashed cursor style. Reduced motion drops
+              // the crosshair entirely (`false`) rather than rendering it
+              // unanimated — the tooltip box alone (already
+              // reduced-motion-safe below) is the static fallback.
+              cursor={reducedMotion ? false : <ChartCrosshair />}
               isAnimationActive={!reducedMotion}
               animationDuration={120}
               animationEasing="ease-out"
@@ -340,11 +508,27 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 ifOverflow="extendDomain"
               />
             ))}
+            {/* Item 6a — two Areas sharing `splitPoints`, both anchored at
+                the invested baseline via `baseValue`: `aboveValue` never
+                dips below it (an invisible, zero-height fill wherever the
+                real line is below the baseline), `belowValue` never rises
+                above it. Together they read as one fill that changes tone
+                exactly where the price line crosses what the user
+                invested. */}
             <Area
               type="monotone"
-              dataKey="plotValue"
+              dataKey="aboveValue"
+              baseValue={investedPlotValue}
               stroke="none"
-              fill="url(#growthAreaFill)"
+              fill="url(#growthAreaFillAbove)"
+              isAnimationActive={false}
+            />
+            <Area
+              type="monotone"
+              dataKey="belowValue"
+              baseValue={investedPlotValue}
+              stroke="none"
+              fill="url(#growthAreaFillBelow)"
               isAnimationActive={false}
             />
             <Line
@@ -371,6 +555,46 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 fontFamily: 'var(--font-mono)',
               }}
             />
+            {/* Item 6c — quiet high/low markers: a small hollow dot (muted,
+                never the portfolio-blue hue the endpoint/line use, so
+                neither reads as "the result") plus a compact "value ·
+                Mon YYYY" label. `position` (top for the high, bottom for
+                the low) plus the endpoint-coincidence skip above are this
+                marker's own collision avoidance. */}
+            {showHighMarker ? (
+              <ReferenceDot
+                x={high.point_date}
+                y={high.plotValue}
+                r={3}
+                fill="var(--color-background)"
+                stroke="var(--color-ink-muted)"
+                strokeWidth={1.5}
+                label={{
+                  value: `${formatCurrency(high.rawValue)} · ${formatMonthYear(high.point_date)}`,
+                  position: 'top',
+                  fill: 'var(--color-ink-muted)',
+                  fontSize: 10,
+                  fontFamily: 'var(--font-mono)',
+                }}
+              />
+            ) : null}
+            {showLowMarker ? (
+              <ReferenceDot
+                x={low.point_date}
+                y={low.plotValue}
+                r={3}
+                fill="var(--color-background)"
+                stroke="var(--color-ink-muted)"
+                strokeWidth={1.5}
+                label={{
+                  value: `${formatCurrency(low.rawValue)} · ${formatMonthYear(low.point_date)}`,
+                  position: 'bottom',
+                  fill: 'var(--color-ink-muted)',
+                  fontSize: 10,
+                  fontFamily: 'var(--font-mono)',
+                }}
+              />
+            ) : null}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

@@ -253,6 +253,83 @@ describe('GrowthChart — sparse Y-axis ticks (task D.16)', () => {
   });
 });
 
+describe('GrowthChart — split-baseline area fill (M7 Phase 3D-3, item 6a)', () => {
+  it('renders two area fills (above/below the invested baseline), the price line itself unchanged', () => {
+    const { container } = render(
+      <GrowthChart
+        sim={{
+          ...BASE_SIM,
+          investment_amount: '1000.00000000' as SimulationResponse['investment_amount'],
+          growth_series: series(['1000.00000000', '1200.00000000', '800.00000000', '1100.00000000']),
+        }}
+      />
+    );
+
+    const areas = container.querySelectorAll('path.recharts-area-area');
+    expect(areas).toHaveLength(2);
+
+    // The price line stays the single validated portfolio hue regardless —
+    // this split-fill encoding governs the AREA only (ADR-044's "never
+    // substituted" constraint on the line itself, unchanged).
+    const line = container.querySelector('path.recharts-line-curve');
+    expect(line).toHaveAttribute('stroke', 'var(--color-chart-portfolio)');
+  });
+
+  it('a pure-gain series (never below the invested baseline) still renders both fill layers, one simply empty', () => {
+    const { container } = render(
+      <GrowthChart
+        sim={{
+          ...BASE_SIM,
+          investment_amount: '1000.00000000' as SimulationResponse['investment_amount'],
+          growth_series: series(['1000.00000000', '1100.00000000', '1200.00000000']),
+        }}
+      />
+    );
+    expect(container.querySelectorAll('path.recharts-area-area')).toHaveLength(2);
+  });
+});
+
+describe('GrowthChart — high/low markers (item 6c)', () => {
+  // A 100-day span (not this file's usual 3-6 day fixtures) — the
+  // edge-guard collision check below is a fraction of the series' own
+  // total span with a 14-day floor, so a too-short fixture would swallow
+  // every marker regardless of where the high/low actually falls.
+  function dailySeries(values: string[]): Series {
+    return series(values, '2020-01-01');
+  }
+
+  it('labels the series high and low with a formatted value and a compact month/year', () => {
+    const values = Array.from({ length: 100 }, () => '1000.00000000');
+    values[50] = '1500.00000000'; // high, well inside the range
+    values[60] = '500.00000000'; // low, well inside the range
+    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
+
+    expect(screen.getByText(/\$1,500\.00 · Feb 2020/)).toBeInTheDocument();
+    expect(screen.getByText(/\$500\.00 · Mar 2020/)).toBeInTheDocument();
+  });
+
+  it('omits the high marker when the series high IS the endpoint (no duplicate/colliding marker)', () => {
+    // Strictly increasing — the endpoint is also the series' own maximum.
+    const values = Array.from({ length: 100 }, (_, i) => (1000 + i * 5).toFixed(8));
+    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
+    // Only the endpoint's own label should show this value — the high
+    // marker's "value · Mon YYYY" compact format would duplicate it.
+    const endpointValue = values[values.length - 1];
+    expect(screen.queryByText(new RegExp(`\\$${Number(endpointValue).toLocaleString()}\\.00 ·`))).not.toBeInTheDocument();
+  });
+
+  it('omits a high/low marker that falls within the edge-guard window of the endpoint, even on a different date', () => {
+    // A near-monotonic decline whose true minimum lands a few days (not
+    // zero) before the endpoint — found live crowding the endpoint label
+    // badly before this edge-guard fix.
+    const values = Array.from({ length: 100 }, (_, i) => (1000 - i * 9).toFixed(8));
+    values[97] = '50.00000000'; // the true low, 2 days before the endpoint
+    values[99] = '80.00000000'; // endpoint itself, slightly higher
+    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
+    expect(screen.queryByText(/\$50\.00 ·/)).not.toBeInTheDocument();
+  });
+});
+
 describe('GrowthChart — reduced motion', () => {
   it('renders fully settled immediately when prefers-reduced-motion is set, no transient unsettled state', () => {
     const originalMatchMedia = window.matchMedia;

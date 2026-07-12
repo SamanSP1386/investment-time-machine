@@ -118,6 +118,8 @@ This seeds all **seven** fixture symbols (`app/ingestion/seed_dev_data.py::SEED_
 | `TSLA` | Tesla, Inc. | stock | Disclosed stock split (a single fixed-date 3-for-1 event) |
 | `QQQ` | Invesco QQQ Trust | etf | Plain gain, a second ETF |
 
+Each symbol's daily close price is a **deterministic geometric random walk with drift** (fixed, symbol-derived seed — byte-identical output on every run), not a real historical series: an annualized drift/volatility pair per symbol (`app/ingestion/providers/dev_seed_provider.py::_ANNUAL_DRIFT`/`_ANNUAL_VOLATILITY`) drives a standard-normal daily shock, so the resulting curve has genuine, non-periodic variation — as of M7 Phase 3D-3, replacing an earlier linear-drift-plus-fixed-10-day-wobble formula whose values visibly repeated on a short cycle (KI-049).
+
 The individual per-symbol CLI invocation still works identically for a one-off symbol or a custom date range:
 
 ```bash

@@ -3,7 +3,16 @@ import { AppFooter } from './app-footer';
 import { AppHeader } from './app-header';
 import { cn } from '@/lib/utils';
 
-const DEFAULT_MAX_WIDTH_CLASS = 'max-w-[1120px]';
+/**
+ * M7 Phase 3D-3 (founder review round 2, item 2): raised from 1120px — at
+ * desktop/wide viewports the narrower column read as "a strip in a void,"
+ * excessive dead margin on both sides. 1200px sits in the founder-specified
+ * 1150-1250px range; body prose still caps at `max-w-prose` (65ch, well
+ * under the ~70-80ch readability ceiling) regardless of this wider outer
+ * column, and the Growth Chart is deliberately allowed to bleed past it
+ * (`growth-chart.tsx`).
+ */
+const DEFAULT_MAX_WIDTH_CLASS = 'max-w-[1200px]';
 
 /**
  * Pulls the single `max-w-*` token out of a page's `contentClassName` so

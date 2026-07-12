@@ -107,6 +107,12 @@ describe('SupportingFacts', () => {
     expect(screen.getByText('+9.59%')).toBeInTheDocument();
   });
 
+  it('item 4 (M7 Phase 3D-3): no per-stat "Source" disclosure — the founder found the three formula toggles noisy', () => {
+    setReducedMotion(true);
+    render(<SupportingFacts sim={BASE_SIM} />);
+    expect(screen.queryByText('Source')).not.toBeInTheDocument();
+  });
+
   it('applies the restrained negative tint to Total Return/CAGR for a loss, but never to Final Value', () => {
     setReducedMotion(true);
     const lossSim: SimulationResponse = {
@@ -166,27 +172,49 @@ describe('TheProof', () => {
     const trigger = screen.getByRole('button', { name: 'The Proof — methodology & data' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     // Never hidden — the methodology text is already in the DOM, just collapsed.
-    expect(screen.getByText(/never an adjusted-close shortcut/)).toBeInTheDocument();
+    expect(screen.getByText(/never an adjusted-close estimate/)).toBeInTheDocument();
+  });
+
+  it('item 5a: leads with "In plain terms" — a non-technical, personalized summary', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    expect(screen.getByText('In plain terms')).toBeInTheDocument();
+    expect(screen.getByText(/AAPL's actual daily closing price between/)).toBeInTheDocument();
+    expect(screen.getByText(/never predict the future|does not predict the future/)).toBeInTheDocument();
+  });
+
+  it('item 5a: states plainly whether dividends/inflation were applied, personalized to this simulation', () => {
+    render(<TheProof sim={{ ...BASE_SIM, include_dividends: true, adjust_for_inflation: true }} />);
+    expect(screen.getByText(/reinvested — each one bought additional shares/)).toBeInTheDocument();
+    expect(screen.getByText(/adjusted for inflation, using actual historical CPI data/)).toBeInTheDocument();
   });
 
   it('explains methodology: close_price policy and the 365.25-day CAGR convention, sourced from simulation_formulas.md', () => {
     render(<TheProof sim={BASE_SIM} />);
-    expect(screen.getByText(/never an adjusted-close shortcut/)).toBeInTheDocument();
-    expect(screen.getByText(/365\.25-day-per-year/)).toBeInTheDocument();
+    expect(screen.getByText(/never an adjusted-close estimate/)).toBeInTheDocument();
+    expect(screen.getByText(/365\.25-day year/)).toBeInTheDocument();
+  });
+
+  it('item 4/5b: "How each figure is computed" carries the three formulas moved off the per-stat Source disclosures', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    expect(screen.getByText('How each figure is computed:')).toBeInTheDocument();
+    expect(screen.getByText('((final_value − investment_amount) / investment_amount) × 100')).toBeInTheDocument();
+    expect(screen.getByText('(final_value / investment_amount) ^ (1 / years) − 1')).toBeInTheDocument();
   });
 
   it('states assumptions: exact-date prices, dividend timing, and the CPI as-of lookup', () => {
     render(<TheProof sim={BASE_SIM} />);
-    expect(screen.getByText(/never silently shifted to the nearest trading day/)).toBeInTheDocument();
-    expect(screen.getByText(/on their ex-dividend date, in the order they occurred/)).toBeInTheDocument();
+    expect(screen.getByText(/a weekend or holiday date is never shifted/)).toBeInTheDocument();
+    expect(screen.getByText(/on their ex-dividend date, in order/)).toBeInTheDocument();
     expect(screen.getByText(/most recent CPI reading on or before/)).toBeInTheDocument();
   });
 
-  it('shows provenance: calculation version, simulation ID, and created timestamp', () => {
+  it('item 5d: shows a Technical Record — calculation version, simulation ID, and a formatted (not raw ISO) created timestamp', () => {
     render(<TheProof sim={BASE_SIM} />);
+    expect(screen.getByText('Technical record')).toBeInTheDocument();
     expect(screen.getByText('v2')).toBeInTheDocument();
     expect(screen.getByText('sim-123')).toBeInTheDocument();
-    expect(screen.getByText('2026-07-18T00:00:00Z')).toBeInTheDocument();
+    expect(screen.queryByText('2026-07-18T00:00:00Z')).not.toBeInTheDocument();
+    expect(screen.getByText('Jul 18, 2026, 12:00 AM UTC')).toBeInTheDocument();
   });
 
   it('does not fetch the data source until the disclosure is actually opened', () => {

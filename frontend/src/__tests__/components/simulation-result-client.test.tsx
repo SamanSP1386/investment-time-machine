@@ -105,12 +105,16 @@ describe('SimulationResultClient', () => {
       'If you had invested $1,000.00 in AAPL between Jan 1, 2015 and Jan 1, 2025, your investment would be worth $2,500.00 today.'
     );
 
-    // Section 4 — Supporting Facts, plain label/value pairs, never a bordered card grid.
-    expect(screen.getByText('Final Value')).toBeInTheDocument();
-    expect(screen.getByText('Final Value').closest('div')).toHaveTextContent('$2,500.00');
-    expect(screen.getByText('Total Return')).toBeInTheDocument();
+    // Section 4 — Supporting Facts, plain label/value pairs, never a bordered
+    // card grid. "Final Value" also appears in The Proof's "How each figure
+    // is computed" formula list (item 4/5b) below, so scoped to the kicker
+    // label element Supporting Facts specifically uses.
+    const finalValueLabel = screen.getByText('Final Value', { selector: 'dt.kicker' });
+    expect(finalValueLabel).toBeInTheDocument();
+    expect(finalValueLabel.closest('div')).toHaveTextContent('$2,500.00');
+    expect(screen.getByText('Total Return', { selector: 'dt.kicker' })).toBeInTheDocument();
     expect(screen.getByText('+150.00%')).toBeInTheDocument();
-    expect(screen.getByText('Annual Return (CAGR)')).toBeInTheDocument();
+    expect(screen.getByText('Annual Return (CAGR)', { selector: 'dt.kicker' })).toBeInTheDocument();
     expect(screen.getByText('+9.59%')).toBeInTheDocument();
 
     // Section 5 — Growth Over Time, now backed by a real, persisted series (KI-021 resolved).

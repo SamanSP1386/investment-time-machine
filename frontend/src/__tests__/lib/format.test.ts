@@ -6,7 +6,7 @@ import { asDecimalString, groupDecimalString, roundDecimalString } from '@/lib/f
 import { compareDecimalStrings } from '@/lib/format/compare-decimal-string';
 import { formatCurrency } from '@/lib/format/currency';
 import { formatPercentage } from '@/lib/format/percentage';
-import { formatDate, formatDateRange } from '@/lib/format/date';
+import { formatDate, formatDateRange, formatDateTime } from '@/lib/format/date';
 import { formatNullableCurrency, formatNullablePercentage } from '@/lib/format/nullable';
 
 describe('roundDecimalString', () => {
@@ -84,6 +84,16 @@ describe('formatDate / formatDateRange', () => {
 
   it('formats a range with an en dash', () => {
     expect(formatDateRange('2015-01-01', '2025-01-01')).toBe('Jan 1, 2015 – Jan 1, 2025');
+  });
+});
+
+describe('formatDateTime', () => {
+  it('formats a full ISO 8601 timestamp with date, time, and an explicit UTC label (M7 Phase 3D-3, item 5d)', () => {
+    expect(formatDateTime('2026-07-18T00:00:00Z')).toBe('Jul 18, 2026, 12:00 AM UTC');
+  });
+
+  it('formats a non-midnight time correctly', () => {
+    expect(formatDateTime('2026-01-05T14:32:00Z')).toBe('Jan 5, 2026, 2:32 PM UTC');
   });
 });
 

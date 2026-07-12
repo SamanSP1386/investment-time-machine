@@ -24,3 +24,27 @@ export function formatDate(isoDate: string): string {
 export function formatDateRange(startIsoDate: string, endIsoDate: string): string {
   return `${formatDate(startIsoDate)} – ${formatDate(endIsoDate)}`;
 }
+
+/**
+ * For a full ISO 8601 timestamp (date + time + zone, e.g. a `created_at`
+ * audit field) — never a plain `YYYY-MM-DD` calendar date, which is what
+ * `formatDate` above is for. Fixed 'en-US'/UTC, matching `formatDate`'s own
+ * rationale exactly (a locale-dependent formatter can't guarantee
+ * consistent rendering across readers). Added M7 Phase 3D-3 (item 5) to
+ * close a regression: The Proof's "Created" row had been displaying
+ * `sim.created_at` raw (an unformatted ISO string) instead of through this
+ * module, the one sanctioned place a date is ever formatted for display.
+ */
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'UTC',
+  timeZoneName: 'short',
+});
+
+export function formatDateTime(isoDateTime: string): string {
+  return DATE_TIME_FORMATTER.format(new Date(isoDateTime));
+}

@@ -135,7 +135,14 @@ body {
  */
 .scramble-figure {
   --scramble-glow-px: 0px;
-  transition: text-shadow 650ms ease;
+  /* FD-018.1 (M7 Phase 3D-3, item 3): shortened from 650ms so the
+     subtle in-cycle glow (rule 1's new "glow DURING the cycle" clause)
+     actually reads as present within the scramble window, not still
+     fading in when the cycle's already halfway settled — the brief
+     post-settle pulse (unchanged in duration, still driven by
+     useScramble's own 650ms glow-hold) reads just as clearly at this
+     faster transition speed. */
+  transition: text-shadow 200ms ease;
   text-shadow: 0 0 var(--scramble-glow-px) var(--color-accent);
 }
 
@@ -408,6 +415,29 @@ input:-webkit-autofill:focus {
 .entrance-dissolve.entrance-dissolve-settled {
   filter: blur(0);
   opacity: 1;
+}
+
+/*
+ * The Growth Chart's hover crosshair (M7 Phase 3D-3, item 6b) — a thin
+ * vertical hairline that tracks the cursor, rendered by a custom Recharts
+ * `cursor` component (`ChartCrosshair`, growth-chart.tsx) only while the
+ * tooltip is active. `@starting-style` gives it a real fade-IN (the "just
+ * arrived" cue that matters most); fade-out on mouse-leave is an instant
+ * unmount, matching how a crosshair is expected to simply "let go" rather
+ * than lingering — this is a deliberate, disclosed asymmetry, not an
+ * oversight. Only rendered at all when motion is allowed — under
+ * `prefers-reduced-motion` the chart passes `cursor={false}` instead, so
+ * this class's transition (irrelevant either way, since reduced motion's
+ * own global override already collapses it) never actually applies.
+ */
+.chart-crosshair {
+  opacity: 1;
+  transition: opacity 120ms ease;
+}
+@starting-style {
+  .chart-crosshair {
+    opacity: 0;
+  }
 }
 
 /*

@@ -10,7 +10,8 @@ from decimal import Decimal
 
 from app.ingestion.providers.base import DividendProvider, PriceProvider, SplitProvider
 from app.ingestion.providers.dev_seed_provider import (
-    _DAILY_DRIFT,
+    _ANNUAL_DRIFT,
+    _ANNUAL_VOLATILITY,
     _DIVIDEND_PAYERS,
     _FIXTURE_BASE_PRICES,
     _SPLIT_EVENTS,
@@ -60,21 +61,54 @@ def test_pton_is_the_deliberately_negative_drift_symbol() -> None:
 
 
 def test_pton_is_the_only_negative_drift_symbol() -> None:
-    """PTON is the one deliberate exception in the per-symbol drift table —
-    every other symbol's own daily drift must stay positive, not an
-    accidental side effect of the drift-table refactor. Checked against the
-    drift *parameter* itself, not simulated output: the short-period
-    +/-1% wobble oscillation can dominate a small enough cumulative drift
-    at arbitrary endpoint dates (confirmed for BTC-USD over this file's own
-    START/END range, a pre-existing property of the original, unmodified
-    wobble formula, not a regression) — so asserting on close-price
+    """PTON is the one deliberate exception in the per-symbol annual-drift
+    table — every other symbol's own drift parameter must stay positive,
+    not an accidental side effect of a future parameter change. Checked
+    against the drift *parameter* itself, not simulated output: a single
+    random-walk draw can realize a loss even for a positive-drift symbol
+    (volatility dominating a short/unlucky path is a real property of a
+    geometric random walk, not a bug) — so asserting on close-price
     ordering directly would be flaky in a way that has nothing to do with
     what this test actually wants to guarantee."""
-    for symbol, drift in _DAILY_DRIFT.items():
+    for symbol, drift in _ANNUAL_DRIFT.items():
         if symbol == "PTON":
             assert drift < 0, "PTON must be the negative-drift symbol"
         else:
             assert drift > 0, f"{symbol} must have positive drift"
+
+
+def test_every_fixture_symbol_has_a_positive_volatility_parameter() -> None:
+    """A zero or negative volatility would collapse the random walk to a
+    pure straight line (or crash the `math.sqrt`/Gaussian-scaling math) —
+    every symbol must have a real, positive annualized volatility."""
+    for symbol in _FIXTURE_BASE_PRICES:
+        assert (
+            _ANNUAL_VOLATILITY.get(symbol, 0) > 0
+        ), f"{symbol} needs a positive volatility parameter"
+
+
+def test_btc_usd_has_the_highest_volatility_parameter() -> None:
+    """Task 1 (M7 Phase 3D-3): 'BTC-USD very high vol' — checked directly
+    against the parameter table, not simulated output, for the same
+    single-draw-flakiness reason the drift tests above avoid asserting on
+    realized prices."""
+    assert _ANNUAL_VOLATILITY["BTC-USD"] == max(_ANNUAL_VOLATILITY.values())
+
+
+def test_price_path_has_no_short_period_repeating_cycle() -> None:
+    """The defect this pass fixes (KI-049): the original formula's
+    `wobble = 1.01 if day_index % 10 < 5 else 0.99` produced a close price
+    that was one of only two possible multipliers of a slowly-drifting
+    base — day-over-day percentage changes repeated on a fixed 10-trading-
+    day cycle, visibly periodic on the Growth Chart. A genuine random walk
+    has no such small repeating cycle: the day-over-day percentage changes
+    over a long series should take on many distinct values, not collapse
+    to a handful repeating on a fixed period."""
+    provider = DevSeedProvider()
+    records = provider.fetch_prices("AAPL", START, END)
+    closes = [float(r.close) for r in records]
+    pct_changes = [round((b - a) / a, 6) for a, b in zip(closes, closes[1:], strict=False)]
+    assert len(set(pct_changes)) > 200, "day-over-day % changes look periodic (too few distinct)"
 
 
 def test_fetch_prices_never_produces_a_non_positive_close_over_a_long_range() -> None:
@@ -141,14 +175,23 @@ def test_fetch_splits_respects_the_requested_date_range() -> None:
     assert before_split == []
 
 
-def test_original_three_symbols_prices_unchanged_by_the_refactor() -> None:
-    """AAPL/SPY/BTC-USD's own drift formula must produce the exact same
-    values as before this pass's per-symbol drift parameterization — a
-    known-answer regression guard against the shared refactor accidentally
-    changing the original fixture's own numbers."""
+def test_price_path_is_a_deterministic_known_answer() -> None:
+    """The random walk is seeded from a fixed, symbol-derived string (never
+    wall-clock or an external source), so it must produce byte-identical
+    output every run — a known-answer regression guard against an
+    accidental change to the seeding/formula (M7 Phase 3D-3, replacing the
+    prior periodic-oscillator formula's own known-answer test)."""
     provider = DevSeedProvider()
     records = provider.fetch_prices("AAPL", date(2020, 1, 1), date(2020, 1, 3))
-    # 2020-01-01 is a Wednesday (a trading day); day_index=0, drift=0,
-    # wobble=1.01 (day_index % 10 < 5) -> close = 100.00 * 1.01 = 101.00
-    assert records[0].price_date == date(2020, 1, 1)
-    assert records[0].close == Decimal("101.0000")
+    assert [r.price_date for r in records] == [date(2020, 1, 1), date(2020, 1, 2), date(2020, 1, 3)]
+    assert [r.close for r in records] == [Decimal("100.09"), Decimal("100.70"), Decimal("100.96")]
+
+
+def test_price_path_is_reproducible_across_repeated_calls() -> None:
+    """Calling `fetch_prices` twice for the same symbol/range must produce
+    byte-identical output — the whole point of a fixed, deterministic seed
+    rather than an unseeded `random` call."""
+    provider = DevSeedProvider()
+    first = provider.fetch_prices("TSLA", START, date(2021, 1, 1))
+    second = provider.fetch_prices("TSLA", START, date(2021, 1, 1))
+    assert [r.close for r in first] == [r.close for r in second]

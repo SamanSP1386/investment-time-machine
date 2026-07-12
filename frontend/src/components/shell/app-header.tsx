@@ -28,7 +28,7 @@ const NAV_LINKS = [{ href: '/simulator', label: 'Simulator' }] as const;
  * container always lines up with the content beneath it instead of a
  * hardcoded width that only matched some pages.
  */
-export function AppHeader({ maxWidthClassName = 'max-w-[1120px]' }: { maxWidthClassName?: string }) {
+export function AppHeader({ maxWidthClassName = 'max-w-[1200px]' }: { maxWidthClassName?: string }) {
   const pathname = usePathname();
 
   return (

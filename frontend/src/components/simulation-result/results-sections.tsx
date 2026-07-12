@@ -8,7 +8,14 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useScramble } from '@/hooks/use-scramble';
 import { useSettleIn } from '@/hooks/use-settle-in';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatDate, formatDateRange, formatPercentage, isNegativeDecimalString } from '@/lib/format';
+import {
+  formatCurrency,
+  formatDate,
+  formatDateRange,
+  formatDateTime,
+  formatPercentage,
+  isNegativeDecimalString,
+} from '@/lib/format';
 import type { SimulationResponse } from '@/types/api';
 
 /**
@@ -40,18 +47,19 @@ function SectionKicker({ children }: { children: string }) {
 function Fact({
   label,
   value,
-  source,
   negative,
   scramble,
 }: {
   label: string;
   value: string;
-  source: string;
   negative?: boolean;
   scramble: { duration: number; delay: number };
 }) {
   const reducedMotion = useReducedMotion();
-  const { text, glow } = useScramble(value, !reducedMotion, scramble);
+  const { text, glow, cycling } = useScramble(value, !reducedMotion, scramble);
+  // FD-018.1 (item 3) — a quieter, constant glow while still cycling (6px),
+  // distinct from the brighter post-settle pulse (16px, unchanged).
+  const glowPx = glow ? '16px' : cycling ? '6px' : '0px';
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -61,13 +69,10 @@ function Fact({
           'figure scramble-figure text-2xl font-semibold break-words sm:text-3xl',
           negative ? 'text-negative-tint' : 'text-ink-primary'
         )}
-        style={{ '--scramble-glow-px': glow ? '16px' : '0px' } as CSSProperties}
+        style={{ '--scramble-glow-px': glowPx } as CSSProperties}
       >
         {text}
       </dd>
-      <Disclosure className="text-xs text-ink-muted" chevronClassName="h-3 w-3" summary="Source">
-        <p className="figure pt-1">{source}</p>
-      </Disclosure>
     </div>
   );
 }
@@ -90,26 +95,25 @@ export function SupportingFacts({ sim }: { sim: SimulationResponse }) {
         settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
       )}
     >
+      {/* FD-018.1 (M7 Phase 3D-3, item 3): 600-700ms (was 450ms), <=150ms
+          stagger between stats (100ms here, unchanged). Item 4: the
+          per-stat "Source" disclosure is removed — the founder found three
+          per-stat formula toggles noisy; the same formulas now live once,
+          together, in The Proof's Methodology ("How each figure is
+          computed") instead of repeated here. */}
       <dl className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-        <Fact
-          label="Final Value"
-          value={finalValueText}
-          source="final_value — Simulation Engine output"
-          scramble={{ duration: 450, delay: 0 }}
-        />
+        <Fact label="Final Value" value={finalValueText} scramble={{ duration: 650, delay: 0 }} />
         <Fact
           label="Total Return"
           value={totalReturnText}
-          source="((final_value − investment_amount) / investment_amount) × 100"
           negative={sim.total_return_percentage !== null && isNegativeDecimalString(sim.total_return_percentage)}
-          scramble={{ duration: 450, delay: 100 }}
+          scramble={{ duration: 650, delay: 100 }}
         />
         <Fact
           label="Annual Return (CAGR)"
           value={cagrText}
-          source="(final_value / investment_amount) ^ (1 / years) − 1"
           negative={sim.cagr_percentage !== null && isNegativeDecimalString(sim.cagr_percentage)}
-          scramble={{ duration: 450, delay: 200 }}
+          scramble={{ duration: 650, delay: 200 }}
         />
       </dl>
     </section>
@@ -240,9 +244,9 @@ function DataSourceLine({ symbol, enabled }: { symbol: string; enabled: boolean 
   const { data, isPending, isError } = useAssetDetail(symbol, enabled);
   const value = !enabled || isPending ? 'Loading…' : isError ? 'Not available' : (data?.data_source ?? 'Not available');
   return (
-    <div>
-      <dt className="kicker">Data source</dt>
-      <dd className="figure text-xs text-ink-primary">{value}</dd>
+    <div className="flex flex-col gap-0.5">
+      <dt>Data source</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
@@ -283,16 +287,83 @@ function GrowthDataTable({ sim }: { sim: SimulationResponse }) {
 }
 
 /**
- * Section 7 — The Proof. Collapsed by default, never hidden. Methodology
- * (which formulas, the `close_price`-not-`adjusted_close_price` policy, the
- * 365.25-day CAGR convention — sourced from docs/simulation_formulas.md),
- * assumptions (exact-date prices, dividend timing convention, the CPI
- * as-of lookup), provenance (data source, calculation version, simulation
- * ID, created timestamp), and the accessible growth-chart data table. Uses
- * the shared `Disclosure` primitive (M7 Phase 3D-1, task B.8) — a neutral
- * rotating chevron, not the mockup's accent "+" (task 11's accent-scarcity
- * cleanup: a decorative glyph on every disclosure trigger across the page
- * was accent overuse, not a key data mark).
+ * "In plain terms" (M7 Phase 3D-3, item 5a) — 3-4 short, non-technical
+ * bullets: what data was used, how dividends/inflation were handled, and
+ * what was deliberately NOT done. Personalized to this simulation's own
+ * choices (not a generic disclaimer block), read before Methodology's
+ * denser prose — a non-technical reader can stop here and already
+ * understand the result; Methodology is for a reader who wants more.
+ */
+function plainTermsBullets(sim: SimulationResponse): string[] {
+  const dividendsBullet = sim.include_dividends
+    ? 'Dividend payments were reinvested — each one bought additional shares on its own payment date, compounding your share count from there.'
+    : `Dividends were not reinvested. If ${sim.asset_symbol} paid any during this period, they are not reflected in the result above.`;
+  const inflationBullet = sim.adjust_for_inflation
+    ? 'The result was also adjusted for inflation, using actual historical CPI data — never an estimate.'
+    : 'Inflation was not factored in — the figures above are nominal dollars, not adjusted for purchasing power.';
+  return [
+    `Every figure above comes from ${sim.asset_symbol}'s actual daily closing price between ${formatDate(sim.start_date)} and ${formatDate(sim.end_date)} — never an estimate, a model, or a prediction.`,
+    dividendsBullet,
+    inflationBullet,
+    'This does not predict the future, does not account for taxes or brokerage fees, and never shifts your chosen dates to a nearby trading day.',
+  ];
+}
+
+function PlainTermsList({ sim }: { sim: SimulationResponse }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="text-base font-semibold text-ink-primary">In plain terms</h3>
+      <ul className="flex max-w-prose flex-col gap-2 text-sm text-ink-secondary">
+        {plainTermsBullets(sim).map((bullet) => (
+          <li key={bullet} className="flex gap-2">
+            <span aria-hidden className="text-ink-muted">
+              —
+            </span>
+            <span>{bullet}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * "How each figure is computed" (item 4/5b) — the three formulas that
+ * previously lived behind a "Source" disclosure under each individual
+ * Supporting Fact (removed, item 4: the founder found three per-stat
+ * toggles noisy). Stated once, together, here instead.
+ */
+function FormulaList() {
+  return (
+    <dl className="figure flex flex-col gap-2 text-xs text-ink-secondary">
+      <div className="flex flex-col gap-0.5">
+        <dt className="text-ink-primary">Final Value</dt>
+        <dd>The Simulation Engine&rsquo;s own calculated output — not derived from any other figure on this page.</dd>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <dt className="text-ink-primary">Total Return</dt>
+        <dd>((final_value − investment_amount) / investment_amount) × 100</dd>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <dt className="text-ink-primary">Annual Return (CAGR)</dt>
+        <dd>(final_value / investment_amount) ^ (1 / years) − 1</dd>
+      </div>
+    </dl>
+  );
+}
+
+/**
+ * Section 7 — The Proof. Collapsed by default, never hidden. Restructured
+ * M7 Phase 3D-3 (item 5) after founder review: "In plain terms" leads
+ * (§5a), then a tightened Methodology carrying the formula list moved here
+ * from the now-removed per-stat Source disclosures (§5b), Assumptions
+ * (§5c, tightened), a visually quiet Technical Record (§5d — simulation
+ * ID, calculation version, data source, created timestamp; "Created" now
+ * runs through `formatDateTime`, fixing a regression where it rendered
+ * `sim.created_at` raw/unformatted), and the accessible growth-chart data
+ * table (§5e, unchanged). Uses the shared `Disclosure` primitive (M7 Phase
+ * 3D-1, task B.8) — a neutral rotating chevron, not the mockup's accent
+ * "+" (task 11's accent-scarcity cleanup).
  */
 export function TheProof({ sim }: { sim: SimulationResponse }) {
   const [open, setOpen] = useState(false);
@@ -314,34 +385,29 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
         summary="The Proof — methodology & data"
       >
         <div className="mt-7 flex flex-col gap-8 text-sm text-ink-secondary">
+          <PlainTermsList sim={sim} />
+
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Methodology</h3>
             <p className="max-w-prose">
               This simulation uses each trading day&rsquo;s actual closing price (
-              <code className="figure">close_price</code>), never an adjusted-close shortcut — every dollar of the
-              result above traces to a real historical event, not an estimate. When dividends are reinvested, each
-              payment purchases additional shares at that day&rsquo;s closing price, compounding on the share count
-              already held at that point — not the original starting count. Stock splits are retained for audit
-              context but are not applied as a separate share-count adjustment, since the stored price series is
-              already internally consistent across splits within the same data fetch.
+              <code className="figure">close_price</code>), never an adjusted-close estimate. Reinvested dividends
+              buy additional shares at that day&rsquo;s closing price, compounding on shares already held. Stock
+              splits are disclosed for context but need no separate adjustment — the stored price series is already
+              split-consistent. Annual return (CAGR) uses a fixed 365.25-day year, a deliberate, documented choice
+              where the underlying specification states none.
             </p>
-            <p className="max-w-prose">
-              Annual return (CAGR) is calculated as{' '}
-              <code className="figure text-xs">(final_value / investment_amount) ^ (1 / years) − 1</code>, where{' '}
-              <code className="figure text-xs">years</code> uses a fixed 365.25-day-per-year convention (an explicit,
-              documented choice — the underlying specification does not mandate a day-count convention, so this one
-              is stated rather than left implicit).
-            </p>
+            <p className="max-w-prose text-xs text-ink-muted">How each figure is computed:</p>
+            <FormulaList />
           </div>
 
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Assumptions</h3>
             <p className="max-w-prose">
-              This simulation requires an exact closing price on both the start and end date — a date that falls on
-              a weekend or market holiday is never silently shifted to the nearest trading day. Dividends are
-              counted once each, on their ex-dividend date, in the order they occurred. When inflation adjustment is
-              requested, the calculation uses the most recent CPI reading on or before each date needed — never an
-              interpolated value between two real readings.
+              An exact closing price is required on both the start and end date — a weekend or holiday date is never
+              shifted. Dividends are counted once each, on their ex-dividend date, in order. When inflation
+              adjustment is requested, the calculation uses the most recent CPI reading on or before each date
+              needed, never an interpolated value.
             </p>
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
@@ -367,21 +433,25 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
             </dl>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <h3 className="text-base font-semibold text-ink-primary">Provenance</h3>
-            <dl className="figure flex flex-col gap-3 text-xs">
+          {/* §5d — a visually quieter sub-block (smaller text, muted color)
+              than the sections above: this is a record for support/audit
+              reference, not something a reader needs to read to understand
+              their result. */}
+          <div className="flex flex-col gap-3 border-t border-border-hairline pt-6">
+            <h3 className="kicker">Technical record</h3>
+            <dl className="figure flex flex-col gap-2.5 text-xs text-ink-muted">
               <DataSourceLine symbol={sim.asset_symbol} enabled={open} />
               <div className="flex flex-col gap-0.5">
-                <dt className="kicker">Calculation version</dt>
+                <dt>Calculation version</dt>
                 <dd>{sim.calculation_version}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
-                <dt className="kicker">Simulation ID</dt>
+                <dt>Simulation ID</dt>
                 <dd>{sim.id}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
-                <dt className="kicker">Created</dt>
-                <dd>{sim.created_at}</dd>
+                <dt>Created</dt>
+                <dd>{formatDateTime(sim.created_at)}</dd>
               </div>
             </dl>
           </div>

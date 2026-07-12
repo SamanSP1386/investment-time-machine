@@ -426,3 +426,11 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Planned Resolution**: A follow-up documentation pass should update `docs/BRAND_CONSTITUTION.md` §6–7 and `docs/frontend_design_system.md` §3–4 to reflect the M7 Phase 3D font/palette decisions (or explicitly scope those sections' "app-wide" language to "outside `.itm-elevated` surfaces," if the two-palette design is intended to persist rather than eventually replace the base tokens everywhere).
 - **Resolution Date**: Not yet resolved.
 
+### KI-049
+
+- **Description**: `DevSeedProvider.fetch_prices` (`backend/app/ingestion/providers/dev_seed_provider.py`) generated `close = (base_price + day_index * daily_drift) * (1.01 if day_index % 10 < 5 else 0.99)` — a linear drift with a fixed-amplitude multiplier that alternated every 5 trading days. Plotted on the Growth Chart, this produced a visibly periodic saw-tooth/oscillator curve, with day-over-day percentage changes repeating exactly on a 10-trading-day cycle — a founder reviewing a real chart (M7 Phase 3D-3 review) correctly identified the result as "a useless graph."
+- **Severity**: Medium — did not affect any real-data path (this provider is non-production-only, guarded at construction), but materially undercut the Growth Chart's own credibility as a demo/review artifact, the single screen this platform's flagship visualization depends on most.
+- **Status**: **Resolved.**
+- **Resolution**: Replaced with a deterministic geometric random walk with drift — a fixed, symbol-derived seed (`random.Random(f"dev_seed_random_walk:{symbol}")`) drives one standard-normal draw per trading day, applied as `price *= 1 + daily_drift + daily_volatility * z`, with per-symbol annualized drift/volatility parameters (`_ANNUAL_DRIFT`/`_ANNUAL_VOLATILITY`). Determinism/reproducibility (byte-identical output per symbol/date-range, required by this provider's own docstring contract) is preserved — verified by a new regression test (`test_price_path_is_reproducible_across_repeated_calls`) — while eliminating the short-cycle repetition (`test_price_path_has_no_short_period_repeating_cycle` asserts >200 distinct day-over-day percentage changes over a 5-year series).
+- **Resolution Date**: 2026-07-27.
+
