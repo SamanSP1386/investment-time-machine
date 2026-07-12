@@ -84,6 +84,17 @@ describe('AssetSearchCombobox', () => {
     await waitFor(() => expect(screen.getByText('You’ve reached the limit for now. Please try again shortly.')).toBeInTheDocument());
   });
 
+  it('reflects an externally-set `value` (e.g. an example-chip preset) into the visible text', () => {
+    useAssetSearchMock.mockReturnValue({ data: undefined, isFetching: false, error: undefined });
+    const { rerender } = render(<AssetSearchCombobox label="Asset" onChange={vi.fn()} value={null} />);
+
+    const input = screen.getByRole('combobox', { name: 'Asset' });
+    expect(input).toHaveValue('');
+
+    rerender(<AssetSearchCombobox label="Asset" onChange={vi.fn()} value={AAPL} />);
+    expect(input).toHaveValue('AAPL — Apple Inc.');
+  });
+
   it('is fully keyboard operable: Escape closes the open listbox', async () => {
     useAssetSearchMock.mockReturnValue({ data: { assets: [AAPL], total: 1 }, isFetching: false, error: undefined });
     const user = userEvent.setup();

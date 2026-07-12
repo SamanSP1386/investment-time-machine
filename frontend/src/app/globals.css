@@ -366,6 +366,51 @@ input:-webkit-autofill:focus {
 }
 
 /*
+ * A one-shot rise+fade for content that appears in response to a user
+ * action rather than a page mount (M7 Phase 3D-2, refinement 11) — the
+ * Simulator's "Asset information" confirmation block, shown the instant a
+ * combobox selection resolves. Same shape as FD-018 clause 2's one-shot
+ * section entrances (<=16px translate, ease-out) but triggered by mount
+ * (the element simply doesn't exist in the DOM until selected), so no JS
+ * timing hook is needed — a plain CSS animation on first paint is
+ * sufficient and is already covered by the prefers-reduced-motion override
+ * below (collapses to ~0ms, so it reads as an instant appearance).
+ */
+@keyframes rise-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-fade-in {
+  animation: rise-fade-in 200ms ease-out;
+}
+
+/*
+ * Results page entrance — blur-to-sharp dissolve (M7 Phase 3D-2, item 14).
+ * Applied only by `useEntranceDissolve` when it has decided the transition
+ * should actually play (first arrival, motion allowed) — the class is never
+ * added at all otherwise, so there is no reliance on the transition
+ * collapsing to ~0 under `prefers-reduced-motion`; the reduced-motion case
+ * never renders the blurred starting state in the first place.
+ */
+.entrance-dissolve {
+  filter: blur(16px);
+  opacity: 0.4;
+  transition:
+    filter 400ms ease-out,
+    opacity 400ms ease-out;
+}
+.entrance-dissolve.entrance-dissolve-settled {
+  filter: blur(0);
+  opacity: 1;
+}
+
+/*
  * A one-shot skeleton shimmer (task E.19) — replaces Tailwind's
  * `animate-pulse` (infinite by default, a direct FD-018 violation: "NO
  * infinite/ambient animation"). Sweeps at most twice, then stops; under

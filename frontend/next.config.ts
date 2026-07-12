@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  // The dev-mode build-activity indicator pollutes founder demos (M7 Phase
+  // 3D-2, bug 5) — it carries no information a working dev server doesn't
+  // already convey via the terminal, and is never present in a production
+  // build regardless of this flag.
+  devIndicators: false,
 };
 
 export default nextConfig;

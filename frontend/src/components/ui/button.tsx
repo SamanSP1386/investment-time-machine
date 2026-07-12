@@ -16,9 +16,16 @@ import { cn } from '@/lib/utils';
  * working state (see below). 120-200ms, ease-out, transform/opacity/color
  * only — state feedback, not decoration, matching FD-018's explicit
  * carve-out for hover/press/focus.
+ *
+ * Phase 3D-2 regression fix: the 3D-1 pass above never actually set
+ * `cursor-pointer` — a native `<button>`'s UA-default cursor is `default`
+ * (an arrow), not `pointer`, unlike `<a>`, so every claim in this comment
+ * about hover/press feedback was true only once a user had already
+ * discovered the button was clickable by accident. The hover/press/focus
+ * styles below were always live; only the pointer affordance was missing.
  */
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--button-radius)] text-sm font-medium transition-[color,background-color,transform] duration-[var(--duration-micro)] ease-[var(--ease-standard)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100',
+  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[var(--button-radius)] text-sm font-medium transition-[color,background-color,transform] duration-[var(--duration-micro)] ease-[var(--ease-standard)] active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
   {
     variants: {
       variant: {

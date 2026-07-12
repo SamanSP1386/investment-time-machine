@@ -32,10 +32,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className="text-sm font-medium text-ink-primary">
+        <label htmlFor={inputId} className="kicker">
           {label}
           {required ? (
-            <span aria-hidden className="ml-1 text-xs text-ink-muted">
+            <span aria-hidden className="ml-1">
               *
             </span>
           ) : null}
@@ -47,7 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           aria-invalid={Boolean(error) || undefined}
           aria-describedby={describedBy}
           className={cn(
-            'figure h-10 rounded-[var(--input-radius)] border border-[var(--input-border)] bg-surface px-3 text-sm text-ink-primary transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)] placeholder:text-ink-muted focus-visible:border-[var(--input-border-focus)]',
+            'figure h-10 rounded-[var(--input-radius)] border border-[var(--input-border)] bg-surface px-3 text-sm text-ink-primary transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)] placeholder:text-ink-muted focus-visible:border-[var(--input-border-focus)] disabled:cursor-not-allowed disabled:opacity-50',
             error && 'border-[var(--input-border-invalid)]',
             className
           )}

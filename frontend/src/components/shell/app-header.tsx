@@ -9,24 +9,31 @@ const NAV_LINKS = [{ href: '/simulator', label: 'Simulator' }] as const;
 /**
  * The minimal editorial product header (M7 Phase 3D-1, Craft & Coherence,
  * task A.1) — a Newsreader wordmark, one quiet nav link, a hairline bottom
- * rule, and no background of its own ("atmosphere-transparent": the
- * full-bleed gradient/grain painted on `ProductShell`'s outer wrapper shows
- * through it, so there is never a visible seam between "header chrome" and
- * "page atmosphere").
+ * rule.
  *
  * Sticky by choice, not by default: the Results page can run long (hero →
  * Supporting Facts → chart → Why → The Proof), and a persistent way back to
  * the Simulator without scrolling to the top is a real, small convenience
- * for a returning/exploring reader — the header's own hairline rule stays
- * legible against passing content without an opaque backdrop precisely
- * because it's a thin 1px line, not a filled bar.
+ * for a returning/exploring reader.
+ *
+ * M7 Phase 3D-2 (bug 2) regression fix: the header was fully
+ * "atmosphere-transparent" (no background at all), which read as intended
+ * only while the page underneath hadn't scrolled — the instant it had, page
+ * content scrolled directly under and visually collided with the header's
+ * own text. A translucent scroll backdrop (the page's own surface tint,
+ * blurred) fixes the collision while staying quiet — it's still a thin
+ * hairline rule doing the visual separation, not a filled opaque bar.
+ * `maxWidthClassName` is threaded down from `ProductShell`, which derives it
+ * from the current page's own content column, so the header's inner
+ * container always lines up with the content beneath it instead of a
+ * hardcoded width that only matched some pages.
  */
-export function AppHeader() {
+export function AppHeader({ maxWidthClassName = 'max-w-[1120px]' }: { maxWidthClassName?: string }) {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border-hairline">
-      <div className="mx-auto flex max-w-[1120px] items-center justify-between px-6 py-5 sm:px-10">
+    <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border-hairline bg-background/85 backdrop-blur-md">
+      <div className={cn('mx-auto flex items-center justify-between px-6 py-5 sm:px-10', maxWidthClassName)}>
         <Link href="/simulator" className="font-serif text-lg text-ink-primary italic">
           Investment Time Machine
         </Link>

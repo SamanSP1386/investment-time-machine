@@ -4,6 +4,40 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.15.1] — 2026-07-26 — M7 Phase 3D-2: Regression Fixes & Founder Design Review Refinements
+
+### Fixed
+- **Audit root cause**: `Button` never actually set `cursor-pointer` — a native `<button>`'s UA-default cursor is `default` (an arrow), not `pointer`, unlike `<a>`, so 3D-1's documented hover/press/focus states were real but undiscoverable; a user had no visual cue the button was clickable at all. Added `cursor-pointer`/`disabled:cursor-not-allowed`.
+- **Bug 1 — asset search returned zero results**: not a code defect. The local `itm_dev` database had no migrations applied and no seed data at all (`alembic_version` existed with zero rows applied). Ran `alembic upgrade head` + `python -m app.ingestion.seed_dev_data`; search now works end-to-end. See report for the one-line re-seed command.
+- **Bug 2 — header/content collision on scroll and column mismatch**: `AppHeader` had no background at all, so scrolled content visually collided with header text; its inner container was hardcoded to `max-w-[1120px]` while the Simulator's own content column is `760px`, so the header visibly "pinned to the viewport edges" against a narrower content column beneath it. Added a translucent scroll backdrop (`bg-background/85 backdrop-blur-md`, keeping the existing hairline bottom rule) and made `ProductShell` derive the header's max-width from the current page's own `contentClassName`, so the two always match.
+- **Bug 3 — date inputs accepted any year (e.g. 1887)**: `noValidate` routes all validation through react-hook-form, so the native `min`/`max` attributes on `<input type="date">` never actually blocked a manually-typed out-of-range year. Date inputs are now disabled with an explanatory hint until an asset is selected; once selected, a dynamically-rebuilt Zod schema bounds `start_date`/`end_date` to the asset's own `availability` window and surfaces a plain-language inline error for a manual out-of-range entry. Dates are never auto-shifted.
+- **Bug 4 — interactive states**: covered by the `cursor-pointer` fix above (`Button` backs Run simulation, Copy link, Check again, Run another simulation's underlying pattern) plus `Input`'s new `disabled:opacity-50 disabled:cursor-not-allowed`. Header nav, `Disclosure` ("More options", "Source", "Technical details"), and the toggle switches were verified live and already had correct hover/press/focus/disabled states from 3D-1.
+- **Bug 5 — dev overlays in demos**: `next.config.ts` now sets `devIndicators: false`; `ReactQueryDevtools` now renders only behind `NEXT_PUBLIC_ENABLE_DEVTOOLS=true` (previously any `next dev` session). Confirmed absent from a production build.
+
+### Added
+- Three one-click example presets under the Simulator form ("$1,000 in Apple Inc., 2020 → 2024", a loss preset — Peloton, and a dividend-reinvested preset — Coca-Cola), styled as quiet pill chips; clicking fills the form without submitting.
+- `AssetSearchCombobox` now accepts an externally-controlled `value` prop (used by the example chips) so a parent can programmatically fill the combobox's displayed selection.
+- A one-shot rise+fade (`.rise-fade-in`) on the Simulator's "Asset information" confirmation block, played once when a selection resolves.
+- `useEntranceDissolve` + `.entrance-dissolve` — a one-shot blur(16px)/opacity(0.4)-to-sharp dissolve on the Results page's content container, played once per simulation id per browser session (`sessionStorage`-gated, never replayed on a back-navigation revisit), fully disabled under `prefers-reduced-motion` (item 14).
+- Non-breaking-space-safe date spans and a ~15%-smaller mono figure size (`text-[0.85em]`) in the Results hero sentence, so a date or money figure never wraps mid-token and the mono figures sit on the serif sentence's optical line.
+
+### Changed
+- `Input`/`AssetSearchCombobox` field labels ("Asset", "Investment amount (USD)", "Start date", "End date") now use the mono `.kicker` eyebrow style used everywhere on the Results page, replacing the previous bold-sans treatment — a consistent typography rule (serif = display, mono = data/eyebrows, sans = body only) across both pages.
+
+### Verified (no change needed)
+- Supporting Facts' three figures were already on one shared baseline (grid-aligned, measured at 1440px: identical `y`/`height` across all three columns).
+- The content column was already mathematically centered at 1920px (`main`/`header` both measured `x: 400, width: 1120` against a 1920px viewport) — the perceived "dead left half"/off-axis appearance traced to the header/content width mismatch fixed under bug 2.
+- Accent-budget discipline (warm `--color-status-serious` validation tone, muted required-field asterisk, accent reserved for hero figures/primary chrome/key data marks) and the full ARIA combobox pattern (keyboard nav, `role="listbox"`, no-matches/searching/failed trichotomy) were already correctly implemented from 3D-1.
+
+### Deferred
+- Item 15 (chart tooltip micro-settle + baseline draw-in sequencing) — touches Recharts internals governed by ADR-043; deferred to keep this pass's risk scoped to what could be fully live-verified.
+- Item 16 (post-selection focus move + underline draw on the amount field) — deferred; a robust one-shot draw that doesn't fight the shared `Input` primitive's existing focus styling needs its own design pass.
+- Item 17 (submit button label/width morph) — deferred; needs layout-shift testing across the button's existing loading-spinner state that this pass didn't have room to do properly.
+- Item 18 (View Transitions API for Simulator → Results) — deferred; a cross-page navigation change with real regression risk to the working flow, lowest priority per this pass's explicit instructions.
+
+### Tests
+- New/updated: `asset-search-combobox.test.tsx` (external `value` sync), `simulation-form.test.tsx` (date-field disabled-until-selected, out-of-range manual entry, in-range acceptance, both example-chip presets filling the form without submitting), `use-entrance-dissolve.test.tsx` (active/settled timing, reduced-motion instant-sharp, per-simulation-id session gating). Full suite: 249/250 (1 pre-existing skip), `eslint`/`tsc` clean, production build clean with a `.env.local`-absent CI-parity check (env var supplied directly, matching how a real CI/deploy pipeline injects it), backend suite 299/299 (DB migrations + seed re-run, no backend code changed).
+
 ## [0.15.0] — 2026-07-25 — M7 Phase 3D-1: Craft & Coherence
 
 ### Added

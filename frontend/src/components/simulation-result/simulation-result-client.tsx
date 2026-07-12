@@ -11,7 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ProductShell } from '@/components/shell/product-shell';
 import { OpeningSequenceHeading } from '@/components/simulation-result/opening-sequence-heading';
 import { GrowthOverTime, SupportingFacts, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
+import { useEntranceDissolve } from '@/hooks/use-entrance-dissolve';
 import { useSimulation } from '@/hooks/use-simulation';
+import { cn } from '@/lib/utils';
 import { ApiError, getErrorCopy } from '@/lib/api';
 import { formatCurrency, formatDate, formatDateRange } from '@/lib/format';
 import type { SimulationResponse, SimulationStatus } from '@/types/api';
@@ -197,6 +199,11 @@ function RunAnotherSimulationLink() {
 
 export function SimulationResultClient({ id }: { id: string }) {
   const { data: sim, isPending, isError, error, refetch, isFetching } = useSimulation(id);
+  // Called unconditionally (Rules of Hooks) even though its result is only
+  // used in the `completed` branch below — the hook itself is inert
+  // (renders nothing, schedules nothing) until that branch actually reads
+  // `active`/`dissolved`.
+  const entrance = useEntranceDissolve(id);
 
   if (isPending) {
     return (
@@ -227,16 +234,20 @@ export function SimulationResultClient({ id }: { id: string }) {
         calculationVersion={sim.calculation_version}
         contentClassName="max-w-[1120px] flex flex-col px-6 py-16 sm:px-10 sm:py-24"
       >
-        <OpeningSequenceHeading sim={sim}>
-          <SupportingFacts sim={sim} />
-          <GrowthOverTime sim={sim} />
-          <WhyExplanation sim={sim} />
-          <TheProof sim={sim} />
-          <div className="flex flex-wrap items-center gap-4">
-            <RunAnotherSimulationLink />
-            <CopyLinkButton />
-          </div>
-        </OpeningSequenceHeading>
+        <div
+          className={cn(entrance.active && ['entrance-dissolve', entrance.dissolved && 'entrance-dissolve-settled'])}
+        >
+          <OpeningSequenceHeading sim={sim}>
+            <SupportingFacts sim={sim} />
+            <GrowthOverTime sim={sim} />
+            <WhyExplanation sim={sim} />
+            <TheProof sim={sim} />
+            <div className="flex flex-wrap items-center gap-4">
+              <RunAnotherSimulationLink />
+              <CopyLinkButton />
+            </div>
+          </OpeningSequenceHeading>
+        </div>
       </ProductShell>
     );
   }

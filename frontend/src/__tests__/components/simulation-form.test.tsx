@@ -33,8 +33,9 @@ vi.mock('@/components/simulator/asset-search-combobox', () => ({
   ),
 }));
 
+let availabilityData: { earliest_date: string; latest_date: string } | undefined;
 vi.mock('@/hooks/use-asset-availability', () => ({
-  useAssetAvailability: () => ({ data: undefined }),
+  useAssetAvailability: () => ({ data: availabilityData }),
 }));
 
 const mutateMock = vi.fn();
@@ -86,6 +87,91 @@ describe('SimulationForm', () => {
     mutateMock.mockClear();
     resetMock.mockClear();
     pushMock.mockClear();
+    availabilityData = undefined;
+  });
+
+  it('disables the date fields until an asset is selected, with a hint explaining why', () => {
+    render(<SimulationForm />);
+
+    expect(screen.getByLabelText('Start date', { exact: false })).toBeDisabled();
+    expect(screen.getByLabelText('End date', { exact: false })).toBeDisabled();
+    expect(screen.getByText('Select an asset first to see its available date range.')).toBeInTheDocument();
+  });
+
+  it('enables the date fields once an asset is selected', async () => {
+    const user = userEvent.setup();
+    render(<SimulationForm />);
+
+    await user.click(screen.getByRole('button', { name: 'Select AAPL' }));
+
+    expect(screen.getByLabelText('Start date', { exact: false })).toBeEnabled();
+    expect(screen.getByLabelText('End date', { exact: false })).toBeEnabled();
+  });
+
+  it('rejects a manually-entered date outside the selected asset’s availability window (bug 3)', async () => {
+    availabilityData = { earliest_date: '2020-01-01', latest_date: '2024-12-31' };
+    const user = userEvent.setup();
+    render(<SimulationForm />);
+
+    await user.click(screen.getByRole('button', { name: 'Select AAPL' }));
+    await user.type(screen.getByLabelText('Investment amount (USD)', { exact: false }), '1000');
+    fireEvent.change(screen.getByLabelText('Start date', { exact: false }), { target: { value: '1887-01-01' } });
+    fireEvent.change(screen.getByLabelText('End date', { exact: false }), { target: { value: '2024-01-01' } });
+    await user.click(screen.getByRole('button', { name: 'Run simulation' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Enter a date between 2020-01-01 and 2024-12-31.')).toBeInTheDocument()
+    );
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a manually-entered date inside the availability window', async () => {
+    availabilityData = { earliest_date: '2020-01-01', latest_date: '2024-12-31' };
+    const user = userEvent.setup();
+    render(<SimulationForm />);
+
+    await user.click(screen.getByRole('button', { name: 'Select AAPL' }));
+    await user.type(screen.getByLabelText('Investment amount (USD)', { exact: false }), '1000');
+    fireEvent.change(screen.getByLabelText('Start date', { exact: false }), { target: { value: '2020-06-01' } });
+    fireEvent.change(screen.getByLabelText('End date', { exact: false }), { target: { value: '2024-06-01' } });
+    await user.click(screen.getByRole('button', { name: 'Run simulation' }));
+
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('fills every field from a one-click example preset without submitting the form (refinement 13)', async () => {
+    const user = userEvent.setup();
+    render(<SimulationForm />);
+
+    await user.click(screen.getByRole('button', { name: /Peloton, 2020 → 2024 \(a loss\)/ }));
+
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Investment amount (USD)', { exact: false })).toHaveValue('1000');
+    expect(screen.getByLabelText('Start date', { exact: false })).toHaveValue('2020-01-02');
+    expect(screen.getByLabelText('End date', { exact: false })).toHaveValue('2024-12-30');
+
+    await user.click(screen.getByRole('button', { name: 'Run simulation' }));
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
+    expect(mutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        asset_symbol: 'PTON',
+        investment_amount: '1000',
+        start_date: '2020-01-02',
+        end_date: '2024-12-30',
+        include_dividends: false,
+      })
+    );
+  });
+
+  it('fills the dividend-reinvested example preset with its toggle already on', async () => {
+    const user = userEvent.setup();
+    render(<SimulationForm />);
+
+    await user.click(screen.getByRole('button', { name: /Coca-Cola, dividends reinvested/ }));
+    await user.click(screen.getByRole('button', { name: 'Run simulation' }));
+
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
+    expect(mutateMock).toHaveBeenCalledWith(expect.objectContaining({ asset_symbol: 'KO', include_dividends: true }));
   });
 
   it('shows an inline validation error and never submits when the investment amount is invalid', async () => {

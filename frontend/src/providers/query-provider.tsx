@@ -24,7 +24,12 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       {children}
-      {process.env.NODE_ENV === 'development' ? (
+      {/* Opt-in only (M7 Phase 3D-2, bug 5) — the previous NODE_ENV check
+          meant every `next dev` session, including founder demos, always
+          rendered the devtools toggle. NEXT_PUBLIC_* is inlined at build
+          time, so this is also verifiably absent from a production build,
+          not just hidden behind a runtime check. */}
+      {process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === 'true' ? (
         <ReactQueryDevtools initialIsOpen={false} />
       ) : null}
     </QueryClientProvider>

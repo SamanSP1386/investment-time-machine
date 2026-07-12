@@ -49,7 +49,14 @@ function ScrambleFigure({
   const { text, glow } = useScramble(value, active, { duration, delay });
   return (
     <span
-      className="figure scramble-figure font-semibold text-accent"
+      // Sized down ~15% from the inherited serif size (0.85em) — a mono
+      // face's cap-height/x-height proportions read visually larger than a
+      // serif's at the same nominal font-size, so the un-scaled figure sat
+      // slightly above the surrounding sentence's optical line (M7 Phase
+      // 3D-2, refinement 7). whitespace-nowrap: the figure itself has no
+      // internal spaces, but keeps the money value atomic if it ever wraps
+      // against neighboring inline text.
+      className="figure scramble-figure font-semibold text-accent text-[0.85em] whitespace-nowrap"
       style={{ '--scramble-glow-px': glow ? FIGURE_GLOW_PX : '0px' } as CSSProperties}
     >
       {text}
@@ -118,7 +125,8 @@ export function OpeningSequenceHeading({ sim, children }: { sim: SimulationRespo
         >
           If you had invested{' '}
           <ScrambleFigure value={investedText} active={active} duration={600} delay={0} /> in {assetLabel} between{' '}
-          {formatDate(sim.start_date)} and {formatDate(sim.end_date)}, your investment would be worth{' '}
+          <span className="whitespace-nowrap">{formatDate(sim.start_date)}</span> and{' '}
+          <span className="whitespace-nowrap">{formatDate(sim.end_date)}</span>, your investment would be worth{' '}
           <ScrambleFigure value={answerText} active={active} duration={600} delay={100} /> today.
         </h1>
       </div>

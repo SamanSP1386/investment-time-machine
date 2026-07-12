@@ -20,6 +20,16 @@ export interface AssetSearchComboboxProps {
    * site (e.g. the M7 Phase 3D Simulator restyle) override the default
    * bordered-box input treatment without a component-level change. */
   className?: string;
+  /**
+   * Externally-driven selection (M7 Phase 3D-2, refinement 13's example
+   * chips) — the combobox otherwise owns its own display text entirely
+   * internally, with no way for a parent to programmatically fill it (e.g.
+   * "clicking a preset chip fills the form"). Only *sets* the visible text
+   * when this prop's symbol changes; it never fights normal typing, since a
+   * user's own keystrokes go through `handleInputChange` and never touch
+   * this prop.
+   */
+  value?: AssetSummary | null;
 }
 
 /**
@@ -36,6 +46,7 @@ export function AssetSearchCombobox({
   required,
   placeholder,
   className,
+  value,
 }: AssetSearchComboboxProps) {
   const generatedId = useId();
   const inputId = `${generatedId}-input`;
@@ -52,6 +63,23 @@ export function AssetSearchCombobox({
     const timer = window.setTimeout(() => setDebouncedQuery(inputValue.trim()), DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [inputValue]);
+
+  // Reflects an externally-set selection (a preset chip) into the visible
+  // text, matching exactly the string `handleSelect` itself would produce
+  // for a manually-picked result — the two paths converge on the same
+  // display format rather than the chip inventing a second one. Done
+  // during render (the React-recommended "adjusting state when a prop
+  // changes" pattern), not inside a useEffect — an effect here would
+  // commit the stale text for one paint, then immediately schedule a
+  // second render to correct it (flagged by
+  // react-hooks/set-state-in-effect); comparing against the previous
+  // `value` reference during render applies the update before the first
+  // paint instead.
+  const [priorValue, setPriorValue] = useState(value);
+  if (value !== priorValue) {
+    setPriorValue(value);
+    if (value) setInputValue(`${value.symbol} — ${value.name}`);
+  }
 
   const { data, isFetching, error: searchError } = useAssetSearch(
     { query: debouncedQuery },
@@ -119,10 +147,10 @@ export function AssetSearchCombobox({
 
   return (
     <div className="relative flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-sm font-medium text-ink-primary">
+      <label htmlFor={inputId} className="kicker">
         {label}
         {required ? (
-          <span aria-hidden className="ml-1 text-xs text-ink-muted">
+          <span aria-hidden className="ml-1">
             *
           </span>
         ) : null}
