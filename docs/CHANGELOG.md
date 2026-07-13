@@ -4,6 +4,31 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.16.0] — 2026-07-27 — Real Market Data Ingestion (KI-044 Resolution)
+
+### Added
+- `YahooChartProvider` (`backend/app/ingestion/providers/yahoo_chart_provider.py`, `--provider yahoo_chart`) — a new Provider Layer adapter calling Yahoo's public chart JSON endpoint (`query2.finance.yahoo.com/v8/finance/chart/...`) directly over HTTP with a standard browser User-Agent, bypassing yfinance's crumb-gated wrapper (KI-044's root cause) entirely. Implements `PriceProvider`/`DividendProvider`/`SplitProvider`; works for equities, ETFs, and crypto (`BTC-USD`, `ETH-USD`). Bounded exponential backoff on 429/5xx plus a minimum inter-request spacing (KI-015's "no rate-limit awareness" gap, closed for this provider). See ADR-046 for the full provider-choice rationale (vs. Stooq, vs. a yfinance version bump) and rate-limit/terms-of-use disclosure.
+- `backend/app/ingestion/seed_real_catalog.py` — one-shot operator script ingesting a real starter catalog (AAPL, MSFT, TSLA, NVDA, GOOGL, AMZN, SPY, QQQ, BTC-USD, ETH-USD) via `yahoo_chart`, real display names, full available history per asset. Idempotent/re-runnable; corrects a pre-existing asset row's name/type/data_source if a symbol was previously created by `dev_seed`.
+- `backend/app/ingestion/wipe_seed_assets.py` — one-shot operator script deleting every `dev_seed`-sourced asset and its dependent rows (ai_explanations → simulations → historical_prices/dividends/stock_splits → assets), scoped strictly to `data_source='dev_seed'`. Dry-run by default; `--yes` to actually delete.
+- 17 new provider tests (`backend/tests/ingestion/test_providers_yahoo_chart.py`) — parsing, error translation, 429/5xx retry-and-backoff, and a split-adjustment invariant regression test against a real, recorded AAPL fixture spanning the 2020-08-31 4-for-1 split (no live network call in CI).
+
+### Changed
+- `seed_dev_data.py`'s `SEED_ASSETS` display names now prefixed `"DEMO — "` (e.g. `"DEMO — Apple Inc."`) so fixture data is unmistakable everywhere `Asset.name` is shown, including search results (which do not surface `data_source`) — real and seed catalogs now coexist without silently mixing.
+- `YFinanceProvider` deprecated (module docstring updated, not deleted) in favor of `yahoo_chart` — kept registered for any environment where it happens to work.
+- `cli.py`'s `--provider` choices and usage examples updated to recommend `yahoo_chart`.
+
+### Fixed
+- **KI-044 resolved**: the ingestion pipeline can fetch real market data again, end to end. Verified live: full starter-catalog ingestion against the real internet (AAPL 1980-12-12→2026-07-10, 11,485 rows, plus MSFT/TSLA/NVDA/GOOGL/AMZN/SPY/QQQ/BTC-USD/ETH-USD — see this session's report for full per-asset ranges); idempotent re-ingestion confirmed (0 new rows on a second AAPL run, row count unchanged); a real Simulator run ($10,000 in AAPL, 2020-01-02→2024-01-02, spanning the split) completed with zero console errors, showing $24,723.16 final value and the correct split-disclosure caption.
+- **KI-016's residual gap closed**: the split-adjustment invariant (Founder Decision 001 — raw `close_price` already retroactively split-adjusted within a fetch) is now re-confirmed through the app's own real pipeline, not just a standalone investigative fetch. AAPL `close_price` on 2020-08-28 (last trading day before the real 2020-08-31 4-for-1 split), as actually stored in `historical_prices`: **$124.8075** — matching KI-016's original direct-fetch finding, not the ~$499.23 nominal figure.
+
+### Tests
+- Backend: 320/320 passing (up from 303 — 17 new). `ruff check .`/`black --check .` both clean. Frontend: full suite (264/265, 1 pre-existing skip) and `api-contract-drift.test.ts` both green, unaffected (no frontend code changed this pass).
+
+### Known gaps (disclosed, not fixed this pass)
+- Three of `simulation-form.tsx`'s hardcoded example chips (Apple/Peloton/Coca-Cola) set their own display name directly rather than re-fetching from the backend; PTON/KO (not in the real starter catalog) now show a plain name on their chip versus a `"DEMO — "`-prefixed name in a live search for the same symbol. Cosmetic only — no correctness impact. See KI-044's resolution text.
+
+---
+
 ## [0.15.2] — 2026-07-27 — M7 Phase 3D-3: Founder Review Round 2
 
 ### Fixed
