@@ -1,10 +1,16 @@
 from app.ingestion.providers.coingecko_provider import CoinGeckoProvider
 from app.ingestion.providers.dev_seed_provider import DevSeedProvider
 from app.ingestion.providers.fred_provider import FredProvider
+from app.ingestion.providers.yahoo_chart_provider import YahooChartProvider
 from app.ingestion.providers.yfinance_provider import YFinanceProvider
 
 _PROVIDERS = {
+    # Deprecated (KI-044) — blocked by yfinance's own crumb-negotiation rate
+    # limiting, kept registered (not deleted) for anyone whose environment
+    # has it working, but "yahoo_chart" is the recommended stocks/ETFs/
+    # crypto provider going forward. See ADR-046.
     "yfinance": YFinanceProvider,
+    "yahoo_chart": YahooChartProvider,
     "coingecko": CoinGeckoProvider,
     "fred": FredProvider,
     # Local-development-only fixture provider (never real market data) — see
@@ -33,5 +39,6 @@ __all__ = [
     "DevSeedProvider",
     "FredProvider",
     "YFinanceProvider",
+    "YahooChartProvider",
     "get_provider",
 ]

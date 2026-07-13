@@ -5,19 +5,29 @@ infrastructure work for a future milestone; this only makes the pipeline
 runnable today.
 
 Examples:
-    python -m app.ingestion.cli prices AAPL --provider yfinance \\
-        --start 2020-01-01 --end 2024-01-01
-    python -m app.ingestion.cli prices AAPL --provider yfinance \\
+    python -m app.ingestion.cli prices AAPL --provider yahoo_chart \\
+        --name "Apple Inc." --start 2020-01-01 --end 2024-01-01
+    python -m app.ingestion.cli prices AAPL --provider yahoo_chart \\
         --start 2020-01-01 --end 2024-01-01 --dry-run
     python -m app.ingestion.cli indicator CPIAUCSL --provider fred \\
         --name "CPI for All Urban Consumers" --unit index \\
         --start 2020-01-01 --end 2024-01-01
 
+    # --provider yahoo_chart (recommended, KI-044): Yahoo's public chart
+    # JSON endpoint called directly over HTTP, not through the yfinance
+    # library — see providers/yahoo_chart_provider.py and ADR-046. Works for
+    # stocks, ETFs, and crypto (e.g. BTC-USD, ETH-USD).
+
+    # --provider yfinance: deprecated (KI-044) — blocked by yfinance's own
+    # crumb-negotiation rate limiting in most environments. Kept registered,
+    # not removed, in case a given environment has it working.
+
     # --provider dev_seed: a small, deterministic, clearly-synthetic local
     # fixture (never real market data — see providers/dev_seed_provider.py),
     # for unblocking manual frontend testing when a real provider is
     # unreachable/rate-limited. Refuses to run outside ENVIRONMENT=development
-    # or test. Only AAPL, SPY, and BTC-USD are defined in the fixture.
+    # or test. Display names are prefixed "DEMO — " to stay unmistakable from
+    # real ingested data (see seed_dev_data.py).
     python -m app.ingestion.cli prices AAPL --provider dev_seed \\
         --asset-type stock --start 2020-01-01 --end 2024-12-31
 """
@@ -52,7 +62,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--asset-type", choices=[t.value for t in AssetType], default=AssetType.STOCK.value
     )
     asset_parser.add_argument(
-        "--provider", required=True, choices=["yfinance", "coingecko", "dev_seed"]
+        "--provider",
+        required=True,
+        choices=["yahoo_chart", "yfinance", "coingecko", "dev_seed"],
     )
     asset_parser.add_argument("--start", required=True, type=_parse_date)
     asset_parser.add_argument("--end", required=True, type=_parse_date)

@@ -37,14 +37,21 @@ from app.models.enums import AssetType
 # (dividend payer), PTON (overall loss), TSLA (disclosed stock split), and
 # QQQ (ETF) are new this pass, chosen specifically to give the frontend
 # fixture data for scenarios it previously had none for.
+#
+# KI-044 resolution: every display name is prefixed "DEMO — " so seed/
+# fixture data can never be mistaken for the real catalog ingested via
+# `seed_real_catalog.py` (`yahoo_chart` provider) — the two coexist in the
+# same `assets` table (`data_source` already distinguishes them at the row
+# level, but search/list responses surface `name`, not `data_source` — see
+# ADR-046), and this prefix is the one signal a user actually sees.
 SEED_ASSETS: dict[str, tuple[str, AssetType]] = {
-    "AAPL": ("Apple Inc.", AssetType.STOCK),
-    "SPY": ("SPDR S&P 500 ETF Trust", AssetType.ETF),
-    "BTC-USD": ("Bitcoin", AssetType.CRYPTO),
-    "KO": ("The Coca-Cola Company", AssetType.STOCK),
-    "PTON": ("Peloton Interactive, Inc.", AssetType.STOCK),
-    "TSLA": ("Tesla, Inc.", AssetType.STOCK),
-    "QQQ": ("Invesco QQQ Trust", AssetType.ETF),
+    "AAPL": ("DEMO — Apple Inc.", AssetType.STOCK),
+    "SPY": ("DEMO — SPDR S&P 500 ETF Trust", AssetType.ETF),
+    "BTC-USD": ("DEMO — Bitcoin", AssetType.CRYPTO),
+    "KO": ("DEMO — The Coca-Cola Company", AssetType.STOCK),
+    "PTON": ("DEMO — Peloton Interactive, Inc.", AssetType.STOCK),
+    "TSLA": ("DEMO — Tesla, Inc.", AssetType.STOCK),
+    "QQQ": ("DEMO — Invesco QQQ Trust", AssetType.ETF),
 }
 
 DEFAULT_START = date(2020, 1, 1)

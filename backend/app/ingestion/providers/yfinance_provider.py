@@ -1,5 +1,15 @@
 """Provider Layer adapter for stocks/ETFs via yfinance. Communication only —
 no validation, no normalization, no database access (see providers/base.py).
+
+**Deprecated (KI-044, see ADR-046).** yfinance 0.2.44's internal crumb-
+negotiation endpoint is rate-limited (HTTP 429) in most environments and
+yfinance retries against the same rate-limited endpoint without backing off,
+so this adapter fails for essentially every symbol today. Not deleted —
+kept registered (`--provider yfinance`) for any environment where it happens
+to work — but `YahooChartProvider` (`yahoo_chart_provider.py`,
+`--provider yahoo_chart`) is the recommended provider for stocks, ETFs, and
+crypto going forward: same underlying Yahoo data, reached by a direct HTTP
+GET against the chart endpoint instead of yfinance's crumb-gated wrapper.
 """
 
 import logging
