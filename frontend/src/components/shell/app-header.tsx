@@ -34,7 +34,7 @@ export function AppHeader({ maxWidthClassName = 'max-w-[1200px]' }: { maxWidthCl
   return (
     <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border-hairline bg-background/85 backdrop-blur-md">
       <div className={cn('mx-auto flex items-center justify-between px-6 py-5 sm:px-10', maxWidthClassName)}>
-        <Link href="/simulator" className="font-serif text-lg text-ink-primary italic">
+        <Link href="/" className="font-serif text-lg text-ink-primary italic">
           Investment Time Machine
         </Link>
         <nav aria-label="Primary" className="flex items-center gap-6">

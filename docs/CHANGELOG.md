@@ -4,6 +4,33 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.17.0] — 2026-07-28 — M7 Phase 4: Landing Page
+
+### Added
+- **Landing page (`/`)** — replaces the M7 Phase 1 foundation-verification placeholder. Same `ProductShell` atmosphere/header/footer/tokens as every other product route. Hero states the product's own worked-example question in serif display, typed once on load (Founder Decision 018.2); one line of brand-voice product description; primary CTA to `/simulator`; a proximity-reactive example-simulations index list.
+- `frontend/src/hooks/use-typewriter.ts` — the hero's one-shot typewriter (~1.2s, eases into a steady per-character cadence, cursor blinks twice then fades permanently, `matchMedia`-reduced-motion-gated). Rebuilt in-house, no new dependency.
+- `frontend/src/hooks/use-proximity-rows.ts` — the example list's proximity-reactive interaction (concept adapted from a founder-provided reference, rebuilt in-house — no gsap/ogl/three). A single `requestAnimationFrame` loop lerps each row's `--proximity` custom property toward a pointer- or focus-driven target and stops rescheduling itself once every row has settled — verified live (Chrome DevTools Performance panel) to reach zero scheduled frames at rest.
+- `frontend/src/components/landing/typed-hero-heading.tsx`, `frontend/src/components/landing/example-simulations-list.tsx`.
+- `frontend/src/config/example-simulations.ts` — the one shared source of truth for both the Landing page's example list and the Simulator's "Try an example" chips, closing KI-044's disclosed frontend chip-drift gap. Three examples, all real starter-catalog assets, all live-verified against the running backend before being committed: `$1,000 in Apple, 2010 → today` (AAPL, +4025.49% total return, +25.27% CAGR, crosses two real disclosed splits), `$10,000 in Bitcoin, 2017 → today` (BTC-USD, +6290.91% total return, +54.74% CAGR), `$5,000 in Tesla, Nov 2021 → Jan 2023 (a real drawdown)` (TSLA, -73.63% total return — the loss-teaching example).
+- Root `package.json` (`npm run dev`) and `scripts/dev.mjs` — the project's single "start everything" command: `docker compose up -d --build` (Postgres/Redis/backend), `alembic upgrade head` inside the backend container (retried briefly — the backend container has no healthcheck of its own to block on), `npm install` in `frontend/` on first run only, then the frontend dev server in the foreground. Documented in the README's new "Running locally" section.
+
+### Changed
+- `frontend/src/components/simulator/simulation-form.tsx` — the three "Try an example" chips now read from the shared `example-simulations.ts` config instead of a local, hardcoded array; `PTON`/`KO` (both `dev_seed`-only fixture symbols) replaced with `AAPL`/`BTC-USD`/`TSLA` (all real starter-catalog assets) — closes the disclosed drift noted in KI-044's resolution text. The form now also reads a `?example=<id>` query param on mount (set by the Landing page's example links) and applies the matching preset through the exact same `applyPreset` path the chips already use, then clears the param — implemented via `window.location.search`, not `next/navigation`'s `useSearchParams()`, so no `Suspense` boundary is reintroduced to this route (Founder Decision 017/ADR-041 had deliberately removed the one that previously existed here).
+- `frontend/src/components/shell/product-shell.tsx` — now wraps `/` in addition to `/simulator`/`/simulation/[id]`; its own doc comment updated to match (only `/dev/playground` remains unwrapped, by construction).
+- `frontend/src/components/shell/app-header.tsx` — the wordmark now links to `/` instead of `/simulator`, the conventional "logo goes home" pattern, now that `/` is a real destination rather than a placeholder.
+- `frontend/src/components/ui/button.tsx` — exports `buttonVariants` so a non-`<button>` element (the Landing page's primary CTA, a `Link` since it navigates) can carry the identical "standard button craft" classes rather than a hand-duplicated copy.
+
+### Fixed
+- **KI-044's disclosed frontend chip-drift gap, closed**: the Simulator's example chips no longer reference `dev_seed`-only symbols; both example surfaces in the product now share one config and can never drift from each other again.
+
+### Known gaps (disclosed, not fixed this pass)
+- **KI-050 (new)**: `POST /api/v1/simulations` returns an opaque `500` for any simulation whose `total_return_percentage` (or, in principle, `cagr_percentage`) reaches the `NUMERIC(10, 6)` column's ~9,999.999999% ceiling — discovered live while verifying real date ranges for this pass's example list (a naive `$1,000 in AAPL, 2000 → today` hits it at a real, correctly-computed 31,449.61% return). Backend-scoped; not fixed here. The three shipped examples were chosen with date ranges verified to stay under the ceiling.
+
+### Tests
+- Frontend: full suite green, `eslint`/`tsc --noEmit` clean, `next build` clean (CI-parity env — `.env.local` moved aside, `NEXT_PUBLIC_API_BASE_URL` supplied directly). Live-verified end-to-end against the real, running backend: all three Landing examples navigate to `/simulator` prefilled, submit, and render a completed, real-data Results page; the typewriter runs once and respects reduced motion; the proximity list settles to zero scheduled frames at rest (Performance panel, no perpetual `requestAnimationFrame` loop).
+
+---
+
 ## [0.16.0] — 2026-07-27 — Real Market Data Ingestion (KI-044 Resolution)
 
 ### Added

@@ -42,8 +42,11 @@ function extractMaxWidthClass(contentClassName?: string): string {
  * properties, which inherit down through the DOM regardless of which
  * ancestor actually painted the `background-image`.
  *
- * Used by `/simulator` and `/simulation/[id]` only — the root `/` and
- * `/dev/playground` pages remain unwrapped, unchanged, by construction.
+ * Used by every real product route — `/`, `/simulator`, `/simulation/[id]`
+ * — so the Landing page shares the exact same atmosphere/header/footer/
+ * tokens as the rest of the product rather than a separate marketing shell
+ * (M7 Phase 4). `/dev/playground` remains unwrapped, unchanged, by
+ * construction — it is a component-isolation harness, not a product route.
  */
 export function ProductShell({
   children,

@@ -1,10 +1,19 @@
 'use client';
 
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
+import type { VariantProps } from 'class-variance-authority';
 import { Loader2 } from 'lucide-react';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { cn } from '@/lib/utils';
+import { buttonVariants } from './button-variants';
+
+export { buttonVariants };
+
+export interface ButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  loading?: boolean;
+}
 
 /**
  * Every interactive state defined explicitly (M7 Phase 3D-1, Craft &
@@ -23,33 +32,13 @@ import { cn } from '@/lib/utils';
  * about hover/press feedback was true only once a user had already
  * discovered the button was clickable by accident. The hover/press/focus
  * styles below were always live; only the pointer affordance was missing.
+ *
+ * `buttonVariants` itself now lives in `./button-variants` (no `'use
+ * client'`) so a Server Component can call it directly as a plain function
+ * — a real `next build` prerender failure on the Landing page's CTA `Link`
+ * when it lived here, not a hypothetical (a client-module export can only
+ * be *rendered*, never invoked, from a server component).
  */
-const buttonVariants = cva(
-  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[var(--button-radius)] text-sm font-medium transition-[color,background-color,transform] duration-[var(--duration-micro)] ease-[var(--ease-standard)] active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
-  {
-    variants: {
-      variant: {
-        primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
-        secondary: 'border border-border-hairline text-ink-primary hover:bg-surface',
-        tertiary: 'text-primary hover:bg-surface',
-      },
-      size: {
-        default: 'h-10 px-4',
-        sm: 'h-8 px-3 text-xs',
-      },
-    },
-    defaultVariants: {
-      variant: 'primary',
-      size: 'default',
-    },
-  }
-);
-
-export interface ButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  loading?: boolean;
-}
 
 /**
  * The working-state spinner is a genuine exception to FD-018's no-loop rule

@@ -1,0 +1,8 @@
+{
+  "name": "investment-time-machine",
+  "private": true,
+  "description": "Root-level dev orchestration only — the frontend and backend each keep their own package/dependency manifests. No dependencies are installed at this level.",
+  "scripts": {
+    "dev": "node scripts/dev.mjs"
+  }
+}

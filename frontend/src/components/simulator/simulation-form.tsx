@@ -14,6 +14,7 @@ import { useAssetAvailability } from '@/hooks/use-asset-availability';
 import { simulationCreateSchema } from '@/lib/api/endpoints/simulations';
 import { ApiError, getErrorCopy } from '@/lib/api';
 import { formatDate, formatDateRange } from '@/lib/format';
+import { EXAMPLE_SIMULATIONS, type ExampleSimulation } from '@/config/example-simulations';
 import type { AssetSummary, SimulationCreateInput } from '@/types/api';
 
 /**
@@ -113,54 +114,6 @@ function ToggleField({
   );
 }
 
-/**
- * Three one-click presets (M7 Phase 3D-2, refinement 13) — a fast way to
- * see the product answer a real question without typing, using only
- * assets `app.ingestion.seed_dev_data` actually seeds (M7 Phase 3D-1, task
- * F): a plain gain (AAPL), a loss (PTON — "overall loss" per that script's
- * own seed comment), and a dividend-reinvestment case (KO). Dates are a
- * fixed, known-good trading-day range common to all three (every seeded
- * asset's availability window is 2020-01-01..2024-12-31 by construction —
- * `DEFAULT_START`/`DEFAULT_END`, `seed_dev_data.py`), so a preset click
- * never risks landing on a weekend/holiday and hitting
- * MISSING_HISTORICAL_DATA.
- */
-interface ExamplePreset {
-  chipLabel: string;
-  asset: AssetSummary;
-  investmentAmount: string;
-  startDate: string;
-  endDate: string;
-  includeDividends: boolean;
-}
-
-const EXAMPLE_PRESETS: ExamplePreset[] = [
-  {
-    chipLabel: '$1,000 in Apple Inc., 2020 → 2024',
-    asset: { symbol: 'AAPL', name: 'Apple Inc.', asset_type: 'stock', currency: 'USD' },
-    investmentAmount: '1000',
-    startDate: '2020-01-02',
-    endDate: '2024-12-30',
-    includeDividends: false,
-  },
-  {
-    chipLabel: '$1,000 in Peloton, 2020 → 2024 (a loss)',
-    asset: { symbol: 'PTON', name: 'Peloton Interactive, Inc.', asset_type: 'stock', currency: 'USD' },
-    investmentAmount: '1000',
-    startDate: '2020-01-02',
-    endDate: '2024-12-30',
-    includeDividends: false,
-  },
-  {
-    chipLabel: '$1,000 in Coca-Cola, dividends reinvested',
-    asset: { symbol: 'KO', name: 'The Coca-Cola Company', asset_type: 'stock', currency: 'USD' },
-    investmentAmount: '1000',
-    startDate: '2020-01-02',
-    endDate: '2024-12-30',
-    includeDividends: true,
-  },
-];
-
 const DEFAULT_VALUES: FormValues = {
   asset_symbol: '',
   investment_amount: '',
@@ -213,7 +166,7 @@ export function SimulationForm() {
   }
 
   /** Fills the form only — never submits it (task 13's explicit instruction). */
-  function applyPreset(preset: ExamplePreset) {
+  function applyPreset(preset: ExampleSimulation) {
     setSelectedAsset(preset.asset);
     setValue('asset_symbol', preset.asset.symbol, { shouldValidate: true });
     setValue('investment_amount', preset.investmentAmount, { shouldValidate: true });
@@ -221,6 +174,27 @@ export function SimulationForm() {
     setValue('end_date', preset.endDate, { shouldValidate: true });
     setValue('include_dividends', preset.includeDividends, { shouldValidate: true });
   }
+
+  /**
+   * Prefills from the Landing page's example list (`?example=<id>`,
+   * `config/example-simulations.ts`'s shared `id`s) through the exact same
+   * `applyPreset` path the Simulator's own chips use below — reading
+   * `window.location.search` directly rather than `next/navigation`'s
+   * `useSearchParams()` deliberately avoids reintroducing the `Suspense`
+   * boundary requirement Founder Decision 017/ADR-041 removed from this
+   * route tree. Runs once on mount only (an example is a one-time
+   * prefill, not a live-synced URL state) and clears the param afterward so
+   * a later manual edit + back-navigation doesn't silently re-apply it.
+   */
+  useEffect(() => {
+    const exampleId = new URLSearchParams(window.location.search).get('example');
+    if (!exampleId) return;
+    const preset = EXAMPLE_SIMULATIONS.find((example) => example.id === exampleId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time prefill from the URL on mount, not a synchronization loop; window.location isn't readable during render at all (would be a hydration mismatch), unlike AssetSearchCombobox's derive-during-render precedent.
+    if (preset) applyPreset(preset);
+    router.replace('/simulator', { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The moment a submission succeeds, the button stays in its "Calculating
   // historical returns…" state through the route transition too — derived
@@ -402,14 +376,14 @@ export function SimulationForm() {
       <div className="flex flex-col gap-3">
         <p className="kicker">Try an example</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Example simulations">
-          {EXAMPLE_PRESETS.map((preset) => (
+          {EXAMPLE_SIMULATIONS.map((preset) => (
             <button
-              key={preset.chipLabel}
+              key={preset.id}
               type="button"
               onClick={() => applyPreset(preset)}
               className="cursor-pointer rounded-full border border-border-hairline px-3.5 py-1.5 text-xs text-ink-secondary transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)] hover:border-border-hairline-strong hover:text-ink-primary"
             >
-              {preset.chipLabel}
+              {preset.label}
             </button>
           ))}
         </div>

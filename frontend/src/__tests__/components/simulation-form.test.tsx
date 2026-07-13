@@ -6,8 +6,11 @@ import { ApiError } from '@/lib/api/errors';
 import type { SimulationResponse } from '@/types/api';
 
 const pushMock = vi.fn();
+const replaceMock = vi.fn((url: string) => {
+  window.history.pushState({}, '', url);
+});
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, replace: replaceMock }),
 }));
 
 vi.mock('@/components/simulator/asset-search-combobox', () => ({
@@ -87,6 +90,7 @@ describe('SimulationForm', () => {
     mutateMock.mockClear();
     resetMock.mockClear();
     pushMock.mockClear();
+    replaceMock.mockClear();
     availabilityData = undefined;
   });
 
@@ -143,35 +147,55 @@ describe('SimulationForm', () => {
     const user = userEvent.setup();
     render(<SimulationForm />);
 
-    await user.click(screen.getByRole('button', { name: /Peloton, 2020 → 2024 \(a loss\)/ }));
+    await user.click(screen.getByRole('button', { name: /Tesla, Nov 2021 → Jan 2023 \(a real drawdown\)/ }));
 
     expect(mutateMock).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Investment amount (USD)', { exact: false })).toHaveValue('1000');
-    expect(screen.getByLabelText('Start date', { exact: false })).toHaveValue('2020-01-02');
-    expect(screen.getByLabelText('End date', { exact: false })).toHaveValue('2024-12-30');
+    expect(screen.getByLabelText('Investment amount (USD)', { exact: false })).toHaveValue('5000');
+    expect(screen.getByLabelText('Start date', { exact: false })).toHaveValue('2021-11-04');
+    expect(screen.getByLabelText('End date', { exact: false })).toHaveValue('2023-01-03');
 
     await user.click(screen.getByRole('button', { name: 'Run simulation' }));
     await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
     expect(mutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        asset_symbol: 'PTON',
-        investment_amount: '1000',
-        start_date: '2020-01-02',
-        end_date: '2024-12-30',
+        asset_symbol: 'TSLA',
+        investment_amount: '5000',
+        start_date: '2021-11-04',
+        end_date: '2023-01-03',
         include_dividends: false,
       })
     );
   });
 
-  it('fills the dividend-reinvested example preset with its toggle already on', async () => {
+  it('fills the Bitcoin example preset (a real catalog asset — KI-044) from the shared example-simulations config', async () => {
     const user = userEvent.setup();
     render(<SimulationForm />);
 
-    await user.click(screen.getByRole('button', { name: /Coca-Cola, dividends reinvested/ }));
+    await user.click(screen.getByRole('button', { name: /Bitcoin, 2017 → today/ }));
     await user.click(screen.getByRole('button', { name: 'Run simulation' }));
 
     await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
-    expect(mutateMock).toHaveBeenCalledWith(expect.objectContaining({ asset_symbol: 'KO', include_dividends: true }));
+    expect(mutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ asset_symbol: 'BTC-USD', investment_amount: '10000', include_dividends: false })
+    );
+  });
+
+  it('prefills from a Landing-page `?example=` query param via the same applyPreset mechanism as the chips', async () => {
+    window.history.pushState({}, '', '/simulator?example=aapl-2010');
+    const user = userEvent.setup();
+    render(<SimulationForm />);
+
+    expect(screen.getByLabelText('Investment amount (USD)', { exact: false })).toHaveValue('1000');
+    expect(screen.getByLabelText('Start date', { exact: false })).toHaveValue('2010-01-04');
+    expect(screen.getByLabelText('End date', { exact: false })).toHaveValue('2026-07-10');
+    // The param is consumed and cleared, not left in the URL.
+    await waitFor(() => expect(window.location.search).toBe(''));
+
+    await user.click(screen.getByRole('button', { name: 'Run simulation' }));
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
+    expect(mutateMock).toHaveBeenCalledWith(expect.objectContaining({ asset_symbol: 'AAPL' }));
+
+    window.history.pushState({}, '', '/simulator');
   });
 
   it('shows an inline validation error and never submits when the investment amount is invalid', async () => {

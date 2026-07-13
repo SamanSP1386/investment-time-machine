@@ -77,3 +77,14 @@ The interface follows a written Experience Constitution: the answer renders imme
 Stack
 
 LayerTechnologyEngine & APIPython, FastAPI, SQLAlchemy, Alembic, PydanticDataPostgreSQL (NUMERIC-typed financial columns, JSONB series), RedisFrontendNext.js (App Router), TypeScript, React Query, Recharts, Tailwind design tokensTestingpytest, Vitest, React Testing Library, contract-drift validationInfraDocker Compose, GitHub Actions CI (lint, type-check, fresh-DB migration + full suites)
+
+
+Running locally
+
+One command starts the full stack — Postgres, Redis, and the backend API via Docker Compose, database migrations applied inside the backend container, and the frontend dev server:
+
+```bash
+npm run dev
+```
+
+Requires Docker Desktop (running) and Node 18+. First run installs `frontend/node_modules` automatically if it isn't already present. The frontend dev server runs in the foreground at http://localhost:3000; Postgres/Redis/the backend keep running in the background afterward — stop them with `docker compose down` when you're done. See `scripts/dev.mjs` for exactly what this runs, or `docs/setup_guide.md` for the equivalent manual, step-by-step sequence (Docker Compose only covers M0–M2 in detail there; this command is the current, full-stack equivalent).
