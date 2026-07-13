@@ -64,8 +64,12 @@ class Simulation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     final_price: Mapped[float | None] = mapped_column(Numeric(20, 8), nullable=True)
     shares_purchased: Mapped[float | None] = mapped_column(Numeric(20, 8), nullable=True)
     final_value: Mapped[float | None] = mapped_column(Numeric(20, 8), nullable=True)
-    total_return_percentage: Mapped[float | None] = mapped_column(Numeric(10, 6), nullable=True)
-    cagr_percentage: Mapped[float | None] = mapped_column(Numeric(10, 6), nullable=True)
+    # NUMERIC(14, 6), not (10, 6): KI-050 -- a correctly-computed long-horizon
+    # return (e.g. AAPL 2000-today, +31,449.61%) overflowed the original
+    # NUMERIC(10, 6) bound (~100x max). See alembic/versions/0006_widen_percentage_columns.py
+    # and docs/simulation_formulas.md Section 4b for the headroom justification.
+    total_return_percentage: Mapped[float | None] = mapped_column(Numeric(14, 6), nullable=True)
+    cagr_percentage: Mapped[float | None] = mapped_column(Numeric(14, 6), nullable=True)
     inflation_adjusted_final_value: Mapped[float | None] = mapped_column(
         Numeric(20, 8), nullable=True
     )

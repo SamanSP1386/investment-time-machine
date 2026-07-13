@@ -22,7 +22,8 @@ ROUNDING_MODE = decimal.ROUND_HALF_EVEN
 # Matches historical_prices/simulations NUMERIC(20,8) currency columns.
 CURRENCY_QUANTUM = decimal.Decimal("0.00000001")
 
-# Matches simulations NUMERIC(10,6) percentage columns.
+# Matches simulations NUMERIC(14,6) percentage columns (widened from (10,6)
+# by KI-050 -- scale (6 decimal places) is unchanged, so this quantum is too).
 PERCENTAGE_QUANTUM = decimal.Decimal("0.000001")
 
 
@@ -44,5 +45,5 @@ def quantize_currency(value: decimal.Decimal) -> decimal.Decimal:
 
 
 def quantize_percentage(value: decimal.Decimal) -> decimal.Decimal:
-    """Round to the NUMERIC(10,6) scale used by percentage columns."""
+    """Round to the NUMERIC(14,6) scale used by percentage columns."""
     return value.quantize(PERCENTAGE_QUANTUM, rounding=ROUNDING_MODE)

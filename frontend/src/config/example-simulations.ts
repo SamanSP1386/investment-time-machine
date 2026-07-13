@@ -16,14 +16,17 @@ import type { AssetSummary } from '@/types/api';
  * `endDate` is deliberately a fixed, past trading day rather than a
  * dynamically-computed "today": a preset is a specific, reproducible worked
  * example (Founder Decision 013 §4), not a live-updating figure, matching
- * how the Simulator's own original presets already worked. The AAPL/BTC-USD
- * ranges below are intentionally shorter than "2000"/inception-to-today —
- * a longer range was tested and found to overflow the `simulations` table's
- * `NUMERIC(10, 6)` `total_return_percentage` column past a ~9,999% return (a
- * real, live-discovered backend defect, reported separately — not fixed
- * here, since this pass is frontend-scoped); these ranges were chosen to
- * stay comfortably under that ceiling while still telling a real, striking
- * story.
+ * how the Simulator's own original presets already worked.
+ *
+ * KI-050 resolved: the Apple example originally shipped shortened to
+ * "2010 → today" as a disclosed frontend workaround for a backend defect —
+ * `total_return_percentage`'s old `NUMERIC(10, 6)` column overflowed past a
+ * ~9,999% return. Now that the column is widened to `NUMERIC(14, 6)` and the
+ * fix is live-verified, the example returns to the original, more striking
+ * "2000 → today" range (+31,449.61% total return) — there is no remaining
+ * technical reason to hold it back, and a genuine ~315x, 26-year compounding
+ * return tells this product's own thesis more strikingly than a shorter
+ * range does.
  */
 export interface ExampleSimulation {
   id: string;
@@ -37,11 +40,11 @@ export interface ExampleSimulation {
 
 export const EXAMPLE_SIMULATIONS: ExampleSimulation[] = [
   {
-    id: 'aapl-2010',
-    label: '$1,000 in Apple, 2010 → today',
+    id: 'aapl-2000',
+    label: '$1,000 in Apple, 2000 → today',
     asset: { symbol: 'AAPL', name: 'Apple Inc.', asset_type: 'stock', currency: 'USD' },
     investmentAmount: '1000',
-    startDate: '2010-01-04',
+    startDate: '2000-01-03',
     endDate: '2026-07-10',
     includeDividends: false,
   },

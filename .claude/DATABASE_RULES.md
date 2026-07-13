@@ -15,7 +15,8 @@ Distilled from Founder Specification Part 2.6 (Database Architecture, 2.6.1–2.
 ## Financial value types (no exceptions)
 
 - Currency/price values: `NUMERIC(20,8)`.
-- Percentages/ratios: `NUMERIC(10,6)`.
+- Percentages unbounded by compounding (e.g. `total_return_percentage`/`cagr_percentage`): `NUMERIC(14,6)` — widened from `NUMERIC(10,6)` by KI-050. See `docs/simulation_formulas.md` §4b.
+- Ratios bounded by their own real-world magnitude (e.g. `stock_splits.split_ratio`): `NUMERIC(10,6)` remains correct.
 - `FLOAT` / `REAL` / `DOUBLE PRECISION` are prohibited for any financial value.
 
 ## The nine logical domains — implemented in M1 (`backend/app/models/`)

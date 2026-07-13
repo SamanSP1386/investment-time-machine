@@ -49,7 +49,8 @@ Every backend service is built on a small, shared foundation — this exists bef
 ## Financial data types (backend and DB, no exceptions)
 
 - Currency values: `NUMERIC(20,8)`.
-- Percentages/ratios: `NUMERIC(10,6)`.
+- Percentages unbounded by compounding (e.g. `total_return_percentage`/`cagr_percentage`): `NUMERIC(14,6)` — widened from `NUMERIC(10,6)` by KI-050, whose ~100x ceiling a real long-horizon return exceeded. See `docs/simulation_formulas.md` §4b.
+- Ratios bounded by their own real-world magnitude (e.g. `stock_splits.split_ratio`): `NUMERIC(10,6)` remains correct.
 - `float` / `REAL` / `DOUBLE PRECISION` are **prohibited** anywhere a financial value is stored, computed, or serialized.
 
 ## Frontend

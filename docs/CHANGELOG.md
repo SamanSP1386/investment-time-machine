@@ -4,6 +4,22 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.17.1] — 2026-07-13 — KI-050 Resolution: Percentage Column Overflow
+
+### Fixed
+- **KI-050**: `POST /api/v1/simulations` no longer returns an opaque `500` for a long-horizon, high-growth real simulation. `simulations.total_return_percentage`/`cagr_percentage` widened from `NUMERIC(10, 6)` (max magnitude `9999.999999`, ~100x) to `NUMERIC(14, 6)` (max magnitude `99999999.999999`, ~1,000,000x) via `backend/alembic/versions/0006_widen_percentage_columns.py`. Live-verified against the exact repro this KI was discovered with: `$1,000 in AAPL, 2000-01-03 → 2026-07-10` now returns `201 Created` with `"total_return_percentage": "31449.606043"` (previously a `DataError`/`NumericValueOutOfRange` 500). No backfill needed — an overflowing value was never stored in the first place.
+
+### Changed
+- `frontend/src/config/example-simulations.ts` — the Landing/Simulator Apple example reverted from the disclosed "2010 → today" workaround back to the original "2000 → today" range (+31,449.61% total return, +24.24% CAGR) now that the overflow ceiling is fixed.
+- `.claude/CODING_STANDARDS.md`/`.claude/DATABASE_RULES.md` — the "Percentages/ratios: `NUMERIC(10,6)`" rule split into two: percentages unbounded by compounding (`NUMERIC(14,6)`) vs. ratios bounded by their own real-world magnitude, e.g. `split_ratio` (`NUMERIC(10,6)`, unchanged).
+
+### Tests
+- Backend: 4 new DB-integration regression tests (`backend/tests/simulation/test_percentage_column_bounds.py`) — the exact old `NUMERIC(10, 6)` boundary (`9999.999999%`) still succeeds; `10000.01%` (previously the smallest overflow) now succeeds; a synthetic short-horizon multi-bagger pushes `cagr_percentage` itself past the old ceiling and succeeds; a synthetic reproduction at the real AAPL magnitude (`31449.606043%`) succeeds. Full suite: 325/325 passing, `ruff`/`black --check` clean.
+- Frontend: 1 new component-render test (`results-sections.test.tsx`) confirms a 5-6 digit percentage renders in full, unclipped. Full suite: 49 files / 282 tests (281 passed, 1 pre-existing skip), `eslint`/`tsc --noEmit`/`next build` clean.
+- Live end-to-end: real Docker Compose stack, real Postgres, real `yahoo_chart`-ingested AAPL data (1980–2026). See `docs/KNOWN_ISSUES.md` KI-050's resolution text for the full verification record, including the disclosed limitation that no browser-automation tool was available to capture the rendered Results page itself.
+
+---
+
 ## [0.17.0] — 2026-07-28 — M7 Phase 4: Landing Page
 
 ### Added

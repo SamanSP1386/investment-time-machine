@@ -181,12 +181,12 @@ describe('SimulationForm', () => {
   });
 
   it('prefills from a Landing-page `?example=` query param via the same applyPreset mechanism as the chips', async () => {
-    window.history.pushState({}, '', '/simulator?example=aapl-2010');
+    window.history.pushState({}, '', '/simulator?example=aapl-2000');
     const user = userEvent.setup();
     render(<SimulationForm />);
 
     expect(screen.getByLabelText('Investment amount (USD)', { exact: false })).toHaveValue('1000');
-    expect(screen.getByLabelText('Start date', { exact: false })).toHaveValue('2010-01-04');
+    expect(screen.getByLabelText('Start date', { exact: false })).toHaveValue('2000-01-03');
     expect(screen.getByLabelText('End date', { exact: false })).toHaveValue('2026-07-10');
     // The param is consumed and cleared, not left in the URL.
     await waitFor(() => expect(window.location.search).toBe(''));

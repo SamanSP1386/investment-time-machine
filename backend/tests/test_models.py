@@ -205,16 +205,25 @@ def test_financial_currency_columns_use_numeric_20_8() -> None:
         assert (column.type.precision, column.type.scale) == (20, 8)
 
 
-def test_percentage_columns_use_numeric_10_6() -> None:
+def test_percentage_columns_use_numeric_14_6() -> None:
+    # KI-050: widened from NUMERIC(10, 6) -- its ~100x ceiling a real
+    # long-horizon return (AAPL 2000-today, +31,449.61%) exceeded.
     percentage_columns = [
         ("simulations", "total_return_percentage"),
         ("simulations", "cagr_percentage"),
-        ("stock_splits", "split_ratio"),
     ]
     for table_name, column_name in percentage_columns:
         column = _column(table_name, column_name)
         assert column.type.__class__.__name__ == "Numeric"
-        assert (column.type.precision, column.type.scale) == (10, 6)
+        assert (column.type.precision, column.type.scale) == (14, 6)
+
+
+def test_split_ratio_column_uses_numeric_10_6() -> None:
+    # Unaffected by KI-050 -- a split ratio (e.g. 4.0 for a 4-for-1 split) is
+    # bounded by its own real-world magnitude, not a compounding return.
+    column = _column("stock_splits", "split_ratio")
+    assert column.type.__class__.__name__ == "Numeric"
+    assert (column.type.precision, column.type.scale) == (10, 6)
 
 
 def test_imported_data_tables_have_data_source_column() -> None:

@@ -132,6 +132,23 @@ describe('SupportingFacts', () => {
     expect(cagr.className).toMatch(/negative-tint/);
   });
 
+  it('KI-050: a 5-6 digit percentage (a real long-horizon return past the old NUMERIC(10,6) ceiling) renders in full, unclipped, with no digit-count assumption', () => {
+    setReducedMotion(true);
+    // Real figures from the AAPL 2000-01-03 -> 2026-07-10 repro that used to
+    // overflow the backend's old NUMERIC(10, 6) column (KI-050).
+    const longHorizonSim: SimulationResponse = {
+      ...BASE_SIM,
+      final_value: '315496.06043164' as SimulationResponse['final_value'],
+      total_return_percentage: '31449.606043' as SimulationResponse['total_return_percentage'],
+      cagr_percentage: '24.235140' as SimulationResponse['cagr_percentage'],
+    };
+    render(<SupportingFacts sim={longHorizonSim} />);
+
+    const totalReturn = screen.getByText('+31449.61%');
+    expect(totalReturn).toBeInTheDocument();
+    expect(totalReturn.className).not.toMatch(/negative-tint/);
+  });
+
   it('FD-018 rule 6: a gain and a loss get the identical motion/structure treatment — only the negative-tint color class differs, per direct instruction', () => {
     setReducedMotion(true);
     const gainSim = BASE_SIM;
