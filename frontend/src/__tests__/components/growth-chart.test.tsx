@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { GrowthChart } from '@/components/simulation-result/growth-chart';
+import {
+  computeYAxisWidth,
+  GrowthChart,
+  markersTooCloseByValue,
+  type PlotPoint,
+} from '@/components/simulation-result/growth-chart';
 import type { SimulationResponse } from '@/types/api';
 
 type Series = SimulationResponse['growth_series'];
@@ -327,6 +332,93 @@ describe('GrowthChart — high/low markers (item 6c)', () => {
     values[99] = '80.00000000'; // endpoint itself, slightly higher
     render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
     expect(screen.queryByText(/\$50\.00 ·/)).not.toBeInTheDocument();
+  });
+});
+
+describe('GrowthChart — high/low mutual collision (M7 Phase 3D-4, item 4)', () => {
+  function dailySeries(values: string[]): Series {
+    return series(values, '2020-01-01');
+  }
+
+  it('suppresses the later of two mutually-colliding high/low markers on a low-volatility, short range', () => {
+    // A 90-day range (matching the task's "short ranges (<3 months)" test
+    // case), oscillating close around the $1,000 invested baseline: high
+    // $1,010 at day 40, low $990 at day 45. Close enough in VALUE (not just
+    // date) that their oppositely-pointing labels ('top' for high, 'bottom'
+    // for low) would still overlap — the case the original,
+    // since-corrected date-only heuristic missed (see the exported
+    // function's own doc comment for the live case that caught it).
+    const values = Array.from({ length: 90 }, () => '1000.00000000');
+    values[40] = '1010.00000000'; // high
+    values[45] = '990.00000000'; // low — collides with the high above
+    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
+
+    expect(screen.getByText(/\$1,010\.00 ·/)).toBeInTheDocument();
+    expect(screen.queryByText(/\$990\.00 ·/)).not.toBeInTheDocument();
+  });
+
+  it('shows both markers when the high and low are far enough apart in value not to collide, even close in date', () => {
+    // A wide value swing ($500 vs $1,500 against a $1,000 baseline) 10 days
+    // apart — the exact shape of the pre-existing "well inside the range"
+    // fixture below, confirming the value-based guard doesn't regress it.
+    const values = Array.from({ length: 90 }, () => '1000.00000000');
+    values[40] = '1500.00000000'; // high
+    values[50] = '500.00000000'; // low — only 10 days later, but far apart in value
+    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
+
+    expect(screen.getByText(/\$1,500\.00 ·/)).toBeInTheDocument();
+    expect(screen.getByText(/\$500\.00 ·/)).toBeInTheDocument();
+  });
+});
+
+describe('markersTooCloseByValue — collision helper (unit)', () => {
+  function point(dateStr: string, value: number): PlotPoint {
+    return { point_date: dateStr, plotValue: value, rawValue: `${value}` as PlotPoint['rawValue'] };
+  }
+
+  it('is true for two points whose value gap is a small fraction of the plotted domain span', () => {
+    expect(markersTooCloseByValue(point('2020-01-01', 1010), point('2020-02-01', 990), 1000)).toBe(true);
+  });
+
+  it('is false for two points whose value gap is a large fraction of the plotted domain span', () => {
+    expect(markersTooCloseByValue(point('2020-01-01', 1500), point('2020-02-01', 500), 1160)).toBe(false);
+  });
+
+  it('is symmetric — argument order does not change the result', () => {
+    const a = point('2020-01-01', 1010);
+    const b = point('2020-01-05', 990);
+    expect(markersTooCloseByValue(a, b, 1000)).toBe(markersTooCloseByValue(b, a, 1000));
+  });
+});
+
+describe('computeYAxisWidth — dynamic axis width for $1M+ values (unit)', () => {
+  it('reserves more width for a 7-digit dollar domain than a 4-digit one', () => {
+    const smallWidth = computeYAxisWidth(900, 1900);
+    const largeWidth = computeYAxisWidth(900_000, 1_900_000);
+    expect(largeWidth).toBeGreaterThan(smallWidth);
+  });
+
+  it('never shrinks below the minimum or grows past the maximum reserved width', () => {
+    expect(computeYAxisWidth(0, 10)).toBeGreaterThanOrEqual(56);
+    expect(computeYAxisWidth(0, 999_999_999)).toBeLessThanOrEqual(108);
+  });
+});
+
+describe('GrowthChart — $1M+ values render without crashing and with the correct endpoint figure', () => {
+  it('renders a seven-digit endpoint value correctly, flipped to avoid clipping', () => {
+    const { container } = render(
+      <GrowthChart
+        sim={{
+          ...BASE_SIM,
+          growth_series: series(['1000000.00000000', '1500000.00000000', '1987654.32000000']),
+        }}
+      />
+    );
+    const endpointText = Array.from(container.querySelectorAll('text')).find((node) =>
+      node.textContent?.includes('$1,987,654.32')
+    );
+    expect(endpointText).toBeDefined();
+    expect(endpointText).toHaveAttribute('text-anchor', 'end');
   });
 });
 

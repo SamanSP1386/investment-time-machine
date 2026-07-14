@@ -4,6 +4,7 @@ import { ProductShell } from '@/components/shell/product-shell';
 import { TypedHeroHeading } from '@/components/landing/typed-hero-heading';
 import { ExampleSimulationsList } from '@/components/landing/example-simulations-list';
 import { buttonVariants } from '@/components/ui/button-variants';
+import { MagneticWrap } from '@/components/ui/magnetic-wrap';
 
 export const metadata: Metadata = {
   title: 'Investment Time Machine — What would it be worth today?',
@@ -34,11 +35,11 @@ export default function LandingPage() {
         <p className="max-w-prose text-base text-ink-secondary sm:text-lg">
           A deterministic, historical, educational replay of real market data — never a projection, never advice.
         </p>
-        <div>
+        <MagneticWrap>
           <Link href="/simulator" className={buttonVariants({ variant: 'primary' })}>
             Run a simulation
           </Link>
-        </div>
+        </MagneticWrap>
       </section>
 
       <section className="flex flex-col gap-3">

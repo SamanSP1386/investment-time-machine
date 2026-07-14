@@ -7,10 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ErrorState } from '@/components/ui/error-state';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ProductShell } from '@/components/shell/product-shell';
 import { OpeningSequenceHeading } from '@/components/simulation-result/opening-sequence-heading';
-import { GrowthOverTime, SupportingFacts, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
+import { ResultsSkeleton } from '@/components/simulation-result/results-skeleton';
+import {
+  GrowthOverTime,
+  KeyTakeaways,
+  SupportingFacts,
+  TheProof,
+  WhyExplanation,
+} from '@/components/simulation-result/results-sections';
 import { useEntranceDissolve } from '@/hooks/use-entrance-dissolve';
 import { useSimulation } from '@/hooks/use-simulation';
 import { cn } from '@/lib/utils';
@@ -38,44 +44,6 @@ function workedExampleSentence(sim: SimulationResponse): string {
     return `${opening} — here's what we're calculating.`;
   }
   return `${opening} — here's what happened when we tried to calculate it.`;
-}
-
-/**
- * A skeleton shaped like the completed Results layout (hero sentence,
- * Supporting Facts row, chart) — never a generic spinner
- * (frontend_design_system.md §10) — so the page never visibly jumps once
- * the real content arrives. `.skeleton-shimmer` (globals.css) sweeps at
- * most twice, then stops (FD-018 — no infinite/ambient animation); under
- * `prefers-reduced-motion` the two passes complete imperceptibly and every
- * block just reads as its static resting color.
- */
-function ResultsSkeleton() {
-  return (
-    <div role="status" aria-live="polite" className="flex flex-col gap-10 sm:gap-14">
-      <span className="sr-only">Loading simulation…</span>
-      <div aria-hidden className="flex flex-col gap-6 sm:gap-8">
-        <Skeleton className="h-3 w-40" />
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-9 w-full max-w-2xl sm:h-12" />
-          <Skeleton className="h-9 w-3/4 max-w-xl sm:h-12" />
-        </div>
-      </div>
-      <div aria-hidden className="flex flex-col gap-14 sm:gap-20">
-        <div className="grid grid-cols-1 gap-8 border-t border-b border-border-hairline py-8 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-8 w-32" />
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col gap-4">
-          <Skeleton className="h-3 w-32" />
-          <Skeleton className="h-48 w-full sm:h-64" />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /** Every input the user actually chose, unconditionally renderable regardless of status. */
@@ -241,6 +209,7 @@ export function SimulationResultClient({ id }: { id: string }) {
             <SupportingFacts sim={sim} />
             <GrowthOverTime sim={sim} />
             <WhyExplanation sim={sim} />
+            <KeyTakeaways sim={sim} />
             <TheProof sim={sim} />
             <div className="flex flex-wrap items-center gap-4">
               <RunAnotherSimulationLink />

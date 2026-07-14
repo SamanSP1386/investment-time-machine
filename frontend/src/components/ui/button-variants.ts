@@ -15,7 +15,11 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
+        // `btn-sweep` (globals.css, M7 Phase 3D-4 item 11) — a faint static
+        // gradient border at rest plus a one-shot gold/accent light sweep on
+        // hover. Augments the existing `hover:bg-primary-hover` background
+        // shift; doesn't replace it.
+        primary: 'btn-sweep bg-primary text-primary-foreground hover:bg-primary-hover',
         secondary: 'border border-border-hairline text-ink-primary hover:bg-surface',
         tertiary: 'text-primary hover:bg-surface',
       },

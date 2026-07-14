@@ -244,10 +244,14 @@ describe('SimulationForm', () => {
     });
   });
 
-  it('shows a named-step loading state, not a generic spinner label, while pending', () => {
+  it('shows a named-step loading interstitial (item 3), not a generic spinner, while pending', () => {
     mutationState.isPending = true;
     render(<SimulationForm />);
-    expect(screen.getByRole('button', { name: 'Calculating historical returns…' })).toBeInTheDocument();
+    expect(screen.getByText('Calculating historical returns…')).toBeInTheDocument();
+    expect(screen.getByText('Loading simulation…')).toBeInTheDocument();
+    // The interstitial replaces the form outright — no stale submit button
+    // left behind underneath it.
+    expect(screen.queryByRole('button', { name: 'Run simulation' })).not.toBeInTheDocument();
   });
 
   it('renders the central, educational error copy (never a raw message) when historical data is missing', () => {
@@ -322,7 +326,9 @@ describe('SimulationForm', () => {
     render(<SimulationForm />);
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/simulation/sim-123'));
-    expect(screen.getByRole('button', { name: 'Calculating historical returns…' })).toBeInTheDocument();
+    // isNavigating (isSuccess) keeps the same loading interstitial on screen
+    // through the route transition, matching isPending's own treatment above.
+    expect(screen.getByText('Calculating historical returns…')).toBeInTheDocument();
   });
 
   it('navigates to the plain Results screen URL identically when the simulation failed', async () => {
@@ -353,5 +359,14 @@ describe('SimulationForm', () => {
     render(<SimulationForm />);
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/simulation/sim-456'));
+  });
+
+  it('item 12: every "Try an example" chip carries the target-brackets hover/focus class', () => {
+    render(<SimulationForm />);
+    const chips = screen.getAllByRole('button', { name: /→ today|drawdown/ });
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip.className).toMatch(/\btarget-brackets\b/);
+    }
   });
 });

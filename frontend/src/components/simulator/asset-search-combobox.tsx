@@ -1,14 +1,70 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Loader2, SearchX } from 'lucide-react';
 import { useAssetSearch } from '@/hooks/use-asset-search';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ApiError, getErrorCopy } from '@/lib/api';
-import type { AssetSummary } from '@/types/api';
+import type { AssetSummary, AssetType } from '@/types/api';
 import { cn } from '@/lib/utils';
 
 const DEBOUNCE_MS = 300;
+
+/**
+ * Asset browse mode (M7 Phase 3D-4, item 1) — focusing/clicking the *empty*
+ * field opens the full catalog instead of an empty popup, matching a
+ * standard combobox's "browse, then narrow" pattern. There is no
+ * dedicated "list everything" backend endpoint (`GET /api/v1/assets`
+ * requires `query` to be non-empty — `min_length=1`,
+ * `backend/app/api/v1/routers/assets.py`) and adding one is a backend
+ * change out of scope for this frontend-only pass. `%` is a genuine,
+ * non-empty query string that satisfies that constraint while matching
+ * every row: the service layer's own match is
+ * `Asset.symbol.ilike(f"%{query}%")` (`backend/app/api/v1/services/
+ * asset_service.py`), and `f"%{'%'}%"` = `"%%%"`, which is SQL-LIKE-
+ * equivalent to a bare `%` (a run of wildcard characters matches the same
+ * as one) — a real property of the existing endpoint, not a client-side
+ * fabrication of catalog data.
+ */
+const BROWSE_QUERY = '%';
+/** Comfortably above the real+demo starter catalog's current size (~15
+ * assets); still under the endpoint's own `le=100` cap
+ * (`Query(default=20, ge=1, le=100)`), so browse mode never silently
+ * truncates the catalog it's meant to show in full. */
+const BROWSE_LIMIT = 100;
+
+const ASSET_TYPE_GROUP_ORDER: Record<AssetType, number> = { stock: 0, etf: 1, crypto: 2 };
+const ASSET_TYPE_GROUP_LABELS: Record<AssetType, string> = { stock: 'Stocks', etf: 'ETFs', crypto: 'Crypto' };
+
+/**
+ * `seed_dev_data.py`'s own documented convention: every fixture/demo asset's
+ * `name` is prefixed "DEMO — ", specifically so it's "the one signal a user
+ * actually sees" distinguishing it from the real catalog (KI-044). Reading
+ * that existing, real field is presentation-only grouping — not inventing a
+ * `is_demo` flag the API doesn't return.
+ */
+function isDemoAsset(asset: AssetSummary): boolean {
+  return asset.name.startsWith('DEMO — ');
+}
+
+/**
+ * Browse-mode ordering (item 1): grouped Stocks → ETFs → Crypto, demo
+ * assets last within each group, alphabetical by symbol otherwise. A plain
+ * sort over fields the API already returns — no financial calculation.
+ * Exported for a focused unit test independent of the combobox's rendering.
+ */
+export function sortAssetsForBrowseMode(assets: AssetSummary[]): AssetSummary[] {
+  return [...assets].sort((a, b) => {
+    const typeDiff = ASSET_TYPE_GROUP_ORDER[a.asset_type] - ASSET_TYPE_GROUP_ORDER[b.asset_type];
+    if (typeDiff !== 0) return typeDiff;
+    // Not a Number(DecimalString) financial conversion (the lint rule this
+    // codebase runs would otherwise flag) — a plain boolean-to-sort-order
+    // idiom over a presentation-only grouping flag.
+    const demoDiff = (isDemoAsset(a) ? 1 : 0) - (isDemoAsset(b) ? 1 : 0);
+    if (demoDiff !== 0) return demoDiff;
+    return a.symbol.localeCompare(b.symbol);
+  });
+}
 
 export interface AssetSearchComboboxProps {
   label: string;
@@ -81,13 +137,13 @@ export function AssetSearchCombobox({
     if (value) setInputValue(`${value.symbol} — ${value.name}`);
   }
 
+  const isBrowseMode = debouncedQuery.length === 0;
   const { data, isFetching, error: searchError } = useAssetSearch(
-    { query: debouncedQuery },
-    // eslint-disable-next-line no-restricted-syntax -- string lengths, not a DecimalString comparison (ADR-033).
-    { enabled: isOpen && debouncedQuery.length > 0 }
+    isBrowseMode ? { query: BROWSE_QUERY, limit: BROWSE_LIMIT } : { query: debouncedQuery },
+    { enabled: isOpen }
   );
 
-  const assets = data?.assets ?? [];
+  const assets = isBrowseMode ? sortAssetsForBrowseMode(data?.assets ?? []) : (data?.assets ?? []);
 
   function handleSelect(asset: AssetSummary) {
     setInputValue(`${asset.symbol} — ${asset.name}`);
@@ -132,16 +188,20 @@ export function AssetSearchCombobox({
     }
   }
 
-  // eslint-disable-next-line no-restricted-syntax -- string-length comparison, not a DecimalString comparison (ADR-033).
-  const showDropdown = isOpen && debouncedQuery.length > 0;
+  // Open, full stop — browse mode (item 1) means the popup has content to
+  // show even with an empty query, so "has the user typed something" is no
+  // longer the gate; `isOpen` alone (set on focus/click and on every
+  // keystroke, cleared on blur/Escape/selection) is.
+  const showDropdown = isOpen;
   // eslint-disable-next-line no-restricted-syntax -- array-index comparison, not a DecimalString comparison (ADR-033).
   const activeOptionId = activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined;
 
   let liveMessage = '';
   if (showDropdown) {
-    if (isFetching) liveMessage = 'Searching…';
+    if (isFetching) liveMessage = isBrowseMode ? 'Loading assets…' : 'Searching…';
     else if (searchError) liveMessage = 'Search failed.';
     else if (assets.length === 0) liveMessage = 'No assets found.';
+    else if (isBrowseMode) liveMessage = `${assets.length} asset${assets.length === 1 ? '' : 's'} available. Type to filter.`;
     else liveMessage = `${assets.length} result${assets.length === 1 ? '' : 's'} found.`;
   }
 
@@ -173,8 +233,14 @@ export function AssetSearchCombobox({
         onChange={(event) => handleInputChange(event.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => {
-          // eslint-disable-next-line no-restricted-syntax -- string-length comparison, not a DecimalString comparison (ADR-033).
-          if (inputValue.trim().length > 0) setIsOpen(true);
+          // Item 1 — focusing/clicking the field always opens the popup now:
+          // an empty field opens browse mode (the full catalog, grouped),
+          // a field already carrying text re-opens the filtered search for
+          // that text. Native `focus` already fires on click, so no
+          // separate `onClick` handler is needed for the "clicking" half of
+          // "clicking/focusing the empty field" (a native input's click
+          // always focuses it first).
+          setIsOpen(true);
         }}
         onBlur={() => setIsOpen(false)}
         className={cn(
@@ -197,7 +263,7 @@ export function AssetSearchCombobox({
           {isFetching ? (
             <div className="flex items-center gap-2 p-4 text-sm text-ink-secondary">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-              Searching…
+              {isBrowseMode ? 'Loading assets…' : 'Searching…'}
             </div>
           ) : searchError ? (
             <p className="p-4 text-sm text-status-critical">
@@ -207,31 +273,47 @@ export function AssetSearchCombobox({
             <EmptyState
               icon={SearchX}
               title="No assets found"
-              description="Try a different symbol or name."
+              description={isBrowseMode ? 'No assets are available yet.' : 'Try a different symbol or name.'}
               className="gap-2 border-none p-4 text-left"
             />
           ) : (
             <ul id={listboxId} role="listbox" aria-label={`${label} results`} className="max-h-64 overflow-y-auto py-1">
-              {assets.map((asset, index) => (
-                <li
-                  key={asset.symbol}
-                  id={`${listboxId}-option-${index}`}
-                  role="option"
-                  aria-selected={index === activeIndex}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    handleSelect(asset);
-                  }}
-                  className={cn(
-                    'flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm',
-                    index === activeIndex ? 'bg-background' : 'hover:bg-background'
-                  )}
-                >
-                  <span className="figure font-mono text-ink-primary">{asset.symbol}</span>
-                  <span className="flex-1 truncate text-ink-secondary">{asset.name}</span>
-                  <span className="text-xs text-ink-muted uppercase">{asset.asset_type}</span>
-                </li>
-              ))}
+              {assets.map((asset, index) => {
+                // Item 1 — browse mode groups by asset type (Stocks/ETFs/
+                // Crypto, demo assets last within each — sortAssetsForBrowseMode
+                // above); a group header renders whenever this item's type
+                // differs from the previous item's. Headers are
+                // `role="presentation"` — inert text inside the listbox, not
+                // counted by activeIndex/keyboard navigation, which walks
+                // `assets` directly and is unaffected by their presence.
+                const showGroupHeader = isBrowseMode && (index === 0 || assets[index - 1].asset_type !== asset.asset_type);
+                return (
+                  <Fragment key={asset.symbol}>
+                    {showGroupHeader ? (
+                      <li role="presentation" className="kicker px-3 pt-2.5 pb-1 first:pt-1.5">
+                        {ASSET_TYPE_GROUP_LABELS[asset.asset_type]}
+                      </li>
+                    ) : null}
+                    <li
+                      id={`${listboxId}-option-${index}`}
+                      role="option"
+                      aria-selected={index === activeIndex}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        handleSelect(asset);
+                      }}
+                      className={cn(
+                        'flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm',
+                        index === activeIndex ? 'bg-background' : 'hover:bg-background'
+                      )}
+                    >
+                      <span className="figure font-mono text-ink-primary">{asset.symbol}</span>
+                      <span className="flex-1 truncate text-ink-secondary">{asset.name}</span>
+                      <span className="text-xs text-ink-muted uppercase">{asset.asset_type}</span>
+                    </li>
+                  </Fragment>
+                );
+              })}
             </ul>
           )}
         </div>

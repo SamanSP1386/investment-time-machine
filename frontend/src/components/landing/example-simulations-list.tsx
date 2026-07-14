@@ -1,18 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
 import { EXAMPLE_SIMULATIONS } from '@/config/example-simulations';
+import { useCoarsePointer } from '@/hooks/use-coarse-pointer';
 import { useProximityRows } from '@/hooks/use-proximity-rows';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { cn } from '@/lib/utils';
-
-function useCoarsePointer(): boolean {
-  const [coarse] = useState(() =>
-    typeof window === 'undefined' ? false : window.matchMedia('(pointer: coarse)').matches
-  );
-  return coarse;
-}
 
 /**
  * The Landing page's proximity-reactive example index (concept adapted from
@@ -50,7 +44,7 @@ export function ExampleSimulationsList() {
           onBlur={() => setTarget(index, 0)}
           style={{ '--proximity': 0 } as CSSProperties}
           className={cn(
-            'group flex items-center gap-5 border-b border-border-hairline py-4 outline-none',
+            'target-brackets group flex items-center gap-5 border-b border-border-hairline py-4 outline-none',
             'transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)]',
             'hover:[&_.example-label]:text-ink-primary focus-visible:[&_.example-label]:text-ink-primary'
           )}

@@ -28,4 +28,12 @@ describe('ExampleSimulationsList', () => {
       expect(link).toHaveFocus();
     }
   });
+
+  it('item 12: every row carries the target-brackets hover/focus class, no custom cursor applied', () => {
+    render(<ExampleSimulationsList />);
+    for (const link of screen.getAllByRole('link')) {
+      expect(link.className).toMatch(/\btarget-brackets\b/);
+      expect(link.className).not.toMatch(/cursor-none/);
+    }
+  });
 });

@@ -60,4 +60,17 @@ describe('Button', () => {
     render(<Button>Run simulation</Button>);
     expect(screen.getByRole('button').className).toMatch(/active:scale-\[0\.98\]/);
   });
+
+  it('item 11: the primary variant carries the one-shot hover light-sweep class; secondary/tertiary do not', () => {
+    render(
+      <>
+        <Button variant="primary">Primary</Button>
+        <Button variant="secondary">Secondary</Button>
+        <Button variant="tertiary">Tertiary</Button>
+      </>
+    );
+    expect(screen.getByRole('button', { name: 'Primary' }).className).toMatch(/\bbtn-sweep\b/);
+    expect(screen.getByRole('button', { name: 'Secondary' }).className).not.toMatch(/\bbtn-sweep\b/);
+    expect(screen.getByRole('button', { name: 'Tertiary' }).className).not.toMatch(/\bbtn-sweep\b/);
+  });
 });

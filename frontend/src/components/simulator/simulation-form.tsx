@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ErrorState } from '@/components/ui/error-state';
+import { MagneticWrap } from '@/components/ui/magnetic-wrap';
+import { ResultsSkeleton } from '@/components/simulation-result/results-skeleton';
 import { AssetSearchCombobox } from './asset-search-combobox';
 import { useCreateSimulation } from '@/hooks/use-simulation';
 import { useAssetAvailability } from '@/hooks/use-asset-availability';
@@ -222,6 +224,38 @@ export function SimulationForm() {
     ? getErrorCopy(apiError instanceof ApiError ? apiError.code : 'INTERNAL_SERVER_ERROR')
     : null;
 
+  // M7 Phase 3D-4, item 3 — a designed loading state bridging the Simulator
+  // to the Results page, shown only while `POST /api/v1/simulations` (or the
+  // route transition immediately after it succeeds) is genuinely in flight —
+  // never an artificial delay, since both halves of `isSubmitting` are
+  // derived directly from real request/navigation state, matching the
+  // Button's own "Calculating historical returns…" label precedent
+  // (frontend_design_system.md §10's "named-step affordance," not a generic
+  // spinner). Renders a skeleton of the RESULTS layout specifically (the
+  // same `ResultsSkeleton` the Results page itself uses while loading) —
+  // atmosphere-consistent because it's still inside this page's own
+  // `ProductShell` — so the transition from "asking" to "seeing" reads as
+  // one continuous handoff rather than two visually distinct loading
+  // moments. `useCreateSimulation` seeds the Results query cache with this
+  // same request's own response on success, so the subsequent navigation
+  // never triggers a second, redundant fetch/skeleton flash of its own —
+  // this interstitial is the only loading state the user sees, and it ends
+  // the instant real data exists. Reduced motion needs no separate branch
+  // here: `.skeleton-shimmer`'s animation is already globally collapsed to
+  // ~0ms under `prefers-reduced-motion` (globals.css), so this degrades to a
+  // plain, static swap automatically, and the Results page's own
+  // `useEntranceDissolve` — the "existing results entrance" this hands off
+  // to — is itself reduced-motion-gated already.
+  const isSubmitting = createSimulation.isPending || isNavigating;
+  if (isSubmitting) {
+    return (
+      <div className="flex flex-col gap-8">
+        <p className="kicker">Calculating historical returns…</p>
+        <ResultsSkeleton />
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-12">
       <Controller
@@ -369,9 +403,11 @@ export function SimulationForm() {
         />
       ) : null}
 
-      <Button type="submit" loading={createSimulation.isPending || isNavigating} className="mt-2 self-start px-12">
-        {createSimulation.isPending || isNavigating ? 'Calculating historical returns…' : 'Run simulation'}
-      </Button>
+      <MagneticWrap className="mt-2 self-start">
+        <Button type="submit" loading={createSimulation.isPending || isNavigating} className="px-12">
+          {createSimulation.isPending || isNavigating ? 'Calculating historical returns…' : 'Run simulation'}
+        </Button>
+      </MagneticWrap>
 
       <div className="flex flex-col gap-3">
         <p className="kicker">Try an example</p>
@@ -381,7 +417,7 @@ export function SimulationForm() {
               key={preset.id}
               type="button"
               onClick={() => applyPreset(preset)}
-              className="cursor-pointer rounded-full border border-border-hairline px-3.5 py-1.5 text-xs text-ink-secondary transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)] hover:border-border-hairline-strong hover:text-ink-primary"
+              className="target-brackets cursor-pointer rounded-full border border-border-hairline px-3.5 py-1.5 text-xs text-ink-secondary transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)] hover:border-border-hairline-strong hover:text-ink-primary"
             >
               {preset.label}
             </button>

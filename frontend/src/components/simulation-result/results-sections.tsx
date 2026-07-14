@@ -9,6 +9,7 @@ import { useScramble } from '@/hooks/use-scramble';
 import { useSettleIn } from '@/hooks/use-settle-in';
 import { cn } from '@/lib/utils';
 import {
+  compareDecimalStrings,
   formatCurrency,
   formatDate,
   formatDateRange,
@@ -16,7 +17,7 @@ import {
   formatPercentage,
   isNegativeDecimalString,
 } from '@/lib/format';
-import type { SimulationResponse } from '@/types/api';
+import type { GrowthSeriesPoint, SimulationResponse } from '@/types/api';
 
 /**
  * Sections 4-7 of the Results Reading Experience (M7 Phase 3B.2, extended
@@ -239,6 +240,152 @@ export function WhyExplanation({ sim }: { sim: SimulationResponse }) {
   );
 }
 
+/**
+ * Section 6.5 — Key Takeaways (M7 Phase 3D-4, item 7). The founder's
+ * "summary/recommendation" concept, reframed with no advice in it anywhere:
+ * 3-4 deterministic, template-composed educational observations built ONLY
+ * from this simulation's own already-provided fields — never a new
+ * financial calculation. `findExtremeGrowthPoints` below SELECTS an
+ * existing data point (the series' own highest/lowest recorded value,
+ * compared via `compareDecimalStrings` — the general-purpose, string-safe
+ * DecimalString comparator, ADR-033) exactly the way `Math.max`/`Math.min`
+ * would select an element from an array; it never derives a new number
+ * (a percentage, a drawdown magnitude, a duration in years) the API didn't
+ * already return. This is a deliberately different, narrower operation than
+ * `growth-chart.tsx`'s own `toChartPlotNumber`/`findExtremePoints`, which
+ * ADR-043 scopes explicitly to chart-geometry use only — reusing that
+ * pair here, outside the chart, would step outside their own disclosed
+ * exception, so this section computes its own selection using the
+ * general-purpose comparator instead.
+ *
+ * Every sentence below is checked against two hard rules: never imperative
+ * ("you should..." is forbidden — these are observations about what
+ * already happened, not instructions) and never predictive (past tense,
+ * historical fact only; `outcomeTakeaway` and `horizonTakeaway` each say so
+ * explicitly, not just by omission). The section ends with the same
+ * standing educational-tool disclaimer line `AppFooter` carries on every
+ * page, restated here since a reader may never scroll to the footer.
+ */
+function findExtremeGrowthPoints(series: GrowthSeriesPoint[]): { high: GrowthSeriesPoint; low: GrowthSeriesPoint } | null {
+  if (series.length === 0) return null;
+  let high = series[0];
+  let low = series[0];
+  for (const point of series) {
+    if (compareDecimalStrings(point.value, high.value) === 1) high = point;
+    if (compareDecimalStrings(point.value, low.value) === -1) low = point;
+  }
+  return { high, low };
+}
+
+function rangeTakeaway(sim: SimulationResponse): string | null {
+  // eslint-disable-next-line no-restricted-syntax -- array-length comparison, not a DecimalString comparison (ADR-033).
+  if (sim.growth_series.length < 2) return null;
+  const extremes = findExtremeGrowthPoints(sim.growth_series);
+  if (!extremes) return null;
+  const { high, low } = extremes;
+  if (high.point_date === low.point_date) return null;
+  return `Along the way, this investment's own recorded value ranged from ${formatCurrency(low.value)} (on ${formatDate(low.point_date)}) to ${formatCurrency(high.value)} (on ${formatDate(high.point_date)}) — a real illustration of volatility a single final number doesn't show.`;
+}
+
+/**
+ * The "largest drawdown endured and recovery" example — phrased entirely in
+ * real, selected dollar figures and dates (never a computed drawdown
+ * percentage, which the API doesn't return and this frontend must not
+ * derive). Requires the low to be a genuine INTERIOR dip — not the first
+ * point (a monotonically rising series' own "low" is trivially just its
+ * starting price, not a dip to recover from) and not the last (nothing to
+ * recover to yet) — so this only fires for an actual "endured, then
+ * recovered" trajectory, never every gaining simulation by construction.
+ */
+function recoveryTakeaway(sim: SimulationResponse): string | null {
+  // eslint-disable-next-line no-restricted-syntax -- array-length comparison, not a DecimalString comparison (ADR-033).
+  if (sim.growth_series.length < 3 || sim.final_value === null) return null;
+  const extremes = findExtremeGrowthPoints(sim.growth_series);
+  if (!extremes) return null;
+  const { low } = extremes;
+  const firstPoint = sim.growth_series[0];
+  const lastPoint = sim.growth_series[sim.growth_series.length - 1];
+  const isGenuineRecovery =
+    low.point_date !== firstPoint.point_date &&
+    low.point_date !== lastPoint.point_date &&
+    compareDecimalStrings(sim.final_value, low.value) === 1;
+  if (!isGenuineRecovery) return null;
+  return `The lowest value recorded during this period was ${formatCurrency(low.value)} on ${formatDate(low.point_date)} — well before the window closed on ${formatDate(sim.end_date)} at ${formatCurrency(sim.final_value)}. What looked like the low point partway through was not the final word.`;
+}
+
+function dividendContributionTakeaway(sim: SimulationResponse): string | null {
+  if (!sim.include_dividends) return null;
+  return `Dividend reinvestment was enabled for this simulation — every payment ${sim.asset_symbol} made along the way automatically bought additional shares, compounding into the final value above without appearing as a separate line item.`;
+}
+
+function splitTakeaway(sim: SimulationResponse): string | null {
+  if (sim.disclosed_splits.length === 0) return null;
+  // eslint-disable-next-line no-restricted-syntax -- array-length comparison, not a DecimalString comparison (ADR-033).
+  const plural = sim.disclosed_splits.length > 1;
+  return `${sim.disclosed_splits.length} stock split${plural ? 's' : ''} occurred during this window (disclosed above) — a change in share count and price that left this investment's actual value unaffected.`;
+}
+
+/** Always available (dates only, no derived duration) — the "time-in-market" example from the section's own brief, explicitly non-predictive. */
+function horizonTakeaway(sim: SimulationResponse): string {
+  return `This result reflects one continuous holding from ${formatDate(sim.start_date)} to ${formatDate(sim.end_date)} — not an average of many possible entry points, and not a projection of what happens next.`;
+}
+
+/** Always available when a result exists — the general "one specific history, not a rule" observation, guaranteeing at least 3 takeaways even for a degenerate (single-point or empty) growth series. */
+function outcomeTakeaway(sim: SimulationResponse): string | null {
+  if (sim.final_value === null) return null;
+  return `The result above reflects one specific historical window for ${sim.asset_symbol} — a different start or end date in this same asset's real history can show a very different outcome. This simulation is a record of what happened once, not a general expectation.`;
+}
+
+/**
+ * Fixed priority order, first four that apply — deterministic for identical
+ * inputs (Founder Decision 013 §6's determinism principle, extended here to
+ * generated text, not just motion/timing).
+ */
+function buildKeyTakeaways(sim: SimulationResponse): string[] {
+  const candidates = [
+    horizonTakeaway(sim),
+    rangeTakeaway(sim),
+    recoveryTakeaway(sim),
+    dividendContributionTakeaway(sim),
+    splitTakeaway(sim),
+    outcomeTakeaway(sim),
+  ];
+  return candidates.filter((takeaway): takeaway is string => takeaway !== null).slice(0, 4);
+}
+
+export function KeyTakeaways({ sim }: { sim: SimulationResponse }) {
+  const reducedMotion = useReducedMotion();
+  const settled = useSettleIn(!reducedMotion);
+  const takeaways = buildKeyTakeaways(sim);
+
+  if (takeaways.length === 0) return null;
+
+  return (
+    <section
+      aria-label="Key takeaways"
+      className={cn(
+        'flex flex-col gap-6 transition delay-100 duration-[var(--duration-transition)] ease-in',
+        settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      )}
+    >
+      <SectionKicker>Key takeaways</SectionKicker>
+      <ul className="flex max-w-prose flex-col gap-3 text-[15.5px] leading-relaxed text-ink-secondary">
+        {takeaways.map((takeaway) => (
+          <li key={takeaway} className="flex gap-2">
+            <span aria-hidden className="text-ink-muted">
+              —
+            </span>
+            <span>{takeaway}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="max-w-prose text-xs text-ink-muted">
+        Investment Time Machine is an educational tool — not financial advice.
+      </p>
+    </section>
+  );
+}
+
 /** Provenance's "Data source" line — fetched lazily, only once the disclosure is actually opened (see `useAssetDetail`'s own doc comment). */
 function DataSourceLine({ symbol, enabled }: { symbol: string; enabled: boolean }) {
   const { data, isPending, isError } = useAssetDetail(symbol, enabled);
@@ -390,12 +537,10 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Methodology</h3>
             <p className="max-w-prose">
-              This simulation uses each trading day&rsquo;s actual closing price (
-              <code className="figure">close_price</code>), never an adjusted-close estimate. Reinvested dividends
-              buy additional shares at that day&rsquo;s closing price, compounding on shares already held. Stock
-              splits are disclosed for context but need no separate adjustment — the stored price series is already
-              split-consistent. Annual return (CAGR) uses a fixed 365.25-day year, a deliberate, documented choice
-              where the underlying specification states none.
+              Uses each day&rsquo;s closing price (<code className="figure">close_price</code>), never adjusted-close.
+              Dividends reinvest at that day&rsquo;s close, compounding shares held. Splits are disclosed but not
+              adjusted for — the price series is already split-consistent. CAGR uses a fixed 365.25-day year — a
+              documented choice, since the specification is silent.
             </p>
             <p className="max-w-prose text-xs text-ink-muted">How each figure is computed:</p>
             <FormulaList />
@@ -404,10 +549,9 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Assumptions</h3>
             <p className="max-w-prose">
-              An exact closing price is required on both the start and end date — a weekend or holiday date is never
-              shifted. Dividends are counted once each, on their ex-dividend date, in order. When inflation
-              adjustment is requested, the calculation uses the most recent CPI reading on or before each date
-              needed, never an interpolated value.
+              An exact closing price is required on the start and end date — a weekend or holiday is never shifted.
+              Dividends are counted once, on their ex-dividend date, in order. Inflation adjustment (when requested)
+              uses the most recent CPI reading on or before each date — never interpolated.
             </p>
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>

@@ -85,12 +85,36 @@
   --breakpoint-lg: 90rem; /* 1440px */
 }
 
+html {
+  background: var(--color-elevated-bg-light);
+}
+
 body {
-  background: var(--color-background);
+  background: var(--color-elevated-bg-light);
   color: var(--color-ink-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* No overscroll bounce on the one axis that would otherwise reveal
+     whatever's painted behind body (M7 Phase 3D-4, item 2) — belt-and-
+     suspenders alongside the html/body background match right above:
+     browsers that honor this (Chromium, Firefox) never show a bounce at
+     all; browsers that still rubber-band regardless (Safari) fall back to
+     the matched background color instead of a mismatched one. Horizontal
+     overscroll is left at its default (`auto`) — nothing on this page
+     scrolls horizontally to begin with. */
+  overscroll-behavior-y: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) html,
+  :root:not([data-theme='light']) body {
+    background: var(--color-elevated-bg-dark);
+  }
+}
+:root[data-theme='dark'] html,
+:root[data-theme='dark'] body {
+  background: var(--color-elevated-bg-dark);
 }
 
 /*
@@ -467,6 +491,117 @@ input:-webkit-autofill:focus {
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.1s ease-in-out 2;
+}
+
+/*
+ * M7 Phase 3D-4, item 11 — the primary button's light sweep. Rest state: a
+ * faint, STATIC gradient border (FD-018 rule 4 permits a static treatment;
+ * only a looping animation is banned) — `--color-accent` is already this
+ * codebase's literal gold/amber hue (ADR-044), so "gold gradient sweep"
+ * needs no new color. Hover: a one-shot gradient pass, ~600ms, ease-out.
+ *
+ * CSS-only, no JS state: `:hover` naturally restarts a keyframe animation
+ * every time it's re-applied (removed on mouse-leave along with `:hover`
+ * itself, freshly re-triggered on the next hover-enter) — "once per
+ * hover-enter" falls out of the selector alone, nothing to track. Reduced
+ * motion needs no separate branch — the file's existing global
+ * `@media (prefers-reduced-motion: reduce)` override (above) already
+ * collapses every `animation-duration` to ~0.01ms, the same mechanism
+ * `.skeleton-shimmer`/`.rise-fade-in`/`.typewriter-cursor` already rely on.
+ * `mix-blend-mode: overlay` at a moderate opacity, rather than a full
+ * z-index-managed layer above the button's own text — the sweep is a thin,
+ * diagonal, ~600ms-transient highlight, and this is the same visual
+ * trade-off most production "shine" button effects make, not a legibility
+ * regression in practice.
+ */
+.btn-sweep {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--color-accent) 30%, transparent);
+}
+.btn-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  mix-blend-mode: overlay;
+  opacity: 0.55;
+  background-image: linear-gradient(
+    115deg,
+    transparent 35%,
+    var(--color-accent) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  pointer-events: none;
+}
+.btn-sweep:hover::after {
+  animation: btn-sweep-pass 600ms ease-out;
+}
+@keyframes btn-sweep-pass {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+/*
+ * M7 Phase 3D-4, item 12 — target brackets. Four corner marks fade/scale in
+ * (150ms, accent tone) around an example-simulation row or chip on
+ * hover/focus, a "viewfinder lock" affordance. CSS-only: eight background
+ * gradients (a horizontal + vertical short bar per corner, forming an "L")
+ * on one pseudo-element positioned `inset: -6px` (slightly outside the
+ * element, "around" it, never overlapping its own content). No custom
+ * cursor anywhere — the system cursor is untouched; this is a static
+ * decorative mark, not a cursor replacement. Reduced motion needs no
+ * separate branch — the fade/scale transition is a plain CSS `transition`,
+ * already collapsed to ~0.01ms by this file's existing global
+ * `prefers-reduced-motion` override, so the brackets still appear on
+ * hover/focus (a real, still-available state change), just without the
+ * animated fade/scale-in.
+ */
+.target-brackets {
+  position: relative;
+}
+.target-brackets::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
+  background-repeat: no-repeat;
+  background-size: 10px 10px;
+  background-position:
+    top left,
+    top left,
+    top right,
+    top right,
+    bottom left,
+    bottom left,
+    bottom right,
+    bottom right;
+  background-image: linear-gradient(to bottom, var(--color-accent) 2px, transparent 2px),
+    linear-gradient(to right, var(--color-accent) 2px, transparent 2px),
+    linear-gradient(to bottom, var(--color-accent) 2px, transparent 2px),
+    linear-gradient(to left, var(--color-accent) 2px, transparent 2px),
+    linear-gradient(to top, var(--color-accent) 2px, transparent 2px),
+    linear-gradient(to right, var(--color-accent) 2px, transparent 2px),
+    linear-gradient(to top, var(--color-accent) 2px, transparent 2px),
+    linear-gradient(to left, var(--color-accent) 2px, transparent 2px);
+}
+.target-brackets:hover::before,
+.target-brackets:focus-visible::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
 /*

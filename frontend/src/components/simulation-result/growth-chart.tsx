@@ -96,7 +96,7 @@ const MAX_DRAWN_POINTS = 175;
  * chart regardless of its actual values. */
 const ENDPOINT_LABEL_FLIP_THRESHOLD = 10;
 
-interface PlotPoint {
+export interface PlotPoint {
   point_date: string;
   plotValue: number;
   rawValue: DecimalString;
@@ -201,6 +201,55 @@ function formatMonthYear(isoDate: string): string {
 function daysBetween(isoDateA: string, isoDateB: string): number {
   const msPerDay = 86_400_000;
   return Math.abs(new Date(`${isoDateA}T00:00:00Z`).getTime() - new Date(`${isoDateB}T00:00:00Z`).getTime()) / msPerDay;
+}
+
+/**
+ * M7 Phase 3D-4, item 4 — the high/low markers' own existing collision
+ * guard (`isFarEnoughFromEndpointAndStart`, below) only checks each marker
+ * against the endpoint and the series' start; it never checked the two
+ * markers against EACH OTHER. The high marker's label sits ABOVE its point
+ * (`position: 'top'`) and the low marker's sits BELOW its point
+ * (`position: 'bottom'`) — since high is, by construction, plotted higher
+ * on the Y axis than low, their labels normally point AWAY from each other
+ * and date (X) proximity alone doesn't cause a collision (a first attempt
+ * at this fix used date proximity alone and broke a live case: a high/low
+ * pair 10 days apart but $1,000 apart in value on a $460–$1,620 domain never
+ * visually collides — the labels sit in entirely different vertical bands).
+ * The real collision case is the opposite: a low-volatility run where the
+ * high and low values themselves are close enough that both points land in
+ * nearly the same Y band, so their oppositely-pointing labels still
+ * overlap. Compared against a fraction of the chart's own PLOTTED domain
+ * span (`yAxisDomainMax - yAxisDomainMin`, the actual pixel-mapped range,
+ * including the invested-baseline padding) — never a fraction of
+ * `high.plotValue - low.plotValue` itself, which (since high and low ARE
+ * that gap's own endpoints) can never usefully fire.
+ */
+const MUTUAL_MARKER_VALUE_GUARD_FRACTION = 0.15;
+
+export function markersTooCloseByValue(a: PlotPoint, b: PlotPoint, domainSpan: number): boolean {
+  // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only (number) comparison of toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
+  return Math.abs(a.plotValue - b.plotValue) < domainSpan * MUTUAL_MARKER_VALUE_GUARD_FRACTION;
+}
+
+/**
+ * M7 Phase 3D-4, item 4 — the Y-axis's `width` was a single fixed 68px,
+ * sized for a typical 4-6-digit dollar figure. A $1,000,000+ portfolio
+ * value formats to 7+ digits (`formatAxisTick`: "$1,234,567"), which at the
+ * axis's own 11px mono tick font clips against the plot area at that fixed
+ * width. Measures the longest tick label THIS chart will actually draw
+ * (its own padded domain's max/min, run through the same `formatAxisTick`
+ * the axis itself uses) rather than guessing a larger constant that would
+ * over-reserve space for every smaller chart.
+ */
+const AXIS_TICK_CHAR_WIDTH_PX = 6.6; // ~IBM Plex Mono at 11px
+const AXIS_TICK_WIDTH_PADDING_PX = 16;
+const AXIS_TICK_MIN_WIDTH_PX = 56;
+const AXIS_TICK_MAX_WIDTH_PX = 108;
+
+export function computeYAxisWidth(paddedDomainMin: number, paddedDomainMax: number): number {
+  const longest = Math.max(formatAxisTick(paddedDomainMin).length, formatAxisTick(paddedDomainMax).length);
+  const measured = longest * AXIS_TICK_CHAR_WIDTH_PX + AXIS_TICK_WIDTH_PADDING_PX;
+  return Math.min(AXIS_TICK_MAX_WIDTH_PX, Math.max(AXIS_TICK_MIN_WIDTH_PX, Math.round(measured)));
 }
 
 /**
@@ -393,9 +442,26 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
     const farFromEndpointByValue = Math.abs(point.plotValue - last.plotValue) > valueGuard;
     return farFromEndpointByDate && farFromStartByDate && farFromEndpointByValue;
   }
-  const showHighMarker = isFarEnoughFromEndpointAndStart(high);
-  const showLowMarker = isFarEnoughFromEndpointAndStart(low);
+  // The padded plot domain — computed here (rather than only inline on
+  // <YAxis> below) so both the Y-axis width measurement AND the high/low
+  // mutual-collision check (item 4) share the exact one domain calculation,
+  // never two that could silently drift apart.
+  const yAxisDomainMin = Math.floor(Math.min(low.plotValue, investedPlotValue) * 0.92);
+  const yAxisDomainMax = Math.ceil(Math.max(high.plotValue, investedPlotValue) * 1.08);
+  const yAxisWidth = computeYAxisWidth(yAxisDomainMin, yAxisDomainMax);
 
+  // Item 4 — mutual collision: if the high and low markers would land close
+  // enough to each other in VALUE to visually collide, only the
+  // earlier-dated one is kept (a deterministic, disclosed tie-break,
+  // matching findExtremePoints' own "earliest date wins" convention above)
+  // — never both, and never a silent stacked-label overlap.
+  const highLowCollide = markersTooCloseByValue(high, low, yAxisDomainMax - yAxisDomainMin);
+  // eslint-disable-next-line no-restricted-syntax -- fixed-width ISO date-string comparison, not a DecimalString comparison (ADR-033).
+  const earlierOfHighLow = high.point_date <= low.point_date ? 'high' : 'low';
+  const showHighMarker =
+    isFarEnoughFromEndpointAndStart(high) && (!highLowCollide || earlierOfHighLow === 'high');
+  const showLowMarker =
+    isFarEnoughFromEndpointAndStart(low) && (!highLowCollide || earlierOfHighLow === 'low');
   return (
     <div
       className={cn(
@@ -466,7 +532,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
               axisLine={false}
               tickLine={false}
               tickCount={4}
-              width={68}
+              width={yAxisWidth}
               tick={{ fontSize: 11, fill: 'var(--color-ink-muted)', fontFamily: 'var(--font-mono)' }}
               tickFormatter={formatAxisTick}
               domain={[

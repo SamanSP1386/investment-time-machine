@@ -1,7 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { GrowthOverTime, SupportingFacts, TheProof, WhyExplanation } from '@/components/simulation-result/results-sections';
+import {
+  GrowthOverTime,
+  KeyTakeaways,
+  SupportingFacts,
+  TheProof,
+  WhyExplanation,
+} from '@/components/simulation-result/results-sections';
 import type { SimulationResponse } from '@/types/api';
+
+type Series = SimulationResponse['growth_series'];
+
+function seriesFrom(values: string[], startDate = '2020-01-01'): Series {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  return values.map((value, i) => {
+    const d = new Date(start);
+    d.setUTCDate(d.getUTCDate() + i);
+    return { point_date: d.toISOString().slice(0, 10), value: value as Series[number]['value'] };
+  });
+}
 
 vi.mock('@/hooks/use-asset-detail', () => ({
   useAssetDetail: vi.fn(() => ({ data: undefined, isPending: true, isError: false })),
@@ -189,7 +206,7 @@ describe('TheProof', () => {
     const trigger = screen.getByRole('button', { name: 'The Proof — methodology & data' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     // Never hidden — the methodology text is already in the DOM, just collapsed.
-    expect(screen.getByText(/never an adjusted-close estimate/)).toBeInTheDocument();
+    expect(screen.getByText(/never adjusted-close/)).toBeInTheDocument();
   });
 
   it('item 5a: leads with "In plain terms" — a non-technical, personalized summary', () => {
@@ -207,7 +224,7 @@ describe('TheProof', () => {
 
   it('explains methodology: close_price policy and the 365.25-day CAGR convention, sourced from simulation_formulas.md', () => {
     render(<TheProof sim={BASE_SIM} />);
-    expect(screen.getByText(/never an adjusted-close estimate/)).toBeInTheDocument();
+    expect(screen.getByText(/never adjusted-close/)).toBeInTheDocument();
     expect(screen.getByText(/365\.25-day year/)).toBeInTheDocument();
   });
 
@@ -220,7 +237,7 @@ describe('TheProof', () => {
 
   it('states assumptions: exact-date prices, dividend timing, and the CPI as-of lookup', () => {
     render(<TheProof sim={BASE_SIM} />);
-    expect(screen.getByText(/a weekend or holiday date is never shifted/)).toBeInTheDocument();
+    expect(screen.getByText(/a weekend or holiday is never shifted/)).toBeInTheDocument();
     expect(screen.getByText(/on their ex-dividend date, in order/)).toBeInTheDocument();
     expect(screen.getByText(/most recent CPI reading on or before/)).toBeInTheDocument();
   });
@@ -270,5 +287,97 @@ describe('TheProof', () => {
     render(<TheProof sim={{ ...BASE_SIM, growth_series: [] }} />);
     expect(screen.getByText('No growth-series data is available for this simulation.')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+});
+
+describe('KeyTakeaways (M7 Phase 3D-4, item 7)', () => {
+  it('always includes the non-predictive time-horizon observation and the standing educational disclaimer', () => {
+    render(<KeyTakeaways sim={BASE_SIM} />);
+    expect(
+      screen.getByText(/one continuous holding from Jan 1, 2015 to Jan 1, 2025.*not a projection of what happens next/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Investment Time Machine is an educational tool — not financial advice.')
+    ).toBeInTheDocument();
+  });
+
+  it('renders 3-4 deterministic bullets for a typical varied series, never fewer than 3', () => {
+    render(
+      <KeyTakeaways
+        sim={{ ...BASE_SIM, growth_series: seriesFrom(['1000.00000000', '1200.00000000', '900.00000000', '2500.00000000']) }}
+      />
+    );
+    expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByRole('listitem').length).toBeLessThanOrEqual(4);
+  });
+
+  it('describes the real recorded range using selected (not calculated) high/low points', () => {
+    render(
+      <KeyTakeaways
+        sim={{ ...BASE_SIM, growth_series: seriesFrom(['1000.00000000', '1200.00000000', '900.00000000', '2500.00000000']) }}
+      />
+    );
+    expect(screen.getByText(/ranged from \$900\.00 \(on Jan 3, 2020\) to \$2,500\.00 \(on Jan 4, 2020\)/)).toBeInTheDocument();
+  });
+
+  it('describes a genuine interior drawdown and recovery in dollar terms, never as a computed percentage', () => {
+    render(
+      <KeyTakeaways
+        sim={{
+          ...BASE_SIM,
+          growth_series: seriesFrom(['1000.00000000', '700.00000000', '1300.00000000']),
+          end_date: '2020-01-03',
+        }}
+      />
+    );
+    const recovery = screen.getByText(/lowest value recorded during this period was \$700\.00/);
+    expect(recovery.textContent).not.toMatch(/%/);
+    expect(recovery.textContent).toMatch(/was not the final word/);
+  });
+
+  it('never claims a recovery for a monotonically rising series — the "low" is just the starting price, not a dip', () => {
+    render(
+      <KeyTakeaways
+        sim={{ ...BASE_SIM, growth_series: seriesFrom(['1000.00000000', '1500.00000000', '2500.00000000']) }}
+      />
+    );
+    expect(screen.queryByText(/was not the final word/)).not.toBeInTheDocument();
+  });
+
+  it('includes a dividend-contribution observation only when dividends were actually reinvested', () => {
+    const { rerender } = render(<KeyTakeaways sim={{ ...BASE_SIM, include_dividends: false }} />);
+    expect(screen.queryByText(/Dividend reinvestment was enabled/)).not.toBeInTheDocument();
+
+    rerender(<KeyTakeaways sim={{ ...BASE_SIM, include_dividends: true }} />);
+    expect(screen.getByText(/Dividend reinvestment was enabled for this simulation/)).toBeInTheDocument();
+  });
+
+  it('includes a split observation only when a split was actually disclosed, pluralized correctly', () => {
+    const splits: SimulationResponse['disclosed_splits'] = [
+      { split_date: '2020-06-01', split_ratio: '4.000000' as SimulationResponse['disclosed_splits'][number]['split_ratio'] },
+    ];
+    render(<KeyTakeaways sim={{ ...BASE_SIM, disclosed_splits: splits }} />);
+    expect(screen.getByText(/1 stock split occurred during this window/)).toBeInTheDocument();
+  });
+
+  it('never uses imperative "you should" advice language anywhere in the rendered bullets', () => {
+    render(
+      <KeyTakeaways
+        sim={{
+          ...BASE_SIM,
+          include_dividends: true,
+          growth_series: seriesFrom(['1000.00000000', '700.00000000', '1300.00000000', '2500.00000000']),
+        }}
+      />
+    );
+    const list = screen.getByRole('list');
+    expect(list.textContent).not.toMatch(/you should/i);
+    expect(list.textContent).not.toMatch(/\byou need to\b/i);
+  });
+
+  it('degrades honestly (never crashes, never fabricates) to just the always-available time-horizon bullet for a degenerate empty series with no final value', () => {
+    render(<KeyTakeaways sim={{ ...BASE_SIM, final_value: null, growth_series: [] }} />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByText(/one continuous holding from/)).toBeInTheDocument();
   });
 });

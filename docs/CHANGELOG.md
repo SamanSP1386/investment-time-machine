@@ -4,6 +4,57 @@ Semantic version history. Never rewrite history — new entries only. See [.clau
 
 ---
 
+## [0.18.1] — 2026-07-14 — M7 Phase 3D-4 (continued): Items 10-14, KI-051 Closed
+
+### Added
+- **Magnetic primary CTAs** (item 10) — a subtle, `requestAnimationFrame`-lerped pull (≤6px, ~80px proximity radius, ease-out return) on the Simulator's "Run simulation" button and the Landing page's primary CTA only. `frontend/src/hooks/use-magnetic.ts`, `frontend/src/components/ui/magnetic-wrap.tsx`. Disabled for touch and `prefers-reduced-motion`.
+- **Button light sweep** (item 11) — a faint static gradient border at rest plus a one-shot ~600ms gold/accent gradient sweep on hover (CSS-only, `:hover`-triggered), applied to the `primary` button variant app-wide. `.btn-sweep`, `frontend/src/app/globals.css`.
+- **Target brackets** (item 12) — four corner marks fade/scale in (150ms, accent tone) on hover/focus of the Landing page's example rows and the Simulator's example chips. CSS-only, no cursor change. `.target-brackets`, `frontend/src/app/globals.css`.
+
+### Changed
+- **Navbar elevation refinements** (item 13) — hairline strengthened; nav links gained an underline-draw hover/focus affordance (permanently drawn for the active route); the header gained a structural `flex-wrap` mobile-overlap safety net plus a responsive wordmark size and nav gap. `frontend/src/components/shell/app-header.tsx`.
+- `frontend/src/components/landing/example-simulations-list.tsx` — its local `useCoarsePointer` extracted into a shared `frontend/src/hooks/use-coarse-pointer.ts` (a second call site, item 10's magnetic hooks, now needs the identical check).
+
+### Fixed
+- **Responsive pass** (item 14) — a systematic code-level review at 375/768/1440px found and fixed one real risk: the header wordmark could collide with the (now two-link) nav at narrow mobile widths (closed by item 13's `flex-wrap` safety net). No other clearly-broken layout found in the review.
+
+### Known gaps (disclosed, not fixed this pass)
+- No browser-automation/screenshot tool was available — item 14 is a reasoned code-level review, not a literal pixel-verified sweep. Disclosed explicitly, matching this project's established precedent for the same gap.
+- `use-typewriter.test.ts` (pre-existing, unrelated to this pass) intermittently failed under full-suite load but passed cleanly in isolation every time — a timing flake, not a regression; not fixed here.
+
+### Tests
+- Frontend: 53/53 test files passing (320 tests, 4 pre-existing skips), `eslint .` clean, `tsc --noEmit` clean, `next build` clean. New tests: `use-magnetic.test.ts`, `magnetic-wrap.test.tsx`, `app-header.test.tsx` (all new); updated assertions in `button.test.tsx`, `example-simulations-list.test.tsx`, `simulation-form.test.tsx`. Items 11/12's CSS-only rules confirmed present in the compiled production stylesheet.
+- See `docs/KNOWN_ISSUES.md` KI-051 (now Resolved) and `docs/FOUNDER_DECISIONS.md` FD-018.3 for the full record.
+
+---
+
+## [0.18.0] — 2026-07-14 — M7 Phase 3D-4: Pre-Deploy Polish Campaign (Items 1-9)
+
+### Added
+- **Asset browse mode** (item 1) — focusing/clicking the empty asset field opens the full catalog, grouped Stocks/ETFs/Crypto (demo assets last per group), instead of an empty popup; typing still filters as before. Full ARIA combobox/keyboard behavior unchanged. `frontend/src/components/simulator/asset-search-combobox.tsx`.
+- **Simulator→Results loading interstitial** (item 3) — a single, atmosphere-consistent loading state (status line + `ResultsSkeleton`, extracted to `frontend/src/components/simulation-result/results-skeleton.tsx`) shown only while `POST /api/v1/simulations` is genuinely in flight, replacing the previous two-stage (button spinner, then a second results-page skeleton from a redundant re-fetch) sequence. `useCreateSimulation` now seeds the Results query cache with the mutation's own response.
+- **Key Takeaways section** (item 7) — a new `KeyTakeaways` component (`results-sections.tsx`) after Why: 3-4 deterministic, template-composed educational observations (recorded range, a genuine interior drawdown-and-recovery, dividend contribution, split disclosure, an always-present non-predictive time-horizon/outcome statement), built only from already-provided `SimulationResponse` fields — no new financial calculation. Includes the standing educational disclaimer.
+- **`/about` page** (item 8) — builder's story (clearly-marked placeholder pending founder copy), product principles (sourced from `docs/EXPERIENCE_CONSTITUTION.md`), and the full disclaimer. Linked from the nav.
+- **Gradual edge blur** (item 9) — a static, masked backdrop-blur melt beneath the sticky header, and a static bottom-edge fade on scrollable pages. Non-animated; no new dependency.
+
+### Fixed
+- **Overscroll/atmosphere background mismatch** (item 2) — `html`/`body` now share the same theme-matched elevated background the page atmosphere uses (previously the pre-M7-Phase-3D base palette), plus `overscroll-behavior-y: none`, so scrolling past either edge no longer reveals a mismatched color. `frontend/src/app/globals.css`.
+- **`not-found`/`error` pages missing the product shell** (item 5) — both previously rendered as bare, unwrapped divs with no header, footer, or atmosphere; now wrapped in `ProductShell` like every other real route. `global-error.tsx` intentionally left as-is (documented reason: the root crash boundary cannot depend on the token/provider system).
+- **Growth Chart high/low marker mutual collision** (item 4) — the existing endpoint/start collision guard never checked the two markers against each other; a low-volatility, short-range oscillation could overlap. New `markersTooCloseByValue` (domain-span-relative) closes the gap.
+- **Growth Chart Y-axis clipping on $1M+ values** (item 4) — the Y-axis's fixed 68px width could clip a 7-digit dollar tick label; `computeYAxisWidth` now measures the actual longest tick from the chart's own domain, clamped `[56px, 108px]`.
+
+### Changed
+- **The Proof's Methodology tightened** (item 6) — cut ~34% (65→43 words), every fact preserved including the "documented choice, not merely unspecified" nuance around the 365.25-day CAGR convention. Assumptions lightly tightened alongside it.
+
+### Known gaps (disclosed, not fixed this pass)
+- **KI-051 (new)**: items 10-14 of this pass's original 14-item brief (magnetic primary CTAs, a one-shot button light sweep, target-bracket hover/focus states, the remainder of navbar-elevation refinement, and a full 375/768/1440px responsive verification pass) were explicitly triaged out per the pass's own priority rule (cut 12-14 first, then 8-11) and the remaining session budget after items 1-7 (each mandatory item shipped with real test coverage, not a shallow touch). Tracked in `docs/KNOWN_ISSUES.md`.
+- No browser-automation/screenshot tool was available in this environment — every claim in this release is backed by the automated test suite, static analysis, and (for item 9's CSS-only change) direct inspection of the compiled production stylesheet, never a literal browser observation. Disclosed explicitly, matching this project's own established precedent for the same gap (see the 0.17.1 entry above).
+
+### Tests
+- Frontend: 50/50 test files passing (305 tests, 4 pre-existing skips), `eslint .` clean, `tsc --noEmit` clean, `next build` clean (Turbopack). New/updated tests for every shipped item — see `docs/DEVLOG.md`'s 2026-07-14 entry for the full breakdown, including two self-caught-and-fixed defects (a false-positive chart-collision heuristic and a false "recovery" narrative on a plain uptrend) that this pass's own new tests caught before shipping.
+
+---
+
 ## [0.17.1] — 2026-07-13 — KI-050 Resolution: Percentage Column Overflow
 
 ### Fixed

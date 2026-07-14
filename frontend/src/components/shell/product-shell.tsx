@@ -62,6 +62,23 @@ export function ProductShell({
       <AppHeader maxWidthClassName={extractMaxWidthClass(contentClassName)} />
       <main className={cn('mx-auto w-full flex-1', contentClassName)}>{children}</main>
       <AppFooter calculationVersion={calculationVersion} />
+      {/*
+       * M7 Phase 3D-4, item 9 — a subtle bottom-edge fade, the counterpart
+       * to `AppHeader`'s own top melt: a static, fixed, viewport-anchored
+       * strip signaling "more page below" while scrolling a long page
+       * (Results especially). `position: fixed` (not `sticky`) since it has
+       * no in-flow height of its own to reserve — it's a pure visual
+       * overlay, `pointer-events-none` so it never blocks a click on real
+       * content or the footer beneath it. A plain gradient (not a
+       * `backdrop-filter`) — a blurred fixed strip pinned above the
+       * ordinary, already-legible footer text would fight its own
+       * readability for no benefit a plain fade doesn't already provide.
+       * Static, non-animated (FD-018 rule 4).
+       */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[var(--z-sticky)] h-14 [background-image:linear-gradient(to_top,var(--color-background)_0%,transparent_100%)]"
+      />
     </div>
   );
 }
