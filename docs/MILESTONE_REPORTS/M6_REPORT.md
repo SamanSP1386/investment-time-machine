@@ -8,7 +8,7 @@ Self-contained — readable from the repository alone (`.claude/`, `docs/`, `bac
 
 ---
 
-## Objective()
+## Objective()()()()
 
 Implement the Educational AI System — renamed from "AI Analyst" to "Educational AI System" per direct founder instruction — comprising an **Explanation Engine** (structured educational explanations for completed simulations) and a **Financial Tutor** (scoped follow-up Q&A), per Founder Decision 003 (`docs/FOUNDER_DECISIONS.md`), which resolved every Founder Specification silence on provider selection, AI input scope, privacy boundaries, caching/cost control, and integrity validation. Core philosophy, stated as the operative test for every implementation decision: **"The Simulation Engine calculates. The AI teaches."** Frontend, portfolio simulation, advanced analytics, RAG, and a Historical Event Database are explicitly excluded from this milestone; the Simulation Engine is not modified in any way.
 
