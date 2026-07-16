@@ -41,8 +41,8 @@ describe('MagneticWrap (M7 Phase 3D-4, item 10)', () => {
     expect(wrapper?.style.getPropertyValue('--magnetic-x')).toBe('');
   });
 
-  it('is disabled on a coarse (touch) pointer device', () => {
-    setMatchMedia({ '(pointer: coarse)': true });
+  it('is disabled on a coarse (touch-only) pointer device — no fine pointer available at all', () => {
+    setMatchMedia({ '(any-pointer: coarse)': true, '(any-pointer: fine)': false });
     const { container } = render(
       <MagneticWrap>
         <button type="button">Run a simulation</button>

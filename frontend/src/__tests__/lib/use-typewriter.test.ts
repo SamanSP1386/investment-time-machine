@@ -1,18 +1,44 @@
-import { describe, expect, it } from 'vitest';
-import { waitFor, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
 import { useTypewriter } from '@/hooks/use-typewriter';
 
 const TEXT = 'If you had invested — what would it be worth today?';
 
+/**
+ * Fully deterministic via fake timers (3D-4 deflake): the hook's timeline is
+ * `requestAnimationFrame` + `performance.now()` + one `setTimeout`, so all
+ * three are faked and advanced explicitly. The previous real-timer version
+ * raced 20-60ms animation windows against wall-clock `waitFor`/`setTimeout`
+ * polling and reddened CI under load.
+ */
+beforeEach(() => {
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance'],
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** Advance the fake clock frame-by-frame so every scheduled rAF actually fires. */
+function advanceFrames(count: number, frameMs = 16) {
+  for (let i = 0; i < count; i += 1) {
+    act(() => {
+      vi.advanceTimersByTime(frameMs);
+    });
+  }
+}
+
 describe('useTypewriter', () => {
-  it('reduced motion (active=false): renders the full text instantly, with no cursor, on the very first render', async () => {
+  it('reduced motion (active=false): renders the full text instantly, with no cursor, on the very first render', () => {
     const { result } = renderHook(() => useTypewriter(TEXT, false, { duration: 30, cursorBlinkMs: 10 }));
 
     expect(result.current.text).toBe(TEXT);
     expect(result.current.showCursor).toBe(false);
 
-    // Waiting past what would have been the animation's duration changes nothing.
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    // Advancing far past what would have been the animation changes nothing.
+    advanceFrames(10);
     expect(result.current.text).toBe(TEXT);
     expect(result.current.showCursor).toBe(false);
   });
@@ -23,33 +49,43 @@ describe('useTypewriter', () => {
     expect(result.current.showCursor).toBe(true);
   });
 
-  it('active: reveals the text forward-only and settles on the exact full string, once', async () => {
-    const seenLengths: number[] = [];
-    const { result } = renderHook(() => useTypewriter(TEXT, true, { duration: 40, cursorBlinkMs: 10 }));
+  it('active: reveals the text forward-only and settles on the exact full string, once', () => {
+    const { result } = renderHook(() => useTypewriter(TEXT, true, { duration: 160, cursorBlinkMs: 10 }));
 
-    await waitFor(() => expect(result.current.text).toBe(TEXT));
+    let previousLength = 0;
+    for (let frame = 0; frame < 15; frame += 1) {
+      advanceFrames(1);
+      const { text } = result.current;
+      // Forward-only: never deletes, always a prefix of the final string.
+      expect(TEXT.startsWith(text)).toBe(true);
+      expect(text.length).toBeGreaterThanOrEqual(previousLength);
+      previousLength = text.length;
+    }
 
-    // Never deletes: a manual poll across the animation would show a
-    // monotonically non-decreasing length — spot-checked here by re-running
-    // with a slightly longer duration and sampling mid-flight.
-    const { result: midResult } = renderHook(() => useTypewriter(TEXT, true, { duration: 300, cursorBlinkMs: 10 }));
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    seenLengths.push(midResult.current.text.length);
-    expect(TEXT.startsWith(midResult.current.text)).toBe(true);
-    expect(seenLengths[0]).toBeLessThanOrEqual(TEXT.length);
+    expect(result.current.text).toBe(TEXT);
+
+    // Settled: further frames never change the revealed text.
+    advanceFrames(5);
+    expect(result.current.text).toBe(TEXT);
   });
 
-  it('active: the cursor blinks (stays present) immediately after typing completes, then hides permanently', async () => {
-    const { result } = renderHook(() => useTypewriter(TEXT, true, { duration: 20, cursorBlinkMs: 15 }));
+  it('active: the cursor blinks (stays present) immediately after typing completes, then hides permanently', () => {
+    const { result } = renderHook(() => useTypewriter(TEXT, true, { duration: 32, cursorBlinkMs: 100 }));
 
-    await waitFor(() => expect(result.current.text).toBe(TEXT));
+    // Typing completes within a few frames; the cursor must still be showing.
+    advanceFrames(4);
+    expect(result.current.text).toBe(TEXT);
     expect(result.current.showCursor).toBe(true);
 
-    await waitFor(() => expect(result.current.showCursor).toBe(false), { timeout: 1000 });
+    // CURSOR_BLINKS (2) x cursorBlinkMs after completion, it hides for good.
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current.showCursor).toBe(false);
     expect(result.current.text).toBe(TEXT);
 
     // Stays hidden — never reappears, never restarts.
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    advanceFrames(10);
     expect(result.current.showCursor).toBe(false);
     expect(result.current.text).toBe(TEXT);
   });

@@ -21,6 +21,15 @@ import { cn } from '@/lib/utils';
  * `self-start` only does anything on a direct flex/grid item, so it has to
  * move to whichever element is actually that item once a wrapper is
  * introduced.
+ *
+ * `w-fit` is load-bearing, not cosmetic (3D-4 reality-gap fix): as a direct
+ * item of a column flex container (the Landing hero), a plain `inline-block`
+ * span is cross-axis-STRETCHED to the full column width, so `useMagnetic` —
+ * which measures THIS wrapper's rect — centered its 80px pull radius on the
+ * middle of an 780px row of mostly empty space, and hovering the actual
+ * button (radially ~200px from that center) produced no pull at all.
+ * `fit-content` opts the wrapper out of flex stretching everywhere, so the
+ * measured rect is always the wrapped control's own.
  */
 export function MagneticWrap({ children, className }: { children: ReactNode; className?: string }) {
   const reducedMotion = useReducedMotion();
@@ -31,7 +40,7 @@ export function MagneticWrap({ children, className }: { children: ReactNode; cla
   return (
     <span
       ref={ref}
-      className={cn('inline-block [transform:translate(var(--magnetic-x,0px),var(--magnetic-y,0px))]', className)}
+      className={cn('inline-block w-fit [transform:translate(var(--magnetic-x,0px),var(--magnetic-y,0px))]', className)}
     >
       {children}
     </span>

@@ -35,7 +35,20 @@ export function AppHeader({ maxWidthClassName = 'max-w-[1200px]' }: { maxWidthCl
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border-hairline-strong bg-background/85 backdrop-blur-md">
+    <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border-hairline-strong">
+      {/*
+       * The bar's own translucent blur backdrop lives on this dedicated
+       * layer, NOT on the <header> element (3D-4 reality-gap fix): an
+       * element with `backdrop-filter` becomes a "backdrop root" for its
+       * descendants, so while `backdrop-blur-md` sat on the header itself,
+       * the item-9 melt strip below — also a `backdrop-filter` child —
+       * could only sample content painted inside the header's own group
+       * (nothing, below the bar) instead of the page scrolling beneath,
+       * and rendered literally no pixels (verified via headless-Chrome A/B
+       * screenshots, max channel delta 8/255 even under an extreme
+       * blur+invert probe). As siblings, both layers sample the real page.
+       */}
+      <div aria-hidden className="absolute inset-0 -z-10 bg-background/85 backdrop-blur-md" />
       {/*
        * M7 Phase 3D-4, item 13 — `flex-wrap` (plus a vertical gap for the
        * wrapped case) is the "simple stacked... if needed" fallback the

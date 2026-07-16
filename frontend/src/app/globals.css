@@ -195,6 +195,19 @@ body {
 .itm-elevated {
   position: relative;
   isolation: isolate;
+  /*
+   * `clip`, specifically — not `hidden` (3D-4 reality-gap fix): the grain
+   * pseudo-element below (`::after`, `inset: -10%`) is absolutely
+   * positioned, so its overhang extends the viewport's scrollable overflow
+   * ~10% past the shell on every page — an ~80px band of the body's paper
+   * background yawning open past the footer at max scroll, directly under
+   * (and visually corrupting) item 9's fixed bottom-edge fade. `clip`
+   * removes that overhang from the scrollable area WITHOUT creating a
+   * scroll container, which `hidden` would — and a scroll container here
+   * would re-anchor the sticky header to this element and stop it sticking
+   * during viewport scroll.
+   */
+  overflow: clip;
   --color-background: var(--color-elevated-bg-light);
   --color-surface: var(--color-elevated-surface-light);
   --color-ink-primary: var(--color-elevated-ink-primary-light);
@@ -526,15 +539,27 @@ input:-webkit-autofill:focus {
   inset: 0;
   z-index: 1;
   mix-blend-mode: overlay;
-  opacity: 0.55;
+  /*
+   * 0.9 + a white-lifted accent stop, not the original 0.55 + pure accent
+   * (3D-4 reality-gap fix): gold-over-gold at `overlay` 0.55 measured a
+   * peak channel delta of ~49/255 in live headless-Chrome screenshots —
+   * technically animating, perceptually invisible, which is exactly what
+   * the founder reported. This pairing measured ~94/255 (clearly visible)
+   * while keeping the highlight in the accent-gold family.
+   */
+  opacity: 0.9;
   background-image: linear-gradient(
     115deg,
     transparent 35%,
-    var(--color-accent) 50%,
+    color-mix(in oklch, var(--color-accent) 50%, white) 50%,
     transparent 65%
   );
   background-size: 250% 100%;
   background-position: 150% 0;
+  /* Without this the default `repeat` tiles a second copy of the band,
+     which slides over the button during the animation's final frames and
+     vanishes in a visible snap the instant the animation ends. */
+  background-repeat: no-repeat;
   pointer-events: none;
 }
 .btn-sweep:hover::after {
