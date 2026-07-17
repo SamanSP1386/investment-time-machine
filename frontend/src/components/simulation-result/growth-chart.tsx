@@ -1,5 +1,6 @@
 'use client';
 
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import {
   Area,
   ComposedChart,
@@ -12,6 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 import { toChartPlotNumber } from './chart-plot-value';
+import { resolveLabelCollisions, type ChartLabelKind, type MeasuredLabel } from './chart-label-layout';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useSettleIn } from '@/hooks/use-settle-in';
 import { cn } from '@/lib/utils';
@@ -198,37 +200,120 @@ function formatMonthYear(isoDate: string): string {
   return MONTH_YEAR_FORMATTER.format(new Date(`${isoDate}T00:00:00Z`));
 }
 
-function daysBetween(isoDateA: string, isoDateB: string): number {
-  const msPerDay = 86_400_000;
-  return Math.abs(new Date(`${isoDateA}T00:00:00Z`).getTime() - new Date(`${isoDateB}T00:00:00Z`).getTime()) / msPerDay;
-}
-
 /**
- * M7 Phase 3D-4, item 4 — the high/low markers' own existing collision
- * guard (`isFarEnoughFromEndpointAndStart`, below) only checks each marker
- * against the endpoint and the series' start; it never checked the two
- * markers against EACH OTHER. The high marker's label sits ABOVE its point
- * (`position: 'top'`) and the low marker's sits BELOW its point
- * (`position: 'bottom'`) — since high is, by construction, plotted higher
- * on the Y axis than low, their labels normally point AWAY from each other
- * and date (X) proximity alone doesn't cause a collision (a first attempt
- * at this fix used date proximity alone and broke a live case: a high/low
- * pair 10 days apart but $1,000 apart in value on a $460–$1,620 domain never
- * visually collides — the labels sit in entirely different vertical bands).
- * The real collision case is the opposite: a low-volatility run where the
- * high and low values themselves are close enough that both points land in
- * nearly the same Y band, so their oppositely-pointing labels still
- * overlap. Compared against a fraction of the chart's own PLOTTED domain
- * span (`yAxisDomainMax - yAxisDomainMin`, the actual pixel-mapped range,
- * including the invested-baseline padding) — never a fraction of
- * `high.plotValue - low.plotValue` itself, which (since high and low ARE
- * that gap's own endpoints) can never usefully fire.
+ * M7 Phase 3D-4 completion (founder gap 2) — the measurement adapter for
+ * `chart-label-layout.ts`'s pure resolver. The original item-4 approach
+ * predicted collisions from data-space heuristics (day-span guards,
+ * domain-fraction value guards) and omitted markers pre-render; the founder
+ * verified collisions persisted — data-space prediction can't see actual
+ * on-screen text extents. This hook observes instead: after every render
+ * (and again whenever Recharts redraws — initial async `ResponsiveContainer`
+ * sizing, container resizes, data changes), it measures the REAL bounding
+ * boxes of every tagged label, asks the pure resolver what to do, and
+ * applies the answer as inline styles.
+ *
+ * Mechanics worth stating explicitly:
+ * - A `MutationObserver` (childList + the geometry attributes Recharts
+ *   writes: x/y/cx/cy/d/width/height) re-triggers measurement when the
+ *   chart actually redraws. The applier itself writes ONLY `style`
+ *   (`transform`/`visibility`), which the observer deliberately does not
+ *   watch — measurement can never re-trigger itself, so there is no
+ *   feedback loop by construction, not by debouncing luck.
+ * - Every element touched is recorded and fully reset before the next
+ *   measurement, so each pass measures pristine Recharts output, never its
+ *   own previous adjustments.
+ * - Hiding the high/low marker hides its whole `ReferenceDot` group (dot +
+ *   label together — a dot with no label under the endpoint's text would
+ *   read as a stray artifact); hiding the baseline label hides only the
+ *   text, never the dashed reference line; the endpoint is never hidden
+ *   (the resolver guarantees it).
+ * - In jsdom every box measures 0×0 and the resolver ignores zero-area
+ *   boxes, so the entire pass is a structural no-op in unit tests.
  */
-const MUTUAL_MARKER_VALUE_GUARD_FRACTION = 0.15;
+const LABEL_TEXT_SELECTORS: ReadonlyArray<{ selector: string; kind: ChartLabelKind; hideWholeGroup?: string }> = [
+  { selector: 'text.itm-cl-endpoint', kind: 'endpoint' },
+  { selector: 'text.itm-cl-high', kind: 'high', hideWholeGroup: '.itm-cl-high-dot' },
+  { selector: 'text.itm-cl-low', kind: 'low', hideWholeGroup: '.itm-cl-low-dot' },
+  { selector: 'text.itm-cl-baseline', kind: 'baseline' },
+  { selector: '.itm-cl-split line.recharts-reference-line-line', kind: 'split' },
+  { selector: 'text.recharts-cartesian-axis-tick-value', kind: 'tick' },
+];
 
-export function markersTooCloseByValue(a: PlotPoint, b: PlotPoint, domainSpan: number): boolean {
-  // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only (number) comparison of toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
-  return Math.abs(a.plotValue - b.plotValue) < domainSpan * MUTUAL_MARKER_VALUE_GUARD_FRACTION;
+function useChartLabelCollisions(containerRef: RefObject<HTMLDivElement | null>) {
+  const touchedElements = useRef<Set<SVGElement | HTMLElement>>(new Set());
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof MutationObserver === 'undefined') return undefined;
+
+    let frame = 0;
+
+    function measureAndApply() {
+      if (!container) return;
+      for (const el of touchedElements.current) {
+        el.style.removeProperty('visibility');
+        el.style.removeProperty('transform');
+      }
+      touchedElements.current.clear();
+
+      const containerBox = container.getBoundingClientRect();
+      if (containerBox.width === 0 || containerBox.height === 0) return;
+
+      const labels: MeasuredLabel[] = [];
+      const elementsById = new Map<string, { text: SVGElement | HTMLElement; group: SVGElement | HTMLElement }>();
+      for (const { selector, kind, hideWholeGroup } of LABEL_TEXT_SELECTORS) {
+        container.querySelectorAll<SVGElement>(selector).forEach((el, index) => {
+          const box = el.getBoundingClientRect();
+          const id = `${kind}-${index}`;
+          labels.push({
+            id,
+            kind,
+            x: box.left - containerBox.left,
+            y: box.top - containerBox.top,
+            width: box.width,
+            height: box.height,
+          });
+          const group = hideWholeGroup ? (el.closest<SVGElement>(hideWholeGroup) ?? el) : el;
+          elementsById.set(id, { text: el, group });
+        });
+      }
+
+      const resolutions = resolveLabelCollisions(labels, {
+        width: containerBox.width,
+        height: containerBox.height,
+      });
+
+      for (const resolution of resolutions) {
+        const target = elementsById.get(resolution.id);
+        if (!target) continue;
+        if (resolution.action === 'hide') {
+          target.group.style.setProperty('visibility', 'hidden');
+          touchedElements.current.add(target.group);
+        } else {
+          target.text.style.setProperty('transform', `translate(${resolution.dx}px, ${resolution.dy}px)`);
+          touchedElements.current.add(target.text);
+        }
+      }
+    }
+
+    function schedule() {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measureAndApply);
+    }
+
+    schedule();
+    const observer = new MutationObserver(schedule);
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['x', 'y', 'cx', 'cy', 'd', 'width', 'height'],
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [containerRef]);
 }
 
 /**
@@ -419,49 +504,22 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
   // already-decimated `points`, matching what the Line/Area already draw).
   const splitPoints = withBaselineSplit(points, investedPlotValue);
 
-  // Item 6c marker visibility — skipped whenever the high/low sits too
-  // close to the endpoint (or the plot's left edge) on EITHER axis: date
-  // (a fraction of the series' own total day-span) or value (a fraction of
-  // the series' own high-low range). Date alone isn't enough — found live,
-  // a near-monotonic loss trajectory whose true low landed several weeks
-  // before the endpoint but at an almost-identical Y position still
-  // crowded the endpoint label badly, since both labels render in the same
-  // bottom-right corner regardless of the weeks between their X positions.
-  // Collision avoidance by omission, the same approach `markedSplits`
-  // already uses above.
-  const totalSpanDays = Math.max(1, daysBetween(first.point_date, last.point_date));
-  const edgeGuardDays = Math.max(14, totalSpanDays * 0.04);
-  const valueSpan = Math.max(1e-9, high.plotValue - low.plotValue);
-  const valueGuard = valueSpan * 0.06;
-  function isFarEnoughFromEndpointAndStart(point: PlotPoint): boolean {
-    // eslint-disable-next-line no-restricted-syntax -- plain day-count/chart-geometry (number) comparisons, not a DecimalString comparison (ADR-033).
-    const farFromEndpointByDate = daysBetween(point.point_date, last.point_date) > edgeGuardDays;
-    // eslint-disable-next-line no-restricted-syntax -- plain day-count (number) comparison, not a DecimalString comparison (ADR-033).
-    const farFromStartByDate = daysBetween(point.point_date, first.point_date) > edgeGuardDays;
-    // eslint-disable-next-line no-restricted-syntax -- chart-geometry-only (number) comparison of toChartPlotNumber outputs, not a DecimalString comparison (ADR-033).
-    const farFromEndpointByValue = Math.abs(point.plotValue - last.plotValue) > valueGuard;
-    return farFromEndpointByDate && farFromStartByDate && farFromEndpointByValue;
-  }
   // The padded plot domain — computed here (rather than only inline on
-  // <YAxis> below) so both the Y-axis width measurement AND the high/low
-  // mutual-collision check (item 4) share the exact one domain calculation,
-  // never two that could silently drift apart.
+  // <YAxis> below) so the Y-axis width measurement shares the exact one
+  // domain calculation the axis itself plots.
   const yAxisDomainMin = Math.floor(Math.min(low.plotValue, investedPlotValue) * 0.92);
   const yAxisDomainMax = Math.ceil(Math.max(high.plotValue, investedPlotValue) * 1.08);
   const yAxisWidth = computeYAxisWidth(yAxisDomainMin, yAxisDomainMax);
 
-  // Item 4 — mutual collision: if the high and low markers would land close
-  // enough to each other in VALUE to visually collide, only the
-  // earlier-dated one is kept (a deterministic, disclosed tie-break,
-  // matching findExtremePoints' own "earliest date wins" convention above)
-  // — never both, and never a silent stacked-label overlap.
-  const highLowCollide = markersTooCloseByValue(high, low, yAxisDomainMax - yAxisDomainMin);
-  // eslint-disable-next-line no-restricted-syntax -- fixed-width ISO date-string comparison, not a DecimalString comparison (ADR-033).
-  const earlierOfHighLow = high.point_date <= low.point_date ? 'high' : 'low';
-  const showHighMarker =
-    isFarEnoughFromEndpointAndStart(high) && (!highLowCollide || earlierOfHighLow === 'high');
-  const showLowMarker =
-    isFarEnoughFromEndpointAndStart(low) && (!highLowCollide || earlierOfHighLow === 'low');
+  // Founder gap 2 — both extreme markers now ALWAYS render; whether their
+  // labels survive is decided post-render by `useChartLabelCollisions`,
+  // which measures what actually painted instead of predicting from data
+  // space (the item-4 heuristics this replaces — day-span and
+  // domain-fraction guards — were verified by the founder to still let
+  // real collisions through). Every label/line below carries an `itm-cl-*`
+  // class so the measurement pass can find it.
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  useChartLabelCollisions(chartContainerRef);
   return (
     <div
       className={cn(
@@ -477,7 +535,11 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
           not past the outer ProductShell column) so the flagship chart
           reads as wider/more present than the text around it, per the
           founder's explicit "chart may bleed slightly wider than text." */}
-      <div aria-hidden className="-mx-6 h-48 w-[calc(100%+3rem)] sm:-mx-10 sm:h-64 sm:w-[calc(100%+5rem)]">
+      <div
+        ref={chartContainerRef}
+        aria-hidden
+        className="-mx-6 h-48 w-[calc(100%+3rem)] sm:-mx-10 sm:h-64 sm:w-[calc(100%+5rem)]"
+      >
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={splitPoints}
@@ -563,6 +625,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 fill: 'var(--color-ink-muted)',
                 fontSize: 11,
                 fontFamily: 'var(--font-mono)',
+                className: 'itm-cl-baseline',
               }}
             />
             {markedSplits.map((split) => (
@@ -572,6 +635,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 stroke="var(--color-ink-muted)"
                 strokeDasharray="2 3"
                 ifOverflow="extendDomain"
+                className="itm-cl-split"
               />
             ))}
             {/* Item 6a — two Areas sharing `splitPoints`, both anchored at
@@ -619,15 +683,23 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 fontSize: 13,
                 fontWeight: 600,
                 fontFamily: 'var(--font-mono)',
+                className: 'itm-cl-endpoint',
               }}
             />
             {/* Item 6c — quiet high/low markers: a small hollow dot (muted,
                 never the portfolio-blue hue the endpoint/line use, so
                 neither reads as "the result") plus a compact "value ·
-                Mon YYYY" label. `position` (top for the high, bottom for
-                the low) plus the endpoint-coincidence skip above are this
-                marker's own collision avoidance. */}
-            {showHighMarker ? (
+                Mon YYYY" label. Both ALWAYS render (founder gap 2) — any
+                collision with the endpoint, the baseline, each other, or
+                the chart's own edges is resolved after render by
+                `useChartLabelCollisions` from measured pixels, replacing
+                the old data-space omission heuristics. The ONE render-time
+                exclusion left is identity, not geometry: an extreme whose
+                date IS the endpoint's date is the same point the endpoint
+                label already names — verified live (TSLA loss, MSFT gain)
+                to render as a stacked duplicate of the same dollar figure
+                otherwise. */}
+            {high.point_date !== last.point_date ? (
               <ReferenceDot
                 x={high.point_date}
                 y={high.plotValue}
@@ -635,16 +707,18 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 fill="var(--color-background)"
                 stroke="var(--color-ink-muted)"
                 strokeWidth={1.5}
+                className="itm-cl-high-dot"
                 label={{
                   value: `${formatCurrency(high.rawValue)} · ${formatMonthYear(high.point_date)}`,
                   position: 'top',
                   fill: 'var(--color-ink-muted)',
                   fontSize: 10,
                   fontFamily: 'var(--font-mono)',
+                  className: 'itm-cl-high',
                 }}
               />
             ) : null}
-            {showLowMarker ? (
+            {low.point_date !== last.point_date ? (
               <ReferenceDot
                 x={low.point_date}
                 y={low.plotValue}
@@ -652,12 +726,14 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
                 fill="var(--color-background)"
                 stroke="var(--color-ink-muted)"
                 strokeWidth={1.5}
+                className="itm-cl-low-dot"
                 label={{
                   value: `${formatCurrency(low.rawValue)} · ${formatMonthYear(low.point_date)}`,
                   position: 'bottom',
                   fill: 'var(--color-ink-muted)',
                   fontSize: 10,
                   fontFamily: 'var(--font-mono)',
+                  className: 'itm-cl-low',
                 }}
               />
             ) : null}

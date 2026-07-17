@@ -57,7 +57,8 @@ All cited to exact Founder Specification sections (full detail in `docs/simulati
 - Every controlled error is explicit and named (Founder Specification 2.14.14) — no bare `except Exception` anywhere in the engine.
 - Full findings in `docs/SECURITY_LOG.md`.
 
-## Technical Debt
+## Technical Debt1
+
 
 | ID | Item | Status |
 |---|---|---|

@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import {
-  computeYAxisWidth,
-  GrowthChart,
-  markersTooCloseByValue,
-  type PlotPoint,
-} from '@/components/simulation-result/growth-chart';
+import { computeYAxisWidth, GrowthChart } from '@/components/simulation-result/growth-chart';
 import type { SimulationResponse } from '@/types/api';
 
 type Series = SimulationResponse['growth_series'];
@@ -294,11 +289,7 @@ describe('GrowthChart — split-baseline area fill (M7 Phase 3D-3, item 6a)', ()
   });
 });
 
-describe('GrowthChart — high/low markers (item 6c)', () => {
-  // A 100-day span (not this file's usual 3-6 day fixtures) — the
-  // edge-guard collision check below is a fraction of the series' own
-  // total span with a 14-day floor, so a too-short fixture would swallow
-  // every marker regardless of where the high/low actually falls.
+describe('GrowthChart — high/low markers (M7 Phase 3D-4 completion, founder gap 2)', () => {
   function dailySeries(values: string[]): Series {
     return series(values, '2020-01-01');
   }
@@ -313,81 +304,57 @@ describe('GrowthChart — high/low markers (item 6c)', () => {
     expect(screen.getByText(/\$500\.00 · Mar 2020/)).toBeInTheDocument();
   });
 
-  it('omits the high marker when the series high IS the endpoint (no duplicate/colliding marker)', () => {
-    // Strictly increasing — the endpoint is also the series' own maximum.
-    const values = Array.from({ length: 100 }, (_, i) => (1000 + i * 5).toFixed(8));
-    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
-    // Only the endpoint's own label should show this value — the high
-    // marker's "value · Mon YYYY" compact format would duplicate it.
-    const endpointValue = values[values.length - 1];
-    expect(screen.queryByText(new RegExp(`\\$${Number(endpointValue).toLocaleString()}\\.00 ·`))).not.toBeInTheDocument();
-  });
-
-  it('omits a high/low marker that falls within the edge-guard window of the endpoint, even on a different date', () => {
-    // A near-monotonic decline whose true minimum lands a few days (not
-    // zero) before the endpoint — found live crowding the endpoint label
-    // badly before this edge-guard fix.
+  it('ALWAYS renders both extreme markers into the DOM — visibility is decided post-render from measured pixels, never pre-render from data-space heuristics', () => {
+    // The exact shapes the old item-4 heuristics used to suppress
+    // pre-render: a low two days before the endpoint, and a low-volatility
+    // oscillation. Both markers must now be IN the DOM (tagged for the
+    // measurement pass); whether a label survives on screen is
+    // `resolveLabelCollisions`' unit-tested job, applied from real
+    // bounding boxes in a real browser (jsdom measures every box 0×0, so
+    // the pass is a structural no-op here by design).
+    // (Interior extremes — recharts declines to draw a ReferenceDot pinned
+    // to the very first category in this jsdom environment, which is a
+    // renderer quirk, not this feature's behavior.)
     const values = Array.from({ length: 100 }, (_, i) => (1000 - i * 9).toFixed(8));
-    values[97] = '50.00000000'; // the true low, 2 days before the endpoint
+    values[3] = '1100.00000000'; // true high, 3 days after the start
+    values[97] = '50.00000000'; // true low, 2 days before the endpoint
     values[99] = '80.00000000'; // endpoint itself, slightly higher
-    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
-    expect(screen.queryByText(/\$50\.00 ·/)).not.toBeInTheDocument();
-  });
-});
+    const { container } = render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
 
-describe('GrowthChart — high/low mutual collision (M7 Phase 3D-4, item 4)', () => {
-  function dailySeries(values: string[]): Series {
-    return series(values, '2020-01-01');
-  }
-
-  it('suppresses the later of two mutually-colliding high/low markers on a low-volatility, short range', () => {
-    // A 90-day range (matching the task's "short ranges (<3 months)" test
-    // case), oscillating close around the $1,000 invested baseline: high
-    // $1,010 at day 40, low $990 at day 45. Close enough in VALUE (not just
-    // date) that their oppositely-pointing labels ('top' for high, 'bottom'
-    // for low) would still overlap — the case the original,
-    // since-corrected date-only heuristic missed (see the exported
-    // function's own doc comment for the live case that caught it).
-    const values = Array.from({ length: 90 }, () => '1000.00000000');
-    values[40] = '1010.00000000'; // high
-    values[45] = '990.00000000'; // low — collides with the high above
-    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
-
-    expect(screen.getByText(/\$1,010\.00 ·/)).toBeInTheDocument();
-    expect(screen.queryByText(/\$990\.00 ·/)).not.toBeInTheDocument();
+    expect(container.querySelector('.itm-cl-high-dot')).toBeInTheDocument();
+    expect(container.querySelector('.itm-cl-low-dot')).toBeInTheDocument();
+    expect(screen.getByText(/\$50\.00 ·/)).toBeInTheDocument();
   });
 
-  it('shows both markers when the high and low are far enough apart in value not to collide, even close in date', () => {
-    // A wide value swing ($500 vs $1,500 against a $1,000 baseline) 10 days
-    // apart — the exact shape of the pre-existing "well inside the range"
-    // fixture below, confirming the value-based guard doesn't regress it.
-    const values = Array.from({ length: 90 }, () => '1000.00000000');
-    values[40] = '1500.00000000'; // high
-    values[50] = '500.00000000'; // low — only 10 days later, but far apart in value
-    render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
+  it('tags every collision-managed label with its measurement class (endpoint, high, low, baseline)', () => {
+    const values = Array.from({ length: 100 }, () => '1000.00000000');
+    values[50] = '1500.00000000';
+    values[60] = '500.00000000';
+    const { container } = render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
 
-    expect(screen.getByText(/\$1,500\.00 ·/)).toBeInTheDocument();
-    expect(screen.getByText(/\$500\.00 ·/)).toBeInTheDocument();
-  });
-});
-
-describe('markersTooCloseByValue — collision helper (unit)', () => {
-  function point(dateStr: string, value: number): PlotPoint {
-    return { point_date: dateStr, plotValue: value, rawValue: `${value}` as PlotPoint['rawValue'] };
-  }
-
-  it('is true for two points whose value gap is a small fraction of the plotted domain span', () => {
-    expect(markersTooCloseByValue(point('2020-01-01', 1010), point('2020-02-01', 990), 1000)).toBe(true);
+    expect(container.querySelector('text.itm-cl-endpoint')).toBeInTheDocument();
+    expect(container.querySelector('text.itm-cl-high')).toBeInTheDocument();
+    expect(container.querySelector('text.itm-cl-low')).toBeInTheDocument();
+    expect(container.querySelector('text.itm-cl-baseline')).toBeInTheDocument();
   });
 
-  it('is false for two points whose value gap is a large fraction of the plotted domain span', () => {
-    expect(markersTooCloseByValue(point('2020-01-01', 1500), point('2020-02-01', 500), 1160)).toBe(false);
+  it('skips an extreme marker whose date IS the endpoint — identity, not geometry: the endpoint label already names that exact point', () => {
+    // Strictly increasing — the series high is the endpoint itself.
+    const values = Array.from({ length: 100 }, (_, i) => (1000 + i * 5).toFixed(8));
+    const { container } = render(<GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values) }} />);
+
+    expect(container.querySelector('.itm-cl-high-dot')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$1,495\.00 ·/)).not.toBeInTheDocument();
   });
 
-  it('is symmetric — argument order does not change the result', () => {
-    const a = point('2020-01-01', 1010);
-    const b = point('2020-01-05', 990);
-    expect(markersTooCloseByValue(a, b, 1000)).toBe(markersTooCloseByValue(b, a, 1000));
+  it('tags split reference lines for the measurement pass', () => {
+    const splits: Splits = [{ split_date: '2020-02-10', split_ratio: '4.000000' as Splits[number]['split_ratio'] }];
+    const values = Array.from({ length: 100 }, () => '1000.00000000');
+    const { container } = render(
+      <GrowthChart sim={{ ...BASE_SIM, growth_series: dailySeries(values), disclosed_splits: splits }} />
+    );
+
+    expect(container.querySelector('.itm-cl-split')).toBeInTheDocument();
   });
 });
 

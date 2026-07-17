@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ErrorState } from '@/components/ui/error-state';
@@ -154,12 +155,22 @@ function ResultHeader({ sim }: { sim: SimulationResponse }) {
   );
 }
 
+/**
+ * M7 Phase 3D-4 completion (founder gap 1) — the Results page's primary
+ * action, restyled from a bare accent text link to the primary button
+ * treatment. Root cause of the founder-observed gap: item 11 wired the
+ * button light sweep into `buttonVariants`' `primary` variant "so it covers
+ * every primary CTA," but this page's primary CTA was never ON that variant
+ * — it was a hand-styled text link, so the Results page was the one route
+ * with no sweep anywhere. Reaching for `buttonVariants({ variant:
+ * 'primary' })` (exactly how the Landing CTA renders a styled `Link`)
+ * inherits the sweep, the accent remap, and every §15 state from the one
+ * shared mechanism, per §16's own rule: "a future primary-action element
+ * should reach for `variant='primary'` ... never `text-accent` directly."
+ */
 function RunAnotherSimulationLink() {
   return (
-    <Link
-      href="/simulator"
-      className="text-sm font-medium text-accent underline-offset-4 transition-colors duration-[var(--duration-micro)] hover:underline"
-    >
+    <Link href="/simulator" className={buttonVariants({ variant: 'primary' })}>
       Run another simulation
     </Link>
   );
