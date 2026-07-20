@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { SimulationResultClient } from '@/components/simulation-result/simulation-result-client';
 import { getSimulation } from '@/lib/api/endpoints/simulations';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatDate, formatPercentage } from '@/lib/format';
+import { socialMetadata } from '@/lib/social-metadata';
 
 /**
  * M7 Phase 3D-1 (Craft & Coherence, task A.3) — a real per-simulation title
@@ -20,18 +21,29 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   try {
     const sim = await getSimulation(id);
     if (sim.status === 'completed' && sim.final_value !== null) {
-      const investedText = formatCurrency(sim.investment_amount);
-      return {
-        title: `If you had invested ${investedText} in ${sim.asset_symbol} — Investment Time Machine`,
-        description: `See what ${investedText} invested in ${sim.asset_symbol} would be worth today, calculated from real historical market data.`,
-      };
+      const investedText = formatCurrency(sim.investment_amount, { decimals: 0 });
+      // M7 Phase 3D-5 (item 4b) — the social-card title is the result
+      // itself, composed only from this simulation's own fields via the
+      // existing formatters ("$1,000 in AAPL, 2000 → 2026: +31,449.61%").
+      // Year labels are the ISO dates' own leading characters — a display
+      // slice, never date arithmetic.
+      const startYear = sim.start_date.slice(0, 4);
+      const endYear = sim.end_date.slice(0, 4);
+      const returnText =
+        sim.total_return_percentage !== null ? `: ${formatPercentage(sim.total_return_percentage)}` : '';
+      const title = `${investedText} in ${sim.asset_symbol}, ${startYear} → ${endYear}${returnText} — Investment Time Machine`;
+      const description = `One historical simulation, replayed from real market data: ${investedText} in ${sim.asset_symbol}, held ${formatDate(sim.start_date)} to ${formatDate(sim.end_date)}, ended at ${formatCurrency(sim.final_value)}. Deterministic and educational — never a prediction, never advice.`;
+      return { title, description, ...socialMetadata({ title, description }) };
     }
   } catch {
     // Best-effort — see doc comment above.
   }
+  const fallbackTitle = 'Simulation Result — Investment Time Machine';
+  const fallbackDescription = 'The result of a historical investment simulation, calculated by the Simulation Engine.';
   return {
-    title: 'Simulation Result — Investment Time Machine',
-    description: 'The result of a historical investment simulation, calculated by the Simulation Engine.',
+    title: fallbackTitle,
+    description: fallbackDescription,
+    ...socialMetadata({ title: fallbackTitle, description: fallbackDescription }),
   };
 }
 

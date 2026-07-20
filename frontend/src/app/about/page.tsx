@@ -1,31 +1,39 @@
 import type { Metadata } from 'next';
 import { ProductShell } from '@/components/shell/product-shell';
+import { socialMetadata } from '@/lib/social-metadata';
+
+const PAGE_TITLE = 'About — Investment Time Machine';
+const PAGE_DESCRIPTION = 'The story behind Investment Time Machine, its principles, and what it is and is not.';
 
 export const metadata: Metadata = {
-  title: 'About — Investment Time Machine',
-  description: 'The story behind Investment Time Machine, its principles, and what it is and is not.',
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  ...socialMetadata({ title: PAGE_TITLE, description: PAGE_DESCRIPTION }),
 };
 
 /**
  * The Educational Disclaimer / About page named in `docs/frontend_design_system.md`
  * §13 (page 8) — a real, linkable page for the "not a financial advisor"
  * positioning and the standing disclaimer, rather than only ever appearing
- * as a footer line or inside an AI panel. M7 Phase 3D-4, item 8.
+ * as a footer line or inside an AI panel. M7 Phase 3D-4, item 8; geometry
+ * unified onto the shared shell measure M7 Phase 3D-5, item 1 (prose still
+ * caps at `max-w-prose` inside the wider column).
  *
  * The builder's-story section is explicitly, visibly a placeholder — the
  * founder supplies final personal copy later (direct instruction); this
  * ships the structure and a clearly-marked stand-in paragraph, never text
- * dressed up to look finished. Everything else on this page (the product's
- * principles, the disclaimer) is real, sourced copy: the three-layer model
- * and Worked Example language are pulled directly from
- * `docs/EXPERIENCE_CONSTITUTION.md` §3-4, not invented for this page.
+ * dressed up to look finished. The GitHub link (M7 Phase 3D-5, item 3) is
+ * real and final. Everything else on this page (the product's principles,
+ * the disclaimer) is real, sourced copy: the three-layer model and Worked
+ * Example language are pulled directly from `docs/EXPERIENCE_CONSTITUTION.md`
+ * §3-4, not invented for this page.
  */
 export default function AboutPage() {
   return (
-    <ProductShell contentClassName="max-w-[720px] flex flex-col gap-16 px-6 py-16 sm:px-10 sm:py-24">
+    <ProductShell contentClassName="flex flex-col gap-16 py-16 sm:py-24">
       <section className="flex flex-col gap-6">
         <p className="kicker">About this project</p>
-        <h1 className="font-serif text-[clamp(2rem,2.8vw+1rem,3.25rem)] leading-tight font-medium text-ink-primary">
+        <h1 className="max-w-4xl font-serif text-[clamp(2rem,2.8vw+1rem,3.25rem)] leading-tight font-medium text-ink-primary">
           What Investment Time Machine is, and why it exists.
         </h1>
         <p className="max-w-prose text-base text-ink-secondary sm:text-lg">
@@ -46,13 +54,21 @@ export default function AboutPage() {
             account of why this project exists and what &ldquo;engineering with receipts&rdquo; means in practice —
             not written by anyone but them.
           </p>
-          <p className="max-w-prose text-sm text-ink-secondary">
-            Source code:{' '}
-            <span className="text-ink-muted">
-              [GitHub link — to be added]
-            </span>
-          </p>
         </div>
+        {/* Real and final (not part of the placeholder above) — the
+            builder's source-code link, in the same quiet editorial link
+            treatment the footer uses (M7 Phase 3D-5, item 3). */}
+        <p className="max-w-prose text-sm text-ink-secondary">
+          Built by Saman —{' '}
+          <a
+            href="https://github.com/SamanSP1386"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink-primary underline decoration-[var(--color-accent)] underline-offset-4 transition-colors duration-[var(--duration-micro)] ease-[var(--ease-standard)] hover:text-accent"
+          >
+            GitHub
+          </a>
+        </p>
       </section>
 
       <section className="flex flex-col gap-6" aria-label="Principles">

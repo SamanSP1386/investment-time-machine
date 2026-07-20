@@ -476,7 +476,11 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
   const last = allPoints[allPoints.length - 1];
   // eslint-disable-next-line no-restricted-syntax -- array-length comparison, not a DecimalString comparison (ADR-033).
   const wasDecimated = allPoints.length > points.length;
-  const summary = `This chart traces the value of this investment from ${formatCurrency(first.rawValue)} on ${formatDate(first.point_date)} to ${formatCurrency(last.rawValue)} on ${formatDate(last.point_date)}, across ${allPoints.length} data points${wasDecimated ? ` (a smoothed line of ${points.length} is drawn for readability — every point is available in the table below)` : ''}.`;
+  // The chart caption, rewritten M7 Phase 3D-5 (item 2, human-voice pass):
+  // meaning first ("the whole story, day by day"), the figures as evidence
+  // — still composed only from this simulation's own fields, and still the
+  // chart's genuine text alternative for a screen reader.
+  const summary = `The line above is the whole story of this investment, day by day: worth ${formatCurrency(first.rawValue)} on ${formatDate(first.point_date)} and ${formatCurrency(last.rawValue)} on ${formatDate(last.point_date)}, and every rise and dip between those two figures actually happened — ${allPoints.length} recorded values, none of them estimated${wasDecimated ? ` (the drawn line samples ${points.length} of them for readability; the full set is in the table below)` : ''}.`;
 
   // Baseline reference — the invested amount, matching the mockup's dashed
   // "$X invested" line. The second (and, per ADR-044, last) call site for

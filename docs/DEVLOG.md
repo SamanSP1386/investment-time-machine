@@ -1563,3 +1563,33 @@ The single "start everything" command (`npm run dev` at the repo root → `scrip
 **Next Milestone**: M7 Phase 4 (Educational AI Experience) — no open 3D-4 items remain.
 
 ---
+
+## 2026-07-19 — M7 Phase 3D-5: Final Coherence Pass
+
+**Version**: 0.18.3
+
+**Objective**: One coherence pass across the whole product surface: (1) a single unified page geometry consumed by every route (founder prefers the wider Results-style measure); (2) a human-voice rewrite of every deterministic results template (Why, Key Takeaways, chart caption, "In plain terms") — meaning first, numbers as evidence, FD-013's "former quant who now teaches" voice, no advice ever; (3) the founder's GitHub wired into /about and the footer; plus founder-approved additions: (4) Open Graph/social cards with per-simulation titles, (5) a permanent-link caption on the Copy link action, (6) editorial 404/error pages. No git operations (explicit instruction).
+
+**Scope**: Frontend only, plus docs. Backend used live (Docker stack) for verification; zero backend changes.
+
+**Implementation Summary**:
+- **Item 1 — unified shell geometry.** Root cause of the visible margin jumps: each route threaded its own `max-w-*` through `ProductShell`'s `contentClassName` (Landing/Simulator 860px, About 720px, Results 1200px, error/pending/404 `max-w-2xl`), and `AppHeader` re-derived its width from whichever page it sat on. New `shell-geometry.ts` states THE measure once (`max-w-[1200px]` + `px-6 sm:px-10`); `ProductShell` applies it to `<main>` itself; `AppHeader`/`AppFooter` consume the same constant; the header's `maxWidthClassName` prop and `extractMaxWidthClass` are deleted. Pages now pass vertical rhythm only; narrower reading content (error cards, pending-state cards) caps its own width *inside* the fixed column. Prose keeps `max-w-prose`; the Growth Chart's gutter bleed is unchanged. Verified live at 1440px (headless Chrome, production build): main/header/footer all at 120→1320px on six routes — zero shift.
+- **Item 2 — human-voice templates.** Every variant rewritten meaning-first: Why/price now branches rise/fall/flat via `compareDecimalStrings` (a comparison, never a derived figure — ADR-033) with structurally parallel gain/loss sentences (FD-013 §6/§7); Why/dividends keeps ADR-043's honest zero-dividend hedge ("Any payment X made..."); Why/inflation keeps its three states. Key Takeaways and the chart caption rewritten in the same register. Self-caught fix: "In plain terms" claimed inflation adjustment happened whenever *requested*, even when the CPI value came back null — now three honest states. All still 100% deterministic template composition from `SimulationResponse` fields; no AI, no new claims, no new arithmetic.
+- **Item 3 — GitHub links.** /about: "Built by Saman — GitHub" as an accent-underlined editorial link (new tab, noopener); footer: a quiet muted GitHub link, sitewide via the shared shell. Placeholder story paragraphs remain visibly marked for the founder's own copy.
+- **Item 4 — social cards.** Static branded 1200×630 card generated locally (Playwright screenshot of `scripts/og-card.html`; palette values verbatim from `primitives.css`; fonts fetched at generation time only — the shipped PNG is static, no runtime external requests). First attempt used the `opengraph-image.png` file convention; live head inspection showed this Next version scopes file-convention images to their own segment only (`/` got the tags, `/about` and `/simulation/[id]` got none) — replaced with an explicit shared `socialMetadata()` helper + `metadataBase`, since a child route's `openGraph` shallowly replaces the root's. Per-simulation titles compose the result from the sim's own fields in the existing server-side `generateMetadata` (already fetching via the GET endpoint). Verified in the rendered head of a real simulation URL. Deployment note: `NEXT_PUBLIC_SITE_URL` must be set in production for absolute OG URLs.
+- **Item 5 — permanent-link caption.** One line under the Results actions (`ResultActions`, both completed and pending/failed states): "Every result has a permanent link — same inputs, same answer, always." Verified by loading both test permalinks in fresh incognito-equivalent Playwright contexts.
+- **Item 6 — editorial 404/error.** Both boundaries rebuilt in the product voice on the shared shell ("This page returned no data." / "This page failed to load its answer."), links to landing + Simulator, digest as a quiet mono reference line, no stack traces. `global-error.tsx` untouched (documented dependency-free constraint). Verified live on a garbage URL and a garbage simulation id.
+
+**Files Created**: `frontend/src/components/shell/shell-geometry.ts`, `frontend/src/lib/social-metadata.ts`, `frontend/scripts/og-card.html`, `frontend/scripts/generate-og-image.mjs`, `frontend/public/og-default.png`, `frontend/src/__tests__/app/error-pages.test.tsx`.
+
+**Files Modified**: `frontend/src/components/shell/product-shell.tsx`, `app-header.tsx`, `app-footer.tsx`; `frontend/src/app/layout.tsx`, `page.tsx`, `simulator/page.tsx`, `about/page.tsx`, `simulation/[id]/page.tsx`, `not-found.tsx`, `error.tsx`; `frontend/src/components/simulation-result/results-sections.tsx`, `simulation-result-client.tsx`, `growth-chart.tsx`; tests: `results-sections.test.tsx`, `growth-chart.test.tsx`, `simulation-result-client.test.tsx`, `about-page.test.tsx`; `docs/CHANGELOG.md`, `docs/DEVLOG.md`.
+
+**Problems Encountered**: (1) The long-running dev server was serving unstyled HTML mid-verification — running `next build` had clobbered the dev server's own `.next` assets; restarted as `next start` (production) for all verification. (2) The OG file-convention scoping surprise above — caught only because verification inspected the real rendered head on child routes rather than trusting the root route's output.
+
+**Testing Summary**: 57/57 test files (347 passed, 1 skipped), `eslint .` clean, `tsc --noEmit` clean, `next build` clean. Live: zero-shift geometry table at 1440px (six routes), OG head inspection on five routes including a real simulation, full-page rendered reads of one real gain (AAPL 2000→2026) and one real loss (TSLA 2021→2023).
+
+**Technical Debt Introduced**: None new. `NEXT_PUBLIC_SITE_URL` joins the deploy-time env checklist (falls back to localhost otherwise — social cards would carry localhost URLs if forgotten).
+
+**Next Milestone**: Founder review of this pass's copy and card; deployment blockers (KI-039/KI-046) remain the platform's open items.
+
+---

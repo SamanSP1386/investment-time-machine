@@ -67,26 +67,46 @@ const BASE_SIM: SimulationResponse = {
 };
 
 describe('WhyExplanation', () => {
-  it('describes price appreciation including the shares this investment purchased', () => {
+  it('leads with the meaning of a rising share price, anchored by the real start/end prices and share count', () => {
     render(<WhyExplanation sim={BASE_SIM} />);
     expect(
-      screen.getByText(/moved from \$100\.00 to \$250\.00 over this period, carrying the 10\.00 shares/)
+      screen.getByText(
+        /The engine of this result is the share price itself climbing: one share of AAPL went from \$100\.00 at the start of this window to \$250\.00 at the end/
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText(/the 10\.00 shares this investment started with rode that rise/)).toBeInTheDocument();
+  });
+
+  it('narrates a falling share price with the same parallel structure as a gain — reported, never softened', () => {
+    render(
+      <WhyExplanation
+        sim={{ ...BASE_SIM, final_price: '50.00000000' as SimulationResponse['final_price'] }}
+      />
+    );
+    expect(
+      screen.getByText(
+        /The story of this result is a falling share price: one share of AAPL was worth \$100\.00 when this window opened and \$50\.00 when it closed/
+      )
     ).toBeInTheDocument();
   });
 
   it('falls back to generic price-appreciation copy when initial/final price are unavailable', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, initial_price: null, final_price: null }} />);
-    expect(screen.getByText(/share price moving over this period is the single largest driver/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/share price moving across this window shaped this result more than any other factor/)
+    ).toBeInTheDocument();
   });
 
-  it('states plainly that dividends were excluded by choice when include_dividends is false', () => {
+  it('states plainly that dividends were excluded by the simulation\'s own setting when include_dividends is false', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, include_dividends: false }} />);
-    expect(screen.getByText(/did not reinvest dividends, by choice/)).toBeInTheDocument();
+    expect(screen.getByText(/Dividends played no part in this number/)).toBeInTheDocument();
+    expect(screen.getByText(/set not to reinvest them/)).toBeInTheDocument();
   });
 
-  it('explains dividend reinvestment, hedged with "any... if any occurred", when include_dividends is true', () => {
+  it('explains dividend reinvestment meaning-first, hedged ("any payment... made") for zero-dividend assets', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, include_dividends: true }} />);
-    expect(screen.getByText(/Any dividends AAPL paid during this period were reinvested automatically/)).toBeInTheDocument();
+    expect(screen.getByText(/Dividends never left this simulation as cash/)).toBeInTheDocument();
+    expect(screen.getByText(/Any payment AAPL made during this window bought a little more stock/)).toBeInTheDocument();
   });
 
   it('omits the inflation paragraph entirely when adjustment was not requested, rather than showing filler', () => {
@@ -105,12 +125,12 @@ describe('WhyExplanation', () => {
       />
     );
     expect(screen.getByText('Inflation adjustment')).toBeInTheDocument();
-    expect(screen.getByText(/represents \$2,100\.00 in today's purchasing power/)).toBeInTheDocument();
+    expect(screen.getByText(/works out to \$2,100\.00 in today's purchasing power/)).toBeInTheDocument();
   });
 
   it('states the CPI data gap plainly when adjust_for_inflation is true but the value is unavailable', () => {
     render(<WhyExplanation sim={{ ...BASE_SIM, adjust_for_inflation: true, inflation_adjusted_final_value: null }} />);
-    expect(screen.getByText(/CPI data needed for this exact period wasn't available/)).toBeInTheDocument();
+    expect(screen.getByText(/CPI records this exact period needs aren't available/)).toBeInTheDocument();
   });
 });
 
@@ -196,7 +216,7 @@ describe('GrowthOverTime', () => {
 
   it('renders the chart summary once growth_series is populated', () => {
     render(<GrowthOverTime sim={BASE_SIM} />);
-    expect(screen.getByText(/This chart traces the value of this investment/)).toBeInTheDocument();
+    expect(screen.getByText(/The line above is the whole story of this investment/)).toBeInTheDocument();
   });
 });
 
@@ -212,14 +232,29 @@ describe('TheProof', () => {
   it('item 5a: leads with "In plain terms" — a non-technical, personalized summary', () => {
     render(<TheProof sim={BASE_SIM} />);
     expect(screen.getByText('In plain terms')).toBeInTheDocument();
-    expect(screen.getByText(/AAPL's actual daily closing price between/)).toBeInTheDocument();
-    expect(screen.getByText(/never predict the future|does not predict the future/)).toBeInTheDocument();
+    expect(screen.getByText(/AAPL's real daily closing prices between/)).toBeInTheDocument();
+    expect(screen.getByText(/what this is not: a prediction/)).toBeInTheDocument();
   });
 
   it('item 5a: states plainly whether dividends/inflation were applied, personalized to this simulation', () => {
-    render(<TheProof sim={{ ...BASE_SIM, include_dividends: true, adjust_for_inflation: true }} />);
-    expect(screen.getByText(/reinvested — each one bought additional shares/)).toBeInTheDocument();
-    expect(screen.getByText(/adjusted for inflation, using actual historical CPI data/)).toBeInTheDocument();
+    render(
+      <TheProof
+        sim={{
+          ...BASE_SIM,
+          include_dividends: true,
+          adjust_for_inflation: true,
+          inflation_adjusted_final_value: '2100.00000000' as SimulationResponse['inflation_adjusted_final_value'],
+        }}
+      />
+    );
+    expect(screen.getByText(/each payment bought more shares the day it arrived/)).toBeInTheDocument();
+    expect(screen.getByText(/translated into today's purchasing power, using actual historical CPI records/)).toBeInTheDocument();
+  });
+
+  it('item 5a (M7 Phase 3D-5): never claims an adjustment happened when the CPI lookup came back unavailable', () => {
+    render(<TheProof sim={{ ...BASE_SIM, adjust_for_inflation: true, inflation_adjusted_final_value: null }} />);
+    expect(screen.getByText(/An inflation adjustment was requested, but the CPI records/)).toBeInTheDocument();
+    expect(screen.queryByText(/translated into today's purchasing power, using actual historical CPI records/)).not.toBeInTheDocument();
   });
 
   it('explains methodology: close_price policy and the 365.25-day CAGR convention, sourced from simulation_formulas.md', () => {
@@ -294,7 +329,7 @@ describe('KeyTakeaways (M7 Phase 3D-4, item 7)', () => {
   it('always includes the non-predictive time-horizon observation and the standing educational disclaimer', () => {
     render(<KeyTakeaways sim={BASE_SIM} />);
     expect(
-      screen.getByText(/one continuous holding from Jan 1, 2015 to Jan 1, 2025.*not a projection of what happens next/)
+      screen.getByText(/one continuous holding from Jan 1, 2015 to Jan 1, 2025.*nothing about the next one/)
     ).toBeInTheDocument();
     expect(
       screen.getByText('Investment Time Machine is an educational tool — not financial advice.')
@@ -317,7 +352,9 @@ describe('KeyTakeaways (M7 Phase 3D-4, item 7)', () => {
         sim={{ ...BASE_SIM, growth_series: seriesFrom(['1000.00000000', '1200.00000000', '900.00000000', '2500.00000000']) }}
       />
     );
-    expect(screen.getByText(/ranged from \$900\.00 \(on Jan 3, 2020\) to \$2,500\.00 \(on Jan 4, 2020\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/as low as \$900\.00 \(on Jan 3, 2020\) and as high as \$2,500\.00 \(on Jan 4, 2020\)/)
+    ).toBeInTheDocument();
   });
 
   it('describes a genuine interior drawdown and recovery in dollar terms, never as a computed percentage', () => {
@@ -330,9 +367,9 @@ describe('KeyTakeaways (M7 Phase 3D-4, item 7)', () => {
         }}
       />
     );
-    const recovery = screen.getByText(/lowest value recorded during this period was \$700\.00/);
+    const recovery = screen.getByText(/the recorded value had fallen to \$700\.00/);
     expect(recovery.textContent).not.toMatch(/%/);
-    expect(recovery.textContent).toMatch(/was not the final word/);
+    expect(recovery.textContent).toMatch(/was not the ending/);
   });
 
   it('never claims a recovery for a monotonically rising series — the "low" is just the starting price, not a dip', () => {
@@ -341,15 +378,15 @@ describe('KeyTakeaways (M7 Phase 3D-4, item 7)', () => {
         sim={{ ...BASE_SIM, growth_series: seriesFrom(['1000.00000000', '1500.00000000', '2500.00000000']) }}
       />
     );
-    expect(screen.queryByText(/was not the final word/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/was not the ending/)).not.toBeInTheDocument();
   });
 
   it('includes a dividend-contribution observation only when dividends were actually reinvested', () => {
     const { rerender } = render(<KeyTakeaways sim={{ ...BASE_SIM, include_dividends: false }} />);
-    expect(screen.queryByText(/Dividend reinvestment was enabled/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Part of this result was earned quietly/)).not.toBeInTheDocument();
 
     rerender(<KeyTakeaways sim={{ ...BASE_SIM, include_dividends: true }} />);
-    expect(screen.getByText(/Dividend reinvestment was enabled for this simulation/)).toBeInTheDocument();
+    expect(screen.getByText(/Part of this result was earned quietly/)).toBeInTheDocument();
   });
 
   it('includes a split observation only when a split was actually disclosed, pluralized correctly', () => {
@@ -357,7 +394,7 @@ describe('KeyTakeaways (M7 Phase 3D-4, item 7)', () => {
       { split_date: '2020-06-01', split_ratio: '4.000000' as SimulationResponse['disclosed_splits'][number]['split_ratio'] },
     ];
     render(<KeyTakeaways sim={{ ...BASE_SIM, disclosed_splits: splits }} />);
-    expect(screen.getByText(/1 stock split occurred during this window/)).toBeInTheDocument();
+    expect(screen.getByText(/1 stock split happened during this window/)).toBeInTheDocument();
   });
 
   it('never uses imperative "you should" advice language anywhere in the rendered bullets', () => {

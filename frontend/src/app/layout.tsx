@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { IBM_Plex_Mono, Newsreader, Public_Sans } from 'next/font/google';
 import { AppProviders } from '@/providers/app-providers';
 import { THEME_INIT_SCRIPT } from '@/providers/theme-script';
+import { socialMetadata } from '@/lib/social-metadata';
 import './globals.css';
 
 /**
@@ -31,9 +32,28 @@ const newsreader = Newsreader({
   style: ['normal', 'italic'],
 });
 
+/**
+ * M7 Phase 3D-5 (item 4) — Open Graph / social cards. `metadataBase` makes
+ * every relative metadata URL (the shared `og-default.png` card each
+ * route's `socialMetadata()` references) resolve to an absolute URL, which
+ * social crawlers require. `NEXT_PUBLIC_SITE_URL` must be set on a real
+ * deployment; the localhost fallback exists only so local dev/build works.
+ * Routes with their own `metadata`/`generateMetadata` compose their own
+ * og/twitter fields via `socialMetadata()` (a child `openGraph` shallowly
+ * replaces this one — see social-metadata.ts); this root object covers any
+ * route that doesn't, e.g. the not-found boundary.
+ */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const SITE_TITLE = 'Investment Time Machine';
+const SITE_DESCRIPTION = 'Understand historical investment outcomes — precisely, and without hype.';
+const rootSocial = socialMetadata({ title: SITE_TITLE, description: SITE_DESCRIPTION });
+
 export const metadata: Metadata = {
-  title: 'Investment Time Machine',
-  description: 'Understand historical investment outcomes — precisely, and without hype.',
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: { type: 'website', siteName: SITE_TITLE, ...rootSocial.openGraph },
+  twitter: rootSocial.twitter,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

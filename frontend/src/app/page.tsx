@@ -5,11 +5,16 @@ import { TypedHeroHeading } from '@/components/landing/typed-hero-heading';
 import { ExampleSimulationsList } from '@/components/landing/example-simulations-list';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { MagneticWrap } from '@/components/ui/magnetic-wrap';
+import { socialMetadata } from '@/lib/social-metadata';
+
+const PAGE_TITLE = 'Investment Time Machine — What would it be worth today?';
+const PAGE_DESCRIPTION =
+  'A deterministic historical investment simulator. Real market data, replayed dividend by dividend — never a prediction, never advice.';
 
 export const metadata: Metadata = {
-  title: 'Investment Time Machine — What would it be worth today?',
-  description:
-    'A deterministic historical investment simulator. Real market data, replayed dividend by dividend — never a prediction, never advice.',
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  ...socialMetadata({ title: PAGE_TITLE, description: PAGE_DESCRIPTION }),
 };
 
 /**
@@ -29,7 +34,10 @@ export const metadata: Metadata = {
  */
 export default function LandingPage() {
   return (
-    <ProductShell contentClassName="max-w-[860px] flex flex-col gap-10 px-6 py-12 sm:px-10 sm:py-16">
+    // Vertical rhythm only — the horizontal measure is the shell's own (M7
+    // Phase 3D-5, item 1). Kept shorter than other routes' py so the page
+    // still rests in one viewport on a typical desktop height.
+    <ProductShell contentClassName="flex flex-col gap-10 py-12 sm:py-16">
       <section className="flex flex-col gap-6">
         <TypedHeroHeading />
         <p className="max-w-prose text-base text-ink-secondary sm:text-lg">

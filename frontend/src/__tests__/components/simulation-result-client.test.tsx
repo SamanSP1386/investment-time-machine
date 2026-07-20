@@ -118,7 +118,7 @@ describe('SimulationResultClient', () => {
     expect(screen.getByText('+9.59%')).toBeInTheDocument();
 
     // Section 5 — Growth Over Time, now backed by a real, persisted series (KI-021 resolved).
-    expect(screen.getByText(/This chart traces the value of this investment/)).toBeInTheDocument();
+    expect(screen.getByText(/The line above is the whole story of this investment/)).toBeInTheDocument();
 
     // Section 6 — Why. Price appreciation and dividend contribution always
     // render; inflation adjustment is omitted here since BASE_SIM did not
@@ -178,6 +178,11 @@ describe('SimulationResultClient', () => {
 
     expect(screen.getByRole('link', { name: 'Run another simulation' })).toHaveAttribute('href', '/simulator');
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeInTheDocument();
+    // M7 Phase 3D-5 (item 5) — the permanent-link caption, provenance
+    // stated as a feature, beside the Copy link action.
+    expect(
+      screen.getByText('Every result has a permanent link — same inputs, same answer, always.')
+    ).toBeInTheDocument();
   });
 
   it('copies the current URL to the clipboard and shows brief confirmation', async () => {

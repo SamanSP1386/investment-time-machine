@@ -20,6 +20,20 @@ describe('AboutPage (M7 Phase 3D-4, item 8)', () => {
     expect(screen.getByText(/Placeholder — founder to replace with final personal copy/)).toBeInTheDocument();
   });
 
+  it('M7 Phase 3D-5 (item 3): links the builder\'s GitHub — new tab, noopener — on the page and quietly in the footer', () => {
+    render(<AboutPage />);
+    // Two by design: the About page's editorial "Built by Saman — GitHub"
+    // link, and the sitewide quiet footer link.
+    const githubLinks = screen.getAllByRole('link', { name: 'GitHub' });
+    expect(githubLinks).toHaveLength(2);
+    for (const link of githubLinks) {
+      expect(link).toHaveAttribute('href', 'https://github.com/SamanSP1386');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link.getAttribute('rel')).toContain('noopener');
+    }
+    expect(screen.getByText(/Built by Saman/)).toBeInTheDocument();
+  });
+
   it('states the product principles (Identity/Trust/Behavior) sourced from the Experience Constitution', () => {
     render(<AboutPage />);
     expect(screen.getByRole('heading', { name: 'Identity' })).toBeInTheDocument();

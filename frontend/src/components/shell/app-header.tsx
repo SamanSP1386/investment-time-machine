@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SHELL_CONTAINER_CLASS } from './shell-geometry';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -26,12 +27,15 @@ const NAV_LINKS = [
  * own text. A translucent scroll backdrop (the page's own surface tint,
  * blurred) fixes the collision while staying quiet — it's still a thin
  * hairline rule doing the visual separation, not a filled opaque bar.
- * `maxWidthClassName` is threaded down from `ProductShell`, which derives it
- * from the current page's own content column, so the header's inner
- * container always lines up with the content beneath it instead of a
- * hardcoded width that only matched some pages.
+ *
+ * M7 Phase 3D-5 (item 1): the per-page `maxWidthClassName` threading is
+ * gone — it existed only because pages carried different column widths, the
+ * very inconsistency the unified shell measure removes. The header's inner
+ * container is now `SHELL_CONTAINER_CLASS`, the same single geometry the
+ * main column and footer use, so it lines up with the content beneath it on
+ * every route by construction.
  */
-export function AppHeader({ maxWidthClassName = 'max-w-[1200px]' }: { maxWidthClassName?: string }) {
+export function AppHeader() {
   const pathname = usePathname();
 
   return (
@@ -62,10 +66,7 @@ export function AppHeader({ maxWidthClassName = 'max-w-[1200px]' }: { maxWidthCl
        * both make that fallback less likely to ever trigger in practice.
        */}
       <div
-        className={cn(
-          'mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-5 sm:px-10',
-          maxWidthClassName
-        )}
+        className={cn(SHELL_CONTAINER_CLASS, 'flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-5')}
       >
         <Link href="/" className="font-serif text-base text-ink-primary italic sm:text-lg">
           Investment Time Machine

@@ -176,6 +176,28 @@ function RunAnotherSimulationLink() {
   );
 }
 
+/**
+ * The Results page's closing action row plus the permanent-link caption
+ * (M7 Phase 3D-5, item 5) — provenance stated as a feature, in one quiet
+ * line. No backend work behind it: persistence + `calculation_version`
+ * already guarantee a stored simulation replays identically at its URL
+ * (Founder Decision 002's anonymous link sharing), so this sentence
+ * describes what is already true rather than promising anything new.
+ */
+function ResultActions() {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center gap-4">
+        <RunAnotherSimulationLink />
+        <CopyLinkButton />
+      </div>
+      <p className="text-xs text-ink-muted">
+        Every result has a permanent link — same inputs, same answer, always.
+      </p>
+    </div>
+  );
+}
+
 export function SimulationResultClient({ id }: { id: string }) {
   const { data: sim, isPending, isError, error, refetch, isFetching } = useSimulation(id);
   // Called unconditionally (Rules of Hooks) even though its result is only
@@ -186,7 +208,7 @@ export function SimulationResultClient({ id }: { id: string }) {
 
   if (isPending) {
     return (
-      <ProductShell contentClassName="max-w-[1200px] px-6 py-16 sm:px-10 sm:py-24">
+      <ProductShell contentClassName="py-16 sm:py-24">
         <ResultsSkeleton />
       </ProductShell>
     );
@@ -194,9 +216,12 @@ export function SimulationResultClient({ id }: { id: string }) {
 
   if (isError) {
     const errorCopy = getErrorCopy(error instanceof ApiError ? error.code : 'INTERNAL_SERVER_ERROR');
+    // The shell's column geometry never narrows per-state (M7 Phase 3D-5,
+    // item 1) — the error card alone caps its own width inside it.
     return (
-      <ProductShell contentClassName="max-w-2xl flex flex-col gap-8 p-6 sm:p-10">
+      <ProductShell contentClassName="flex flex-col gap-8 py-16 sm:py-24">
         <ErrorState
+          className="max-w-2xl"
           title={errorCopy.title}
           description={errorCopy.description}
           requestId={error instanceof ApiError ? error.requestId : undefined}
@@ -209,10 +234,7 @@ export function SimulationResultClient({ id }: { id: string }) {
 
   if (sim.status === 'completed') {
     return (
-      <ProductShell
-        calculationVersion={sim.calculation_version}
-        contentClassName="max-w-[1200px] flex flex-col px-6 py-16 sm:px-10 sm:py-24"
-      >
+      <ProductShell calculationVersion={sim.calculation_version} contentClassName="flex flex-col py-16 sm:py-24">
         <div
           className={cn(entrance.active && ['entrance-dissolve', entrance.dissolved && 'entrance-dissolve-settled'])}
         >
@@ -222,46 +244,45 @@ export function SimulationResultClient({ id }: { id: string }) {
             <WhyExplanation sim={sim} />
             <KeyTakeaways sim={sim} />
             <TheProof sim={sim} />
-            <div className="flex flex-wrap items-center gap-4">
-              <RunAnotherSimulationLink />
-              <CopyLinkButton />
-            </div>
+            <ResultActions />
           </OpeningSequenceHeading>
         </div>
       </ProductShell>
     );
   }
 
+  // The shell's column geometry never narrows per-state (M7 Phase 3D-5,
+  // item 1) — the pending/failed reading content alone caps its own width
+  // inside the shared measure.
   return (
-    <ProductShell contentClassName="max-w-2xl flex flex-col gap-8 p-6 sm:p-10">
-      <ResultHeader sim={sim} />
+    <ProductShell contentClassName="py-16 sm:py-24">
+      <div className="flex max-w-2xl flex-col gap-8">
+        <ResultHeader sim={sim} />
 
-      {sim.status === 'pending' ? (
-        <Card>
-          <CardContent className="flex flex-col items-start gap-3">
-            <p className="text-sm text-ink-primary">
-              This simulation hasn’t finished calculating yet. Results appear here as soon as the Simulation Engine
-              completes.
-            </p>
-            <Button variant="secondary" size="sm" onClick={() => refetch()} loading={isFetching}>
-              Check again
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <ErrorState
-          title="Simulation could not be completed"
-          description={sim.error_message ?? 'The simulation could not be calculated.'}
-        />
-      )}
+        {sim.status === 'pending' ? (
+          <Card>
+            <CardContent className="flex flex-col items-start gap-3">
+              <p className="text-sm text-ink-primary">
+                This simulation hasn’t finished calculating yet. Results appear here as soon as the Simulation Engine
+                completes.
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => refetch()} loading={isFetching}>
+                Check again
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <ErrorState
+            title="Simulation could not be completed"
+            description={sim.error_message ?? 'The simulation could not be calculated.'}
+          />
+        )}
 
-      <SimulationSnapshot sim={sim} />
+        <SimulationSnapshot sim={sim} />
 
-      <TechnicalDetails sim={sim} />
+        <TechnicalDetails sim={sim} />
 
-      <div className="flex flex-wrap items-center gap-4">
-        <RunAnotherSimulationLink />
-        <CopyLinkButton />
+        <ResultActions />
       </div>
     </ProductShell>
   );

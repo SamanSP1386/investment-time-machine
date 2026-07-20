@@ -74,7 +74,7 @@ describe('GrowthChart — normal series', () => {
 
     expect(
       screen.getByText(
-        'This chart traces the value of this investment from $1,000.00 on Jan 2, 2020 to $1,050.00 on Jan 5, 2020, across 4 data points.'
+        'The line above is the whole story of this investment, day by day: worth $1,000.00 on Jan 2, 2020 and $1,050.00 on Jan 5, 2020, and every rise and dip between those two figures actually happened — 4 recorded values, none of them estimated.'
       )
     ).toBeInTheDocument();
     expect(document.querySelector('svg')).toBeInTheDocument();
@@ -169,11 +169,11 @@ describe('GrowthChart — decimation (task D.14)', () => {
     const longSeries = series(Array.from({ length: 500 }, (_, i) => (1000 + i).toFixed(8)));
     render(<GrowthChart sim={{ ...BASE_SIM, growth_series: longSeries }} />);
 
-    const summary = screen.getByText(/This chart traces the value of this investment/);
-    expect(summary.textContent).toContain('across 500 data points');
-    expect(summary.textContent).toMatch(/a smoothed line of \d+ is drawn for readability/);
+    const summary = screen.getByText(/The line above is the whole story of this investment/);
+    expect(summary.textContent).toContain('500 recorded values');
+    expect(summary.textContent).toMatch(/the drawn line samples \d+ of them for readability/);
 
-    const match = summary.textContent?.match(/a smoothed line of (\d+) is drawn/);
+    const match = summary.textContent?.match(/the drawn line samples (\d+) of them/);
     const drawnCount = match ? Number(match[1]) : 0;
     expect(drawnCount).toBeLessThanOrEqual(200);
     expect(drawnCount).toBeGreaterThanOrEqual(100);
@@ -189,8 +189,8 @@ describe('GrowthChart — decimation (task D.14)', () => {
       />
     );
 
-    const summary = screen.getByText(/This chart traces the value of this investment/);
-    expect(summary.textContent).not.toMatch(/smoothed line/);
+    const summary = screen.getByText(/The line above is the whole story of this investment/);
+    expect(summary.textContent).not.toMatch(/samples \d+ of them/);
   });
 
   it('the accessible Proof table (via the parent results-sections.tsx pattern) always reflects every raw point — decimation only affects what the chart draws, confirmed here by the sim.growth_series prop passed through unchanged', () => {

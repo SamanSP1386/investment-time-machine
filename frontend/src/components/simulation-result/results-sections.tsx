@@ -156,13 +156,34 @@ function WhyParagraph({ heading, children }: { heading: string; children: string
   );
 }
 
-/** Section 6's price-appreciation paragraph — always relevant, since price movement drives every simulation regardless of dividend/inflation choices. */
+/**
+ * Section 6's price-appreciation paragraph — always relevant, since price
+ * movement drives every simulation regardless of dividend/inflation
+ * choices. Rewritten M7 Phase 3D-5 (item 2, human-voice pass): meaning
+ * first, the figures as evidence — the old copy recited the numbers
+ * ("moved from X to Y, carrying the Z shares...") and left the reader to
+ * work out what they meant. Branches on the price's own direction via
+ * `compareDecimalStrings` (the general-purpose, string-safe comparator,
+ * ADR-033 — a comparison, never a derived figure), so a gain and a loss
+ * each get a sentence that actually describes them; the structure and
+ * length of both branches are deliberately parallel (FD-013 §6/§7 —
+ * identical treatment, no celebration, no softening).
+ */
 function priceAppreciationText(sim: SimulationResponse): string {
   if (sim.initial_price === null || sim.final_price === null || sim.shares_purchased === null) {
-    return `${sim.asset_symbol}'s own share price moving over this period is the single largest driver of this result.`;
+    return `${sim.asset_symbol}'s own share price moving across this window shaped this result more than any other factor — the exact start and end prices simply aren't available for this particular simulation to show here.`;
   }
   const shares = formatCurrency(sim.shares_purchased, { currencySymbol: '', decimals: 2 });
-  return `${sim.asset_symbol}'s own share price moved from ${formatCurrency(sim.initial_price)} to ${formatCurrency(sim.final_price)} over this period, carrying the ${shares} shares this investment purchased to the final value above — the single largest driver of this result.`;
+  const initial = formatCurrency(sim.initial_price);
+  const final = formatCurrency(sim.final_price);
+  const direction = compareDecimalStrings(sim.final_price, sim.initial_price);
+  if (direction === 1) {
+    return `The engine of this result is the share price itself climbing: one share of ${sim.asset_symbol} went from ${initial} at the start of this window to ${final} at the end, and the ${shares} shares this investment started with rode that rise. More than anything else, that movement is what the final value above reflects.`;
+  }
+  if (direction === -1) {
+    return `The story of this result is a falling share price: one share of ${sim.asset_symbol} was worth ${initial} when this window opened and ${final} when it closed, and the ${shares} shares this investment started with fell with it. More than anything else, that decline is what the final value above reflects.`;
+  }
+  return `${sim.asset_symbol}'s share price ended this window exactly where it began — ${initial} per share at both ends — so price movement itself neither added to nor subtracted from this result.`;
 }
 
 /**
@@ -181,9 +202,9 @@ function priceAppreciationText(sim: SimulationResponse): string {
  */
 function dividendText(sim: SimulationResponse): string {
   if (sim.include_dividends) {
-    return `Any dividends ${sim.asset_symbol} paid during this period were reinvested automatically — used to purchase additional shares each time a payment occurred — compounding the share count that produced the final value above.`;
+    return `Dividends never left this simulation as cash. Any payment ${sim.asset_symbol} made during this window bought a little more stock the same day it arrived, so the share count could grow on its own — and every later move in the price worked on those extra shares too. That compounding, wherever it occurred, is already inside the final value above.`;
   }
-  return `This simulation did not reinvest dividends, by choice. If ${sim.asset_symbol} paid dividends during this period, they are not reflected in the value above.`;
+  return `Dividends played no part in this number — this simulation was set not to reinvest them. If ${sim.asset_symbol} paid any during this window, that cash simply isn't counted here; what you see above is the shares alone.`;
 }
 
 /**
@@ -198,9 +219,9 @@ function dividendText(sim: SimulationResponse): string {
 function inflationText(sim: SimulationResponse): string | null {
   if (!sim.adjust_for_inflation) return null;
   if (sim.inflation_adjusted_final_value !== null) {
-    return `Adjusted for inflation, this result represents ${formatCurrency(sim.inflation_adjusted_final_value)} in today's purchasing power — a measure of what the final value could actually buy, not just its face amount.`;
+    return `Face value and buying power are not the same thing. Measured against actual CPI records for these dates, the final value above works out to ${formatCurrency(sim.inflation_adjusted_final_value)} in today's purchasing power — what the money could really buy, not just the number written on it.`;
   }
-  return `Inflation adjustment was requested, but the CPI data needed for this exact period wasn't available. The figures above are shown in nominal, not inflation-adjusted, dollars — a genuine data gap, stated plainly rather than smoothed over.`;
+  return `Inflation adjustment was requested for this simulation, but the CPI records this exact period needs aren't available. The figures above are therefore face-value dollars, not purchasing power — a genuine gap in the data, stated here plainly rather than smoothed over.`;
 }
 
 /**
@@ -284,7 +305,7 @@ function rangeTakeaway(sim: SimulationResponse): string | null {
   if (!extremes) return null;
   const { high, low } = extremes;
   if (high.point_date === low.point_date) return null;
-  return `Along the way, this investment's own recorded value ranged from ${formatCurrency(low.value)} (on ${formatDate(low.point_date)}) to ${formatCurrency(high.value)} (on ${formatDate(high.point_date)}) — a real illustration of volatility a single final number doesn't show.`;
+  return `The final number hides a bumpy ride. Along the way, this investment was recorded as low as ${formatCurrency(low.value)} (on ${formatDate(low.point_date)}) and as high as ${formatCurrency(high.value)} (on ${formatDate(high.point_date)}) — swings a single end-of-window figure never shows.`;
 }
 
 /**
@@ -310,30 +331,30 @@ function recoveryTakeaway(sim: SimulationResponse): string | null {
     low.point_date !== lastPoint.point_date &&
     compareDecimalStrings(sim.final_value, low.value) === 1;
   if (!isGenuineRecovery) return null;
-  return `The lowest value recorded during this period was ${formatCurrency(low.value)} on ${formatDate(low.point_date)} — well before the window closed on ${formatDate(sim.end_date)} at ${formatCurrency(sim.final_value)}. What looked like the low point partway through was not the final word.`;
+  return `There was a point where this looked much worse. On ${formatDate(low.point_date)} the recorded value had fallen to ${formatCurrency(low.value)}; by the time the window closed on ${formatDate(sim.end_date)} it stood at ${formatCurrency(sim.final_value)}. The low point along the way was not the ending.`;
 }
 
 function dividendContributionTakeaway(sim: SimulationResponse): string | null {
   if (!sim.include_dividends) return null;
-  return `Dividend reinvestment was enabled for this simulation — every payment ${sim.asset_symbol} made along the way automatically bought additional shares, compounding into the final value above without appearing as a separate line item.`;
+  return `Part of this result was earned quietly. With reinvestment on, every dividend ${sim.asset_symbol} paid bought more shares the day it arrived — growth that never appears as its own line item, only inside the final value.`;
 }
 
 function splitTakeaway(sim: SimulationResponse): string | null {
   if (sim.disclosed_splits.length === 0) return null;
   // eslint-disable-next-line no-restricted-syntax -- array-length comparison, not a DecimalString comparison (ADR-033).
   const plural = sim.disclosed_splits.length > 1;
-  return `${sim.disclosed_splits.length} stock split${plural ? 's' : ''} occurred during this window (disclosed above) — a change in share count and price that left this investment's actual value unaffected.`;
+  return `${sim.disclosed_splits.length} stock split${plural ? 's' : ''} happened during this window (disclosed above). A split changes how many shares exist and what each one costs — it never changed what this investment was worth.`;
 }
 
 /** Always available (dates only, no derived duration) — the "time-in-market" example from the section's own brief, explicitly non-predictive. */
 function horizonTakeaway(sim: SimulationResponse): string {
-  return `This result reflects one continuous holding from ${formatDate(sim.start_date)} to ${formatDate(sim.end_date)} — not an average of many possible entry points, and not a projection of what happens next.`;
+  return `This result took the whole window to happen: one continuous holding from ${formatDate(sim.start_date)} to ${formatDate(sim.end_date)}, never traded in between. It says nothing about any other stretch of time — and nothing about the next one.`;
 }
 
 /** Always available when a result exists — the general "one specific history, not a rule" observation, guaranteeing at least 3 takeaways even for a degenerate (single-point or empty) growth series. */
 function outcomeTakeaway(sim: SimulationResponse): string | null {
   if (sim.final_value === null) return null;
-  return `The result above reflects one specific historical window for ${sim.asset_symbol} — a different start or end date in this same asset's real history can show a very different outcome. This simulation is a record of what happened once, not a general expectation.`;
+  return `This is what ${sim.asset_symbol} did across one specific stretch of its own history. Start or end the window somewhere else and the same asset's real past can tell a very different story — one simulation is one record, not a rule.`;
 }
 
 /**
@@ -443,16 +464,23 @@ function GrowthDataTable({ sim }: { sim: SimulationResponse }) {
  */
 function plainTermsBullets(sim: SimulationResponse): string[] {
   const dividendsBullet = sim.include_dividends
-    ? 'Dividend payments were reinvested — each one bought additional shares on its own payment date, compounding your share count from there.'
-    : `Dividends were not reinvested. If ${sim.asset_symbol} paid any during this period, they are not reflected in the result above.`;
-  const inflationBullet = sim.adjust_for_inflation
-    ? 'The result was also adjusted for inflation, using actual historical CPI data — never an estimate.'
-    : 'Inflation was not factored in — the figures above are nominal dollars, not adjusted for purchasing power.';
+    ? 'Dividends went straight back in: each payment bought more shares the day it arrived, which is how the share count — and the result — compounded.'
+    : `Dividends stayed out of this one, per this simulation's own settings. If ${sim.asset_symbol} paid any, that cash is not in the number above.`;
+  // Three inflation states, not two (M7 Phase 3D-5, item 2): the old bullet
+  // claimed the result "was adjusted" whenever adjustment was *requested*,
+  // even when the CPI lookup came back unavailable and the figures were
+  // actually nominal — the one place this list could quietly misstate what
+  // happened. The unavailable case now says so, matching `inflationText`.
+  const inflationBullet = !sim.adjust_for_inflation
+    ? 'No inflation adjustment was applied — the figures above are the dollar amounts as they stood, with no translation into today\'s buying power.'
+    : sim.inflation_adjusted_final_value !== null
+      ? 'The result was also translated into today\'s purchasing power, using actual historical CPI records — what the money could really buy, not just its face amount.'
+      : 'An inflation adjustment was requested, but the CPI records for this exact period aren\'t available — so the figures above are face-value dollars, and that gap is stated rather than hidden.';
   return [
-    `Every figure above comes from ${sim.asset_symbol}'s actual daily closing price between ${formatDate(sim.start_date)} and ${formatDate(sim.end_date)} — never an estimate, a model, or a prediction.`,
+    `Everything above was replayed from ${sim.asset_symbol}'s real daily closing prices between ${formatDate(sim.start_date)} and ${formatDate(sim.end_date)} — recorded market history, with nothing estimated, modeled, or predicted.`,
     dividendsBullet,
     inflationBullet,
-    'This does not predict the future, does not account for taxes or brokerage fees, and never shifts your chosen dates to a nearby trading day.',
+    'And what this is not: a prediction. Taxes, fees, and brokerage costs aren\'t modeled; chosen dates are never quietly shifted to a nearby trading day; and nothing here says what happens next.',
   ];
 }
 

@@ -2,10 +2,15 @@ import type { Metadata } from 'next';
 import { Check } from 'lucide-react';
 import { ProductShell } from '@/components/shell/product-shell';
 import { SimulationForm } from '@/components/simulator/simulation-form';
+import { socialMetadata } from '@/lib/social-metadata';
+
+const PAGE_TITLE = 'Simulator — Investment Time Machine';
+const PAGE_DESCRIPTION = 'Simulate a historical investment decision against real historical market data.';
 
 export const metadata: Metadata = {
-  title: 'Simulator — Investment Time Machine',
-  description: 'Simulate a historical investment decision against real historical market data.',
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  ...socialMetadata({ title: PAGE_TITLE, description: PAGE_DESCRIPTION }),
 };
 
 /**
@@ -29,7 +34,9 @@ const TRUST_INDICATORS = [
  */
 export default function SimulatorPage() {
   return (
-    <ProductShell contentClassName="max-w-[860px] flex flex-col gap-14 px-6 py-20 sm:px-10 sm:py-28">
+    // Vertical rhythm only — the horizontal measure is the shell's own (M7
+    // Phase 3D-5, item 1); py aligned to the Results page's 16/24.
+    <ProductShell contentClassName="flex flex-col gap-14 py-16 sm:py-24">
       <div className="flex flex-col gap-8">
         {/* "Historical simulation," not the product wordmark — AppHeader
             already carries brand identity on every product route. */}

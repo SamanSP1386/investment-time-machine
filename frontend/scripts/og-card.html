@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!--
+  The design source for src/app/opengraph-image.png / twitter-image.png
+  (M7 Phase 3D-5, item 4a). Rasterized to a static 1200x630 PNG by
+  scripts/generate-og-image.mjs — the fonts below load from Google Fonts at
+  GENERATION time only; the shipped asset is a plain PNG, so the product
+  itself still makes no external font/CDN request at runtime (ADR-044).
+  Every color is the elevated dark palette's own token value, verbatim from
+  src/styles/tokens/primitives.css.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+  href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    /* --gradient-elevated-bg-dark, verbatim */
+    background: linear-gradient(160deg, #12151c 0%, #0d141f 55%, #0a0d13 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 72px 80px 64px;
+    font-family: 'Newsreader', Georgia, serif;
+  }
+  .kicker {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: oklch(0.6 0.035 235); /* --color-elevated-ink-muted-dark */
+  }
+  .question-block { display: flex; flex-direction: column; gap: 36px; }
+  .rule {
+    width: 56px;
+    height: 2px;
+    background: oklch(0.78 0.13 82); /* --color-accent-dark */
+  }
+  h1 {
+    font-size: 84px;
+    line-height: 1.12;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: oklch(0.95 0.015 85); /* --color-elevated-ink-primary-dark */
+    max-width: 980px;
+  }
+  .bottom { display: flex; align-items: baseline; justify-content: space-between; }
+  .wordmark {
+    font-style: italic;
+    font-size: 34px;
+    font-weight: 500;
+    color: oklch(0.78 0.13 82); /* --color-accent-dark */
+  }
+  .tagline {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 17px;
+    color: oklch(0.6 0.035 235); /* --color-elevated-ink-muted-dark */
+  }
+</style>
+</head>
+<body>
+  <p class="kicker">A deterministic historical simulation</p>
+  <div class="question-block">
+    <div class="rule"></div>
+    <h1>If you had invested&nbsp;&mdash; what would it be worth today?</h1>
+  </div>
+  <div class="bottom">
+    <p class="wordmark">Investment Time Machine</p>
+    <p class="tagline">Real market data. Never advice.</p>
+  </div>
+</body>
+</html>
