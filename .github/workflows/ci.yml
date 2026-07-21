@@ -109,10 +109,25 @@ jobs:
 
       - name: Run it on a Render-shaped $PORT and smoke-test /healthz
         run: |
+          # ENVIRONMENT=test (not production): this step verifies the image
+          # builds and binds to Render's injected $PORT — it does not stand
+          # up a real Postgres or a real Vercel-deployed frontend, so it
+          # cannot honestly satisfy Settings' production fail-fast guard
+          # (app/core/config.py — DATABASE_URL must not be loopback,
+          # CORS_ALLOWED_ORIGINS/JWT_SECRET must not be placeholders,
+          # ENVIRONMENT=production only). That guard is correct and is
+          # exercised for real by backend/tests/core/test_config.py; this
+          # step's own job is narrower ("does the image boot and serve
+          # traffic"), so it runs under a non-production environment the
+          # guard already exempts, same as any other test/dev boot. Kept
+          # DATABASE_URL/CORS_ALLOWED_ORIGINS/JWT_SECRET set anyway (harmless
+          # under ENVIRONMENT=test) so this step still exercises the same
+          # startup code path — config loading, CORS middleware wiring, the
+          # Redis-optional startup log — a bare-minimum env would skip.
           docker run -d --name itm-backend-ci \
             -p 10000:10000 \
             -e PORT=10000 \
-            -e ENVIRONMENT=production \
+            -e ENVIRONMENT=test \
             -e DATABASE_URL="postgresql://ci_user:ci_password@localhost:5432/ci_placeholder" \
             -e CORS_ALLOWED_ORIGINS="https://ci-placeholder.vercel.app" \
             -e JWT_SECRET="ci-only-not-a-real-secret-$(date +%s)" \
