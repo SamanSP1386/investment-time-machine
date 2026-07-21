@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,6 +8,33 @@ _DEFAULT_JWT_SECRET = "changeme-dev-only-do-not-use-in-production"
 _DEFAULT_DATABASE_URL = "postgresql://itm_user:itm_password@localhost:5432/itm_dev"
 _DEFAULT_CORS_ORIGINS = "http://localhost:3000"
 _NON_PRODUCTION_ENVIRONMENTS = {"development", "test", "testing"}
+_LOCAL_DATABASE_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
+
+
+def _is_local_placeholder_database_url(url: str) -> bool:
+    """True for a `DATABASE_URL` that could not possibly be a real
+    production database — empty/unparseable, or pointed at a loopback host.
+
+    Deliberately NOT an exact-string match against `_DEFAULT_DATABASE_URL`.
+    pydantic-settings resolves an unset field from a real environment
+    variable (which outranks the Python field default) before ever falling
+    back to that literal default — so a *different* local placeholder than
+    the one exact default string can and does reach `Settings` unnoticed.
+    Concretely, this is exactly how this guard's own CI regression happened:
+    `.github/workflows/ci.yml`'s `lint-and-test` job sets a job-level
+    `DATABASE_URL=postgresql://itm_user:itm_password@localhost:5432/itm_test`
+    for its ephemeral Postgres service — same host, different database name
+    — which a literal `== _DEFAULT_DATABASE_URL` check let straight through.
+    Matching on the *host* instead catches every local/placeholder variant,
+    not just the one string this module happens to default to.
+    """
+    if not url:
+        return True
+    try:
+        hostname = urlparse(url).hostname
+    except ValueError:
+        return True
+    return not hostname or hostname.lower() in _LOCAL_DATABASE_HOSTNAMES
 
 
 class Settings(BaseSettings):
@@ -143,11 +171,11 @@ class Settings(BaseSettings):
         values a deploy must always override, plus the cookie flag that must
         never be relaxed outside development."""
         if self.environment not in _NON_PRODUCTION_ENVIRONMENTS:
-            if self.database_url == _DEFAULT_DATABASE_URL:
+            if _is_local_placeholder_database_url(self.database_url):
                 raise ValueError(
                     "DATABASE_URL must be set to the real database when ENVIRONMENT is not one "
-                    f"of {sorted(_NON_PRODUCTION_ENVIRONMENTS)} — refusing to start pointed at "
-                    "the local development placeholder."
+                    f"of {sorted(_NON_PRODUCTION_ENVIRONMENTS)} — refusing to start pointed at a "
+                    "local/loopback or missing database host."
                 )
             if self.cors_allowed_origins == _DEFAULT_CORS_ORIGINS:
                 raise ValueError(
