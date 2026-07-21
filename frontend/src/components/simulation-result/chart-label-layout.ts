@@ -136,10 +136,12 @@ function candidateShifts(label: MeasuredLabel): Array<{ dx: number; dy: number }
 }
 
 /**
- * Clamp-shift for the endpoint label only: the minimal dx/dy that brings an
- * out-of-bounds box fully inside the chart. (The render-time left/right
- * flip in growth-chart.tsx already reserves margin for the common case;
- * this is the measured backstop for what that heuristic can't foresee.)
+ * Clamp-shift for the endpoint label and axis ticks: the minimal dx/dy that
+ * brings an out-of-bounds box fully inside the chart. (growth-chart.tsx's
+ * own render-time margin reservation already covers the common case for
+ * both; this is the measured backstop for what that estimate can't
+ * foresee — a font-metric mismatch, an unusual date width, a browser
+ * difference.)
  */
 function clampIntoBounds(box: Box, bounds: ChartBounds): { dx: number; dy: number } {
   let dx = 0;
@@ -212,14 +214,28 @@ export function resolveLabelCollisions(labels: MeasuredLabel[], bounds: ChartBou
     let settledBox: Box | null = null;
     for (const includeSoft of [true, false]) {
       for (const { dx, dy } of candidateShifts(label)) {
-        const candidate = shifted(label, dx, dy);
-        // A tick's only candidate is its natural position — an axis label
-        // brushing the container edge is the axis's own business, not a
-        // reason to hide it; bounds only constrain labels this pass MOVES.
-        if (label.kind !== 'tick' && !insideBounds(candidate, bounds)) continue;
+        let candidate = shifted(label, dx, dy);
+        if (label.kind === 'tick') {
+          // A tick's own text is meaning-bearing (WHERE it is), so it's
+          // never hidden — but it's also never allowed to clip against the
+          // chart's own edge. Most often this is the LAST tick, centered
+          // (text-anchor: middle) on the plot's rightmost point: half its
+          // width can extend past the plot area into a thin right margin,
+          // straight into the SVG's own default `overflow: hidden`
+          // boundary. Clamped fully into bounds instead of skipped — a
+          // shift left (or right, at the domain's start), never a clip.
+          // Collision with a higher-priority label below still applies to
+          // this clamped position, exactly as it did before.
+          const clamp = clampIntoBounds(candidate, bounds);
+          candidate = shifted(candidate, clamp.dx, clamp.dy);
+        } else if (!insideBounds(candidate, bounds)) {
+          continue;
+        }
         if (collidesWith(candidate, includeSoft)) continue;
         settledBox = candidate;
-        if (dx !== 0 || dy !== 0) resolutions.push({ id: label.id, action: 'shift', dx, dy });
+        const totalDx = candidate.x - label.x;
+        const totalDy = candidate.y - label.y;
+        if (totalDx !== 0 || totalDy !== 0) resolutions.push({ id: label.id, action: 'shift', dx: totalDx, dy: totalDy });
         break;
       }
       if (settledBox) break;

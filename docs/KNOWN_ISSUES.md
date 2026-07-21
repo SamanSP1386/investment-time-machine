@@ -88,6 +88,7 @@ Tracks all unresolved issues. Resolved issues remain in this document with a Res
 - **Resolution Date**: 2026-07-15
 
 
+
 ### KI-011
 
 - **Description**: The `secret-scan` CI job (`gitleaks/gitleaks-action@v2`) failed intermittently with a non-zero exit after a merge / unrelated-history pull, even though its own log reported "no leaks found." Root cause: the action infers a commit range from the GitHub push/PR event refs to scan only the diff; that range becomes ambiguous once local and remote histories are merged (e.g. after a merge commit or a pull that combines unrelated history), and the action fails to resolve it rather than falling back to a full scan.

@@ -492,6 +492,22 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
   const endpointLabel = formatCurrency(last.rawValue);
   // eslint-disable-next-line no-restricted-syntax -- string-length comparison, not a DecimalString comparison (ADR-033).
   const endpointLabelFlipped = endpointLabel.length > ENDPOINT_LABEL_FLIP_THRESHOLD;
+  // Found live (BTC-USD 2017-today, 3479 points): the X-axis's LAST tick is
+  // always centered (text-anchor: middle) on the plot's rightmost point —
+  // the endpoint's own date — regardless of which side the endpoint VALUE
+  // label flips to. When the endpoint flips left, the right margin used to
+  // drop to a flat 16px on the assumption nothing else needed it; but the
+  // tick's own label still does, and Recharts' <svg> has no `overflow:
+  // visible`, so an under-reserved tick clips mid-character against the
+  // SVG's own default-hidden edge (never the shell's — this happens well
+  // inside it). Estimated with the same mono-font char width
+  // `computeYAxisWidth` uses for the Y-axis (same 11px mono tick style).
+  const lastTickLabel = formatDate(last.point_date);
+  const lastTickHalfWidth = Math.ceil((lastTickLabel.length * AXIS_TICK_CHAR_WIDTH_PX) / 2);
+  const chartRightMargin = Math.max(
+    endpointLabelFlipped ? 16 : 84,
+    lastTickHalfWidth + AXIS_TICK_WIDTH_PADDING_PX / 2
+  );
   // The baseline sits near the top of the plotted domain for a loss (the
   // invested amount is the series' own maximum) and near the bottom for a
   // gain — found live (task D verification): anchoring its label on the
@@ -547,7 +563,7 @@ function ChartBody({ sim, settled }: { sim: SimulationResponse; settled: boolean
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={splitPoints}
-            margin={{ top: 8, right: endpointLabelFlipped ? 16 : 84, bottom: 8, left: 4 }}
+            margin={{ top: 8, right: chartRightMargin, bottom: 8, left: 4 }}
           >
             <defs>
               {/* Item 6a — two fills, split at the invested-amount baseline:

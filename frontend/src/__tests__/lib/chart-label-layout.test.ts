@@ -109,9 +109,14 @@ describe('resolveLabelCollisions — bounds handling (founder scenario: 375px wi
     }
   });
 
-  it('does not hide a tick merely for brushing the container edge — bounds only constrain labels the resolver moves', () => {
+  it('clamp-shifts a tick that overflows the chart edge back into view, rather than clipping or hiding it (BTC-USD 2017→today repro)', () => {
     const resolutions = resolveLabelCollisions([label('tick-0', 'tick', 340, 180, 60, 12)], NARROW);
-    expect(resolutions).toEqual([]);
+    expect(resolutionFor(resolutions, 'tick-0')).toEqual({ id: 'tick-0', action: 'shift', dx: -25, dy: 0 });
+  });
+
+  it('leaves a tick untouched when it is already fully in bounds', () => {
+    const resolutions = resolveLabelCollisions([label('tick-0', 'tick', 100, 180, 60, 12)], NARROW);
+    expect(resolutionFor(resolutions, 'tick-0')).toBeUndefined();
   });
 });
 
