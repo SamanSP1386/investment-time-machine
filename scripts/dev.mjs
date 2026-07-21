@@ -35,6 +35,78 @@ function fail(message) {
   process.exit(1);
 }
 
+const FRONTEND_PORT = 3000;
+
+// Finds the PID of whatever process is LISTENING on `port`, or null if the
+// port is free. No shell/pipe usage (the earlier `netstat -ano | findstr`
+// idea was dropped — Node's `shell: true` re-quotes each arg individually
+// before handing them to cmd.exe, which mangles a literal `|`); instead the
+// full `netstat` output is captured and filtered in JS.
+function findPidOnPort(port) {
+  if (isWindows) {
+    const result = spawnSync('netstat', ['-ano'], { encoding: 'utf8' });
+    if (!result.stdout) return null;
+    const line = result.stdout
+      .split(/\r?\n/)
+      .find((l) => l.includes('LISTENING') && l.includes(`:${port} `));
+    if (!line) return null;
+    const pid = line.trim().split(/\s+/).pop();
+    return /^\d+$/.test(pid) ? pid : null;
+  }
+  const result = spawnSync('lsof', ['-ti', `tcp:${port}`], { encoding: 'utf8' });
+  const pid = result.stdout ? result.stdout.trim().split('\n')[0] : null;
+  return pid || null;
+}
+
+// Only a confirmed Node process is auto-killed (see ensurePortIsFree below)
+// — killing an arbitrary unrelated process automatically, just because it
+// happens to occupy port 3000, is too risky to do silently.
+function isLikelyNodeProcess(pid) {
+  if (isWindows) {
+    const result = spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8' });
+    return typeof result.stdout === 'string' && /node\.exe/i.test(result.stdout);
+  }
+  const result = spawnSync('ps', ['-p', pid, '-o', 'comm='], { encoding: 'utf8' });
+  return typeof result.stdout === 'string' && /node/i.test(result.stdout);
+}
+
+function killPid(pid) {
+  if (isWindows) {
+    spawnSync('taskkill', ['/PID', pid, '/F'], { stdio: 'ignore' });
+  } else {
+    spawnSync('kill', ['-9', pid], { stdio: 'ignore' });
+  }
+}
+
+// Guards against silent port drift: without this check, if something is
+// already bound to port 3000, Next.js just starts on 3001 (then 3002, ...)
+// instead of failing — and that drifted port then no longer matches
+// CORS_ALLOWED_ORIGINS (app/core/config.py, now comma-list-aware precisely
+// to make room for this), so API calls start failing with a CORS error that
+// looks completely unrelated to "a stray dev server is still running."
+function ensurePortIsFree(port) {
+  const pid = findPidOnPort(port);
+  if (!pid) return;
+
+  console.log(`\nPort ${port} is already in use (pid ${pid}).`);
+  if (isLikelyNodeProcess(pid)) {
+    console.log(
+      `That looks like a leftover Node process (a previous dev server) — killing pid ${pid} ` +
+        `so the frontend starts on its expected port ${port} instead of silently drifting to ` +
+        `the next free one...`
+    );
+    killPid(pid);
+    return;
+  }
+
+  fail(
+    `Port ${port} is already in use by a non-Node process (pid ${pid}). This script only ` +
+      `auto-frees a port it can confirm is a leftover Node process — killing an unrelated ` +
+      `process automatically is too risky to do silently. Stop it yourself, then re-run ` +
+      `\`npm run dev\`.`
+  );
+}
+
 console.log('Investment Time Machine — starting the full local stack\n');
 
 // 1. Postgres, Redis, and the backend API (docker-compose.yml). `depends_on`
@@ -79,7 +151,8 @@ if (!existsSync(path.join(frontendDir, 'node_modules'))) {
 // 4. Frontend dev server — the one long-running foreground process. Postgres/
 // Redis/the backend keep running in the background (`docker compose up -d`);
 // stop them separately with `docker compose down` when done.
-console.log('\nStarting frontend dev server (http://localhost:3000)...\n');
+ensurePortIsFree(FRONTEND_PORT);
+console.log(`\nStarting frontend dev server (http://localhost:${FRONTEND_PORT})...\n`);
 const frontend = spawn('npm', ['run', 'dev'], {
   cwd: frontendDir,
   stdio: 'inherit',

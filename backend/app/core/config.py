@@ -4,6 +4,8 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEFAULT_JWT_SECRET = "changeme-dev-only-do-not-use-in-production"
+_DEFAULT_DATABASE_URL = "postgresql://itm_user:itm_password@localhost:5432/itm_dev"
+_DEFAULT_CORS_ORIGINS = "http://localhost:3000"
 _NON_PRODUCTION_ENVIRONMENTS = {"development", "test", "testing"}
 
 
@@ -14,17 +16,26 @@ class Settings(BaseSettings):
 
     app_name: str = "Investment Time Machine"
     environment: str = "development"
-    database_url: str = "postgresql://itm_user:itm_password@localhost:5432/itm_dev"
-    cors_allowed_origins: str = "http://localhost:3000"
+    database_url: str = _DEFAULT_DATABASE_URL
+    cors_allowed_origins: str = _DEFAULT_CORS_ORIGINS
 
     # Data Ingestion (Milestone 2)
     fred_api_key: str = ""
     ingestion_http_timeout_seconds: float = 10.0
 
     # API Layer (Milestone 4) — Redis, deliberately excluded until a
-    # milestone actually needed caching or rate limiting (ADR-004); this is
-    # that milestone.
-    redis_url: str = "redis://localhost:6379/0"
+    # milestone actually needed caching or rate limiting (ADR-004). Milestone
+    # 8 (Deployment) revisits this: Redis is OPTIONAL, not required — an
+    # empty string (the default) means "no Redis configured," and every
+    # Redis-backed component (`app.core.rate_limit`, `app.auth.lockout`)
+    # falls back to an in-process, single-instance equivalent instead of
+    # attempting a network connection at all (ADR-047). This is deliberately
+    # a *different* fallback trigger than the existing per-call
+    # fail-open-on-`RedisError` behavior below: an empty `REDIS_URL` is a
+    # known, permanent condition (the Render free-tier deploy omits a Redis
+    # add-on entirely) and should never pay a socket-connect-timeout on
+    # every single request finding that out the hard way.
+    redis_url: str = ""
     rate_limit_simulation_per_minute: int = 60
     rate_limit_read_per_minute: int = 100
 
@@ -69,6 +80,19 @@ class Settings(BaseSettings):
     ai_max_explanation_regenerations: int = 3
     ai_max_followup_questions: int = 10
 
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        """`CORS_ALLOWED_ORIGINS` accepts a comma-separated list (not just a
+        single hardcoded origin) so local dev survives Next.js port drift
+        (e.g. `http://localhost:3000,http://localhost:3001`) and so a real
+        deployment can list both a Vercel production domain and its preview
+        domains. Blank entries (a stray trailing comma, or the var being set
+        to an empty string) are dropped rather than passed through as a
+        literal empty-string origin, which would never match a real request
+        and would silently look like "CORS is configured" while blocking
+        everything."""
+        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+
     @model_validator(mode="after")
     def _reject_ai_provider_configured_without_api_key(self) -> "Settings":
         """Mirrors the JWT-secret startup guard below: a real provider
@@ -105,6 +129,39 @@ class Settings(BaseSettings):
                 f"one of {sorted(_NON_PRODUCTION_ENVIRONMENTS)} — refusing to start with the "
                 "default development placeholder."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _reject_dev_defaults_outside_development(self) -> "Settings":
+        """Production config discipline (KI-046): a real deployment left
+        pointed at a local placeholder fails obviously (wrong DB host, no
+        browser origin can call the API) rather than catastrophically like a
+        forgotten `JWT_SECRET` — but "obviously broken in production,
+        silently fine in every local/CI check" is exactly the class of gap
+        KI-046 asks this project to close by construction, not by
+        remembering. Mirrors the JWT-secret guard above for the two other
+        values a deploy must always override, plus the cookie flag that must
+        never be relaxed outside development."""
+        if self.environment not in _NON_PRODUCTION_ENVIRONMENTS:
+            if self.database_url == _DEFAULT_DATABASE_URL:
+                raise ValueError(
+                    "DATABASE_URL must be set to the real database when ENVIRONMENT is not one "
+                    f"of {sorted(_NON_PRODUCTION_ENVIRONMENTS)} — refusing to start pointed at "
+                    "the local development placeholder."
+                )
+            if self.cors_allowed_origins == _DEFAULT_CORS_ORIGINS:
+                raise ValueError(
+                    "CORS_ALLOWED_ORIGINS must be set to the real deployed frontend origin(s) "
+                    f"when ENVIRONMENT is not one of {sorted(_NON_PRODUCTION_ENVIRONMENTS)} — "
+                    "refusing to start with the local development placeholder (no real browser "
+                    "origin would be allowed to call this API)."
+                )
+            if not self.cookie_secure:
+                raise ValueError(
+                    "COOKIE_SECURE must be true when ENVIRONMENT is not one of "
+                    f"{sorted(_NON_PRODUCTION_ENVIRONMENTS)} — a non-Secure cookie must never be "
+                    "issued outside local, non-TLS development."
+                )
         return self
 
 

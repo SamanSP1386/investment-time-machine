@@ -44,3 +44,39 @@ describe('config/env production fallback guard', () => {
     expect(env.NEXT_PUBLIC_API_BASE_URL).toBe('https://api.example.com');
   });
 });
+
+/**
+ * NEXT_PUBLIC_AUTH_ENABLED — a forward-compat flag (KI-039) with no
+ * consumer yet (no login UI exists in the frontend). Defaults to disabled
+ * so a future auth UI stays hidden on a deployment where cross-site cookies
+ * cannot work, without needing every deploy to remember to set it.
+ */
+describe('config/env NEXT_PUBLIC_AUTH_ENABLED', () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+  });
+
+  it('defaults to false when unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'https://api.example.com');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_ENABLED', undefined);
+
+    const { env } = await import('@/config/env');
+    expect(env.NEXT_PUBLIC_AUTH_ENABLED).toBe(false);
+  });
+
+  it('parses "true" as enabled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'https://api.example.com');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_ENABLED', 'true');
+
+    const { env } = await import('@/config/env');
+    expect(env.NEXT_PUBLIC_AUTH_ENABLED).toBe(true);
+  });
+
+  it('rejects a non-boolean-ish value', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'https://api.example.com');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_ENABLED', 'yes');
+
+    await expect(import('@/config/env')).rejects.toThrow('Invalid environment configuration');
+  });
+});

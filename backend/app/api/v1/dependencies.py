@@ -30,7 +30,7 @@ from app.auth.exceptions import InvalidAccessTokenError
 from app.auth.tokens import decode_access_token
 from app.core.config import get_settings
 from app.core.database import get_session_factory
-from app.core.rate_limit import RateLimiter, get_redis_client
+from app.core.rate_limit import get_rate_limiter
 from app.models import User
 
 
@@ -48,21 +48,21 @@ def _client_key(request: Request) -> str:
 
 def rate_limit_simulation(request: Request) -> None:
     settings = get_settings()
-    limiter = RateLimiter(get_redis_client(), limit=settings.rate_limit_simulation_per_minute)
+    limiter = get_rate_limiter(limit=settings.rate_limit_simulation_per_minute)
     if not limiter.allow(f"simulation:{_client_key(request)}"):
         raise RateLimitExceededError()
 
 
 def rate_limit_read(request: Request) -> None:
     settings = get_settings()
-    limiter = RateLimiter(get_redis_client(), limit=settings.rate_limit_read_per_minute)
+    limiter = get_rate_limiter(limit=settings.rate_limit_read_per_minute)
     if not limiter.allow(f"read:{_client_key(request)}"):
         raise RateLimitExceededError()
 
 
 def rate_limit_auth(request: Request) -> None:
     settings = get_settings()
-    limiter = RateLimiter(get_redis_client(), limit=settings.rate_limit_auth_per_minute)
+    limiter = get_rate_limiter(limit=settings.rate_limit_auth_per_minute)
     if not limiter.allow(f"auth:{_client_key(request)}"):
         raise RateLimitExceededError()
 
@@ -73,7 +73,7 @@ def rate_limit_ai(request: Request) -> None:
     review §13) — per-user keying is deferred until real abuse patterns
     justify it, not built speculatively."""
     settings = get_settings()
-    limiter = RateLimiter(get_redis_client(), limit=settings.rate_limit_ai_per_minute)
+    limiter = get_rate_limiter(limit=settings.rate_limit_ai_per_minute)
     if not limiter.allow(f"ai:{_client_key(request)}"):
         raise RateLimitExceededError()
 

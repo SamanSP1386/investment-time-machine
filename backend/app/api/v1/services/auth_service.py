@@ -30,10 +30,9 @@ from app.auth.exceptions import (
     RefreshTokenReuseDetectedError,
     WeakPasswordError,
 )
-from app.auth.lockout import AccountLockout
+from app.auth.lockout import AccountLockout, InMemoryAccountLockout, get_account_lockout_backend
 from app.auth.service import IssuedSession
 from app.core.config import get_settings
-from app.core.rate_limit import get_redis_client
 from app.models.enums import AuditEventType
 
 _ERROR_CODES: dict[type[AuthError], str] = {
@@ -50,10 +49,9 @@ _ERROR_CODES: dict[type[AuthError], str] = {
 }
 
 
-def get_account_lockout() -> AccountLockout:
+def get_account_lockout() -> AccountLockout | InMemoryAccountLockout:
     settings = get_settings()
-    return AccountLockout(
-        get_redis_client(),
+    return get_account_lockout_backend(
         max_attempts=settings.account_lockout_max_attempts,
         window_seconds=settings.account_lockout_window_minutes * 60,
     )

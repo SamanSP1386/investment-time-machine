@@ -92,6 +92,51 @@ jobs:
       - name: Build
         run: npm run build
 
+  backend-docker-build:
+    runs-on: ubuntu-latest
+    # Verifies the exact artifact Render deploys (backend/Dockerfile) still
+    # builds and actually serves traffic on Render's $PORT-binding contract
+    # — neither was ever checked anywhere before (KI-001: "a real `docker
+    # compose up --build` pass is still owed"; this doesn't close KI-001 in
+    # full, since it builds/runs the image directly rather than through
+    # docker-compose, but it is real CI-parity coverage for the specific
+    # artifact production actually ships, which previously had none at all).
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the production image
+        run: docker build --file backend/Dockerfile --tag itm-backend-ci backend
+
+      - name: Run it on a Render-shaped $PORT and smoke-test /healthz
+        run: |
+          docker run -d --name itm-backend-ci \
+            -p 10000:10000 \
+            -e PORT=10000 \
+            -e ENVIRONMENT=production \
+            -e DATABASE_URL="postgresql://ci_user:ci_password@localhost:5432/ci_placeholder" \
+            -e CORS_ALLOWED_ORIGINS="https://ci-placeholder.vercel.app" \
+            -e JWT_SECRET="ci-only-not-a-real-secret-$(date +%s)" \
+            itm-backend-ci
+
+          # /healthz never touches the database (app/main.py), so the
+          # container serving it correctly proves the image + PORT binding
+          # work, independent of whether DATABASE_URL is actually reachable.
+          for attempt in $(seq 1 15); do
+            if curl -sf http://localhost:10000/healthz; then
+              echo "healthz OK"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "::error::/healthz never returned 200 — dumping container logs"
+          docker logs itm-backend-ci
+          exit 1
+
+      - name: Container logs (always, for debugging)
+        if: always()
+        run: docker logs itm-backend-ci || true
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:

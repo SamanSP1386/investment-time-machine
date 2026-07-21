@@ -15,6 +15,10 @@ services:
       timeout: 5s
       retries: 5
 
+  # Local dev only. The Render free-tier deploy omits Redis entirely — see
+  # docs/DEPLOYMENT.md / docs/ARCHITECTURE_DECISIONS.md ADR-047 — and the
+  # backend falls back automatically to an in-process equivalent when
+  # REDIS_URL is unset (app.core.rate_limit, app.auth.lockout).
   redis:
     image: redis:7-alpine
     ports:

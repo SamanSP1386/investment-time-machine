@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template itself, which documents every var a real deploy
+# needs (docs/DEPLOYMENT.md) and must ship in the repo, not just exist
+# locally on whichever machine happened to create it.
+!.env.example
 
 # vercel
 .vercel
