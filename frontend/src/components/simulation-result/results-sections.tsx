@@ -488,7 +488,10 @@ function PlainTermsList({ sim }: { sim: SimulationResponse }) {
   return (
     <div className="flex flex-col gap-3">
       <h3 className="text-base font-semibold text-ink-primary">In plain terms</h3>
-      <ul className="flex max-w-prose flex-col gap-2 text-sm text-ink-secondary">
+      {/* No max-w-prose here (M7 Phase 3D-6 clipping-bug fix) — see TheProof's
+          own doc comment for why this section's prose runs the panel's full
+          measure rather than the AI/Tutor 65-75ch cap. */}
+      <ul className="flex flex-col gap-2 text-sm text-ink-secondary">
         {plainTermsBullets(sim).map((bullet) => (
           <li key={bullet} className="flex gap-2">
             <span aria-hidden className="text-ink-muted">
@@ -539,6 +542,23 @@ function FormulaList() {
  * table (§5e, unchanged). Uses the shared `Disclosure` primitive (M7 Phase
  * 3D-1, task B.8) — a neutral rotating chevron, not the mockup's accent
  * "+" (task 11's accent-scarcity cleanup).
+ *
+ * M7 Phase 3D-6 (final touch pass, text-clipping fix): none of this
+ * section's prose is capped with max-w-prose any more. It was carried over
+ * from the per-stat "Source" disclosures this restructure (§5b) replaced,
+ * but frontend_design_system.md §5's 65-75ch measure is scoped explicitly
+ * to "AI explanation and Financial Tutor text" — long-form narrative prose
+ * read on its own. This panel is reference/evidence content (Methodology,
+ * Assumptions, the data table), read alongside full-width dl/table
+ * siblings in the same single column; capping only the paragraphs produced
+ * a real, reproducible ragged-width defect (a ~700px paragraph directly
+ * above or below an ~1150px grid/table in the same block) — this is what
+ * the founder was seeing as "text not aligned with the full page." Every
+ * element in this disclosure now shares one measure. The simulation-ID
+ * value below also gained break-all for the same investigation — an
+ * unbroken UUID had no wrap protection and could overflow its container at
+ * narrow widths, clipped by .itm-elevated's page-level overflow: clip
+ * (product-shell.tsx).
  */
 export function TheProof({ sim }: { sim: SimulationResponse }) {
   const [open, setOpen] = useState(false);
@@ -564,19 +584,19 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
 
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Methodology</h3>
-            <p className="max-w-prose">
+            <p>
               Uses each day&rsquo;s closing price (<code className="figure">close_price</code>), never adjusted-close.
               Dividends reinvest at that day&rsquo;s close, compounding shares held. Splits are disclosed but not
               adjusted for — the price series is already split-consistent. CAGR uses a fixed 365.25-day year — a
               documented choice, since the specification is silent.
             </p>
-            <p className="max-w-prose text-xs text-ink-muted">How each figure is computed:</p>
+            <p className="text-xs text-ink-muted">How each figure is computed:</p>
             <FormulaList />
           </div>
 
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Assumptions</h3>
-            <p className="max-w-prose">
+            <p>
               An exact closing price is required on the start and end date — a weekend or holiday is never shifted.
               Dividends are counted once, on their ex-dividend date, in order. Inflation adjustment (when requested)
               uses the most recent CPI reading on or before each date — never interpolated.
@@ -615,11 +635,11 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
               <DataSourceLine symbol={sim.asset_symbol} enabled={open} />
               <div className="flex flex-col gap-0.5">
                 <dt>Calculation version</dt>
-                <dd>{sim.calculation_version}</dd>
+                <dd className="break-all">{sim.calculation_version}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
                 <dt>Simulation ID</dt>
-                <dd>{sim.id}</dd>
+                <dd className="break-all">{sim.id}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
                 <dt>Created</dt>
@@ -630,7 +650,7 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
 
           <div className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink-primary">Growth chart data</h3>
-            <p className="max-w-prose text-xs text-ink-muted">
+            <p className="text-xs text-ink-muted">
               The exact date and value behind every point on the growth chart above — the chart&rsquo;s text
               alternative, not only a visual aid.
             </p>

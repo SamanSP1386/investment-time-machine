@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useScramble } from '@/hooks/use-scramble';
+
+function mockBackForwardNavigation() {
+  Object.defineProperty(window, 'navigation', {
+    value: { activation: { navigationType: 'traverse' } },
+    configurable: true,
+  });
+}
 
 /**
  * FD-018 rule 1 (the digits-only scramble/settle) and rule 5 (the
@@ -98,6 +105,24 @@ describe('useScramble', () => {
       await waitFor(() => expect(result.current.glow).toBe(true));
       await waitFor(() => expect(result.current.glow).toBe(false), { timeout: 1000 });
       expect(result.current.cycling).toBe(false);
+    });
+  });
+
+  describe('M7 Phase 3D-6 — back/forward navigation', () => {
+    afterEach(() => {
+      // @ts-expect-error -- test-only cleanup of a property mockBackForwardNavigation defines.
+      delete window.navigation;
+    });
+
+    it('renders the final target text immediately on a back/forward traversal, even though `active` is true — the Results entrance never replays on revisit', async () => {
+      mockBackForwardNavigation();
+      const { result } = renderHook(() => useScramble(TARGET, true, { duration: 30 }));
+
+      expect(result.current.text).toBe(TARGET);
+      expect(result.current.cycling).toBe(false);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(result.current.text).toBe(TARGET);
     });
   });
 });

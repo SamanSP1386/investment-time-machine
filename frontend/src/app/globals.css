@@ -667,3 +667,22 @@ input:-webkit-autofill:focus {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * M7 Phase 3D-6 (final touch pass, page transitions) — the app-wide View
+ * Transition crossfade (`layout.tsx`) is browser-animated inside a separate
+ * pseudo-element tree (`::view-transition-*`), not real DOM nodes, so the
+ * `*`-selector override immediately above never reaches it — the same gap
+ * Next's own "Designing view transitions" guide calls out explicitly.
+ * Collapsing every view-transition animation to ~0 duration here reduces it
+ * to the browser's un-animated default (an instant swap), matching how
+ * every other motion in this codebase degrades under reduced motion.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+}

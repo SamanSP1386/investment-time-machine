@@ -1,3 +1,4 @@
+import { LogoMark } from './logo-mark';
 import { SHELL_CONTAINER_CLASS } from './shell-geometry';
 
 /**
@@ -12,12 +13,19 @@ import { SHELL_CONTAINER_CLASS } from './shell-geometry';
  * quiet line-end link — muted, text-xs, sitewide by virtue of living here.
  * Same geometry as the header and main column (`SHELL_CONTAINER_CLASS`,
  * item 1).
+ *
+ * M7 Phase 3D-6 (final touch pass) adds the bare spiral mark ahead of the
+ * disclaimer line — `text-ink-muted` (not accent: a repeated per-page
+ * appearance is exactly the "would it still feel special?" case §16 already
+ * rules against for accent, so the footer mark reads as a quiet signature,
+ * not a second accent moment). Static only, per LogoMark's own doc comment.
  */
 export function AppFooter({ calculationVersion }: { calculationVersion?: string }) {
   return (
     <footer className="border-t border-border-hairline">
       <div className={`${SHELL_CONTAINER_CLASS} flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 py-6`}>
-        <p className="figure text-xs text-ink-muted">
+        <p className="figure flex items-baseline gap-2 text-xs text-ink-muted">
+          <LogoMark className="h-3 w-3 shrink-0 translate-y-[0.15em] text-ink-muted" />
           Investment Time Machine is an educational tool — not financial advice.
           {calculationVersion ? ` Calculation ${calculationVersion}.` : ''}
         </p>

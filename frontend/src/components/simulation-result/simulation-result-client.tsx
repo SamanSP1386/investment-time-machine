@@ -94,7 +94,7 @@ function TechnicalDetails({ sim }: { sim: SimulationResponse }) {
       <dl className="figure mt-4 flex flex-col gap-2 text-xs text-ink-secondary">
         <div className="flex flex-col gap-0.5">
           <dt className="kicker">Simulation ID</dt>
-          <dd>{sim.id}</dd>
+          <dd className="break-all">{sim.id}</dd>
         </div>
         <div className="flex flex-col gap-0.5">
           <dt className="kicker">Calculation version</dt>

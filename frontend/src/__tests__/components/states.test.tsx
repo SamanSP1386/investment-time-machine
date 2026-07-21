@@ -37,4 +37,10 @@ describe('ErrorState', () => {
     render(<ErrorState title="Something went wrong" />);
     expect(screen.queryByText('Technical details')).not.toBeInTheDocument();
   });
+
+  it('M7 Phase 3D-6 (text-clipping fix): the request id / error code lines carry break-all, so an unbroken UUID cannot overflow its container', () => {
+    render(<ErrorState title="Something went wrong" requestId="req-123" errorCode="INTERNAL_SERVER_ERROR" />);
+    expect(screen.getByText(/req-123/).className).toMatch(/break-all/);
+    expect(screen.getByText(/INTERNAL_SERVER_ERROR/).className).toMatch(/break-all/);
+  });
 });

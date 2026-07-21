@@ -52,6 +52,7 @@ export default function GlobalError({ error, unstable_retry }: RouteErrorBoundar
                 fontSize: 12,
                 color: '#6b6963',
                 fontFamily: 'ui-monospace, monospace',
+                wordBreak: 'break-all',
               }}
             >
               Reference: {error.digest}

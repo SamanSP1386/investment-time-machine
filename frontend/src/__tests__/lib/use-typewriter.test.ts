@@ -4,6 +4,13 @@ import { useTypewriter } from '@/hooks/use-typewriter';
 
 const TEXT = 'If you had invested — what would it be worth today?';
 
+function mockBackForwardNavigation() {
+  Object.defineProperty(window, 'navigation', {
+    value: { activation: { navigationType: 'traverse' } },
+    configurable: true,
+  });
+}
+
 /**
  * Fully deterministic via fake timers (3D-4 deflake): the hook's timeline is
  * `requestAnimationFrame` + `performance.now()` + one `setTimeout`, so all
@@ -98,5 +105,23 @@ describe('useTypewriter', () => {
     const firstRenderText = result.current.text;
     rerender({ value: `${TEXT}`.slice(0) });
     expect(result.current.text).toBe(firstRenderText);
+  });
+
+  describe('M7 Phase 3D-6 — back/forward navigation', () => {
+    afterEach(() => {
+      // @ts-expect-error -- test-only cleanup of a property mockBackForwardNavigation defines.
+      delete window.navigation;
+    });
+
+    it('renders the full text instantly on a back/forward traversal, even though `active` is true — the Landing hero never retypes on revisit', () => {
+      mockBackForwardNavigation();
+      const { result } = renderHook(() => useTypewriter(TEXT, true, { duration: 200, cursorBlinkMs: 10 }));
+
+      expect(result.current.text).toBe(TEXT);
+      expect(result.current.showCursor).toBe(false);
+
+      advanceFrames(5);
+      expect(result.current.text).toBe(TEXT);
+    });
   });
 });

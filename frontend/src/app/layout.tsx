@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { ViewTransition } from 'react';
 import { IBM_Plex_Mono, Newsreader, Public_Sans } from 'next/font/google';
 import { AppProviders } from '@/providers/app-providers';
 import { THEME_INIT_SCRIPT } from '@/providers/theme-script';
@@ -69,7 +70,50 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full antialiased">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          {/*
+           * M7 Phase 3D-6 (final touch pass, page transitions) — the ONE
+           * app-wide View Transition wrapper: unifies every route pair
+           * (landing<->simulator<->results<->about<->error/not-found) on a
+           * quick crossfade, per `next.config.ts`'s
+           * `experimental.viewTransition` flag. `default="auto"` is React's
+           * own built-in crossfade activation for any transition without a
+           * more specific name — deliberately no custom keyframes here: the
+           * View Transitions spec's own default UA animation for an
+           * unnamed root transition is already a 250ms crossfade, which
+           * sits inside the requested ~200-250ms window with no bespoke
+           * CSS to maintain. There is no shared-element `name` on this
+           * wrapper since nothing persists identity across a full route
+           * change here (every route swaps its entire `ProductShell`,
+           * header included — see that component's own doc comment on why
+           * no nested layout persists across routes in this app).
+           *
+           * This is the only `<ViewTransition>` in the tree — no page or
+           * component nests another one — so there is exactly one thing to
+           * compose with the Results page's own richer entrance
+           * (`useSettleIn`/`useScramble`), never a second, stacked
+           * page-level transition: this wrapper crossfades the page
+           * SNAPSHOT (old pixels -> new pixels, ~250ms), while the
+           * newly-mounted Results components' own component-level
+           * settle/scramble run as an independent layer on top of the live
+           * DOM, not a second View-Transition-driven effect — the two
+           * compose rather than double-fire the same mechanism.
+           * Back/forward navigation still gets this crossfade (a generic,
+           * appropriate treatment for any navigation) but never replays the
+           * Results/Landing entrance choreography — see
+           * `use-settle-in.ts`/`use-scramble.ts`/`use-typewriter.ts` and
+           * `lib/navigation-history.ts`.
+           *
+           * Feature-detected by the browser itself, per Next's own
+           * viewTransition guide: unsupported browsers render normally
+           * with an instant swap, no separate fallback code needed.
+           * `prefers-reduced-motion` is handled in `globals.css`, since the
+           * View Transition pseudo-element tree isn't reachable by the
+           * existing `*`-selector override (it targets real DOM nodes
+           * only).
+           */}
+          <ViewTransition default="auto">{children}</ViewTransition>
+        </AppProviders>
       </body>
     </html>
   );

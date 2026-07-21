@@ -381,7 +381,7 @@ function EmptySeriesFallback({ simId }: { simId: string }) {
       A day-by-day growth chart isn&rsquo;t available for this specific simulation — an unusual gap for a completed
       result. The Final Value and Total Return above are already exact and fully calculated; only this particular
       view of the path getting there could not be reconstructed.{' '}
-      <span className="figure font-mono text-xs text-ink-muted">Simulation ID: {simId}</span>
+      <span className="figure font-mono text-xs break-all text-ink-muted">Simulation ID: {simId}</span>
     </p>
   );
 }

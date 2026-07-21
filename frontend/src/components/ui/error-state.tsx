@@ -50,8 +50,8 @@ export function ErrorState({ title, description, requestId, errorCode, action, c
           summary="Technical details"
         >
           <div className="figure mt-1 flex flex-col gap-0.5">
-            {errorCode ? <p>Error code: {errorCode}</p> : null}
-            {requestId ? <p>Reference: {requestId}</p> : null}
+            {errorCode ? <p className="break-all">Error code: {errorCode}</p> : null}
+            {requestId ? <p className="break-all">Reference: {requestId}</p> : null}
           </div>
         </Disclosure>
       ) : null}

@@ -289,3 +289,11 @@ The single warm accent hue (`--color-accent`, ported from the founder-approved m
 - Negative/loss values — those use `--color-negative-tint` (a separate, restrained warm tone), never accent and never `--color-status-critical`.
 
 A useful working test before adding a new accent usage: *if this appeared five times on the same screen, would it still feel special?* If the honest answer is no, it isn't a hero figure, a primary action, or a key data mark — it's decoration, and belongs in plain ink instead.
+
+## 17. Logo Mark (M7 Phase 3D-6 — Final Touch Pass)
+
+The brand mark is a single filled logarithmic-spiral path (`LogoMark`, `src/components/shell/logo-mark.tsx`; the standalone favicon at `app/icon.svg` ports the identical path) — founder-selected direction: "the pure spiral," a plain closed spiral evoking compounding growth, gold (`--color-accent`) fill, no stroke, no raster. Used in the navbar lockup (mark sized to the wordmark's cap height), quietly bare in the footer and the 404/error pages.
+
+**The mark never animates, spins, or is used as a loading indicator, anywhere in the product** — a static spiral must not be mistakable for a spinner. No call site may add a `transition`/`animation` class or an `animate-spin` utility to it.
+
+

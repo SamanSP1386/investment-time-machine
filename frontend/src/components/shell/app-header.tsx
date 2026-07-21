@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LogoMark } from './logo-mark';
 import { SHELL_CONTAINER_CLASS } from './shell-geometry';
 import { cn } from '@/lib/utils';
 
@@ -68,7 +69,22 @@ export function AppHeader() {
       <div
         className={cn(SHELL_CONTAINER_CLASS, 'flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-5')}
       >
-        <Link href="/" className="font-serif text-base text-ink-primary italic sm:text-lg">
+        {/*
+         * Navbar lockup (M7 Phase 3D-6, final touch pass) — the spiral mark
+         * plus the existing wordmark, one `Link` so the whole lockup is one
+         * click target (matching how the mark-only footer/error-page uses
+         * stay bare). `h-[1.15em] w-[1.15em]` sizes the mark off the
+         * wordmark's own font-size (its `em` is this row's, since neither
+         * element sets its own font-size) so it tracks the `text-base
+         * sm:text-lg` responsive step automatically rather than needing a
+         * second breakpoint pair. `text-accent`: the mark is gold in both
+         * themes via the existing `--color-accent` remap inside
+         * `.itm-elevated` (§16's single point of control), never a
+         * hand-picked hex here. Static only — see LogoMark's own doc
+         * comment for the standing "never animates" rule.
+         */}
+        <Link href="/" className="flex items-center gap-2 font-serif text-base text-ink-primary italic sm:text-lg">
+          <LogoMark className="h-[1.15em] w-[1.15em] shrink-0 text-accent" />
           Investment Time Machine
         </Link>
         <nav aria-label="Primary" className="flex items-center gap-4 sm:gap-6">

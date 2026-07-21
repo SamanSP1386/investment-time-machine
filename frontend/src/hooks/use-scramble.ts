@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { isBackForwardNavigation } from '@/lib/navigation-history';
 
 /**
  * How often the still-cycling (unlocked) digits re-randomize, in ms — a
@@ -39,13 +40,19 @@ const CYCLE_TICK_MS = 55;
  * no effect runs at all for that case: the FIRST render already shows
  * `target` with no intermediate scrambled state ever observable (FD-018
  * rule 5's test-enforced hard gate).
+ *
+ * M7 Phase 3D-6 (page transitions) — the same initializer also checks
+ * `isBackForwardNavigation()`, matching `useSettleIn`'s own addition: a
+ * browser back/forward traversal shows the final `target` text immediately,
+ * with no scramble, so the Results entrance never replays on a back/forward
+ * revisit. See `useSettleIn`'s doc comment for the full rationale.
  */
 export function useScramble(
   target: string,
   active: boolean,
   { duration, delay = 0 }: { duration: number; delay?: number }
 ): { text: string; glow: boolean; cycling: boolean } {
-  const [wasActive] = useState(active);
+  const [wasActive] = useState(() => active && !isBackForwardNavigation());
   const [state, setState] = useState(() => ({
     text: wasActive ? scrambleAt(target, 0) : target,
     glow: false,

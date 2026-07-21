@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { isBackForwardNavigation } from '@/lib/navigation-history';
 
 const DEFAULT_DURATION_MS = 1200;
 const DEFAULT_CURSOR_BLINK_MS = 500;
@@ -22,13 +23,19 @@ const CURSOR_BLINKS = 2;
  * production values and exist as parameters only so tests can use short
  * synthetic durations (matching `useScramble`'s own `{ duration, delay }`
  * pattern), not because a real call site ever needs a different value.
+ *
+ * M7 Phase 3D-6 (page transitions) — the initializer also checks
+ * `isBackForwardNavigation()`: a browser back/forward traversal back to the
+ * Landing page shows the finished hero line immediately, matching
+ * `useSettleIn`/`useScramble`'s identical addition for the Results page's
+ * own one-shot entrances.
  */
 export function useTypewriter(
   text: string,
   active: boolean,
   { duration = DEFAULT_DURATION_MS, cursorBlinkMs = DEFAULT_CURSOR_BLINK_MS }: { duration?: number; cursorBlinkMs?: number } = {}
 ): { text: string; showCursor: boolean } {
-  const [wasActive] = useState(active);
+  const [wasActive] = useState(() => active && !isBackForwardNavigation());
   const [state, setState] = useState(() => ({
     text: wasActive ? '' : text,
     showCursor: wasActive,

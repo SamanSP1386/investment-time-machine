@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { isBackForwardNavigation } from '@/lib/navigation-history';
 
 /**
  * The Results heading's one permitted entrance transition (Founder Decision
@@ -15,9 +16,19 @@ import { useEffect, useState } from 'react';
  * `true` immediately with no `requestAnimationFrame` scheduled at all --
  * the caller's content is simply present from the first paint, no
  * transition to disable mid-flight.
+ *
+ * M7 Phase 3D-6 (page transitions) — also folds in
+ * `isBackForwardNavigation()`: a browser back/forward traversal never plays
+ * this settle, even when the caller's own `active` says motion is allowed.
+ * This is the composition point with the new app-wide View Transition
+ * crossfade (`layout.tsx`) — that crossfade still plays on every
+ * navigation, back/forward included, but this component-level entrance
+ * does not restack on top of it a second time when the navigation was a
+ * traversal, matching the standing "must not replay entrance choreography
+ * on back/forward" rule.
  */
 export function useSettleIn(active: boolean): boolean {
-  const [wasActive] = useState(active);
+  const [wasActive] = useState(() => active && !isBackForwardNavigation());
   const [settled, setSettled] = useState(!wasActive);
 
   useEffect(() => {

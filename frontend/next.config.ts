@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
   // already convey via the terminal, and is never present in a production
   // build regardless of this flag.
   devIndicators: false,
+  // M7 Phase 3D-6 (final touch pass, page transitions) — enables React's
+  // <ViewTransition> integration with App Router navigations (root layout
+  // wraps {children} in one, `globals.css` supplies the crossfade timing).
+  // Browsers without the View Transitions API are unaffected: per Next's
+  // own docs, "without browser support, your application works normally,
+  // the transitions simply do not animate" — an instant swap, no separate
+  // fallback code needed.
+  experimental: {
+    viewTransition: true,
+  },
 };
 
 export default nextConfig;

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LogoMark } from '@/components/shell/logo-mark';
 import { ProductShell } from '@/components/shell/product-shell';
 import { buttonVariants } from '@/components/ui/button-variants';
 
@@ -15,6 +16,11 @@ export default function NotFound() {
   return (
     <ProductShell contentClassName="flex flex-col gap-8 py-16 sm:py-24">
       <div className="flex flex-col gap-6">
+        {/* Bare mark, quiet (M7 Phase 3D-6) — the header above already
+            carries the wordmark lockup, so this is a small, decorative
+            signature reinforcing "you're still inside the product," not a
+            second brand statement. */}
+        <LogoMark className="h-6 w-6 text-ink-muted" />
         <p className="kicker">404 — Not found</p>
         <h1 className="max-w-4xl font-serif text-[clamp(2rem,2.8vw+1rem,3.25rem)] leading-tight font-medium text-ink-primary">
           This page returned no data.

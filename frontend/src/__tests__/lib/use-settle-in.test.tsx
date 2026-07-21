@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useSettleIn } from '@/hooks/use-settle-in';
+
+function mockBackForwardNavigation() {
+  Object.defineProperty(window, 'navigation', {
+    value: { activation: { navigationType: 'traverse' } },
+    configurable: true,
+  });
+}
 
 function nextFrame() {
   return new Promise<void>((resolve) => {
@@ -45,5 +52,25 @@ describe('useSettleIn', () => {
     // Still settled — the inactive capture at mount is permanent for this
     // mount's lifetime, not re-evaluated on every render.
     expect(result.current).toBe(true);
+  });
+
+  describe('M7 Phase 3D-6 — back/forward navigation', () => {
+    afterEach(() => {
+      // @ts-expect-error -- test-only cleanup of a property mockBackForwardNavigation defines.
+      delete window.navigation;
+    });
+
+    it('starts (and stays) settled on a back/forward traversal, even though `active` is true', async () => {
+      mockBackForwardNavigation();
+      const { result } = renderHook(() => useSettleIn(true));
+
+      expect(result.current).toBe(true);
+
+      await act(async () => {
+        await nextFrame();
+        await nextFrame();
+      });
+      expect(result.current).toBe(true);
+    });
   });
 });

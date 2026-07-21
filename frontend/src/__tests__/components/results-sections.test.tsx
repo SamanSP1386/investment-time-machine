@@ -286,6 +286,18 @@ describe('TheProof', () => {
     expect(screen.getByText('Jul 18, 2026, 12:00 AM UTC')).toBeInTheDocument();
   });
 
+  it('M7 Phase 3D-6 (text-clipping fix): no element inside the panel is capped with max-w-prose — every prose block shares the panel\'s own full measure, matching its full-width dl/table siblings', () => {
+    const { container } = render(<TheProof sim={BASE_SIM} />);
+    const capped = container.querySelectorAll('.max-w-prose');
+    expect(capped.length).toBe(0);
+  });
+
+  it('M7 Phase 3D-6 (text-clipping fix): Simulation ID and Calculation version carry break-all, so an unbroken UUID cannot overflow its container', () => {
+    render(<TheProof sim={BASE_SIM} />);
+    expect(screen.getByText('sim-123').className).toMatch(/break-all/);
+    expect(screen.getByText('v2').className).toMatch(/break-all/);
+  });
+
   it('does not fetch the data source until the disclosure is actually opened', () => {
     render(<TheProof sim={BASE_SIM} />);
     expect(useAssetDetail).toHaveBeenCalledWith('AAPL', false);
