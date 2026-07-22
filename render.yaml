@@ -35,6 +35,14 @@ services:
     plan: free
     region: oregon
     healthCheckPath: /healthz
+    # No `startCommand` here on purpose: backend/Dockerfile's CMD already
+    # points at backend/scripts/start.sh, which runs `alembic upgrade head`
+    # then the one-time starter-catalog ingestion (only if the assets table
+    # is still empty) before exec-ing into uvicorn — see that script's own
+    # header comment. This exists specifically because Render's free tier
+    # has no Shell/One-Off Jobs access to run those as separate manual
+    # steps; a `startCommand` override here would replace the Dockerfile's
+    # CMD and skip all of it, so deliberately left unset.
     envVars:
       - key: APP_NAME
         value: Investment Time Machine

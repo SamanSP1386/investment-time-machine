@@ -9,7 +9,7 @@ This is a **free-tier, no-custom-domain** deploy. Read [Free-tier caveats](#free
 ## Free-tier caveats — read this first
 
 - **Cold starts.** Render's free web services spin down after a period of inactivity and take roughly **30-60 seconds** to wake back up on the next request. The first visitor after a quiet period will see a slow initial load (or a request that times out and needs a retry) — this is normal, not a bug. [Optional: keep it warm with UptimeRobot](#optional-keep-the-backend-warm-with-uptimerobot) below.
-- **Free Postgres has a lifespan.** Render's free-tier PostgreSQL databases are not permanent — Render has historically enforced an expiration window (on the order of 30-90 days) after which a free database is deleted unless upgraded to a paid plan. **Check the current policy in the Render dashboard when you create the database** (it's stated on the database's own page) and calendar a reminder before that date — losing the database means losing every simulation ever created plus the ingested catalog, and required rerunning the one-shot ingestion step below.
+- **Free Postgres has a lifespan.** Render's free-tier PostgreSQL databases are not permanent — Render has historically enforced an expiration window (on the order of 30-90 days) after which a free database is deleted unless upgraded to a paid plan. **Check the current policy in the Render dashboard when you create the database** (it's stated on the database's own page) and calendar a reminder before that date — losing the database means losing every simulation ever created plus the ingested catalog; a fresh database is repopulated automatically on the next boot (see Step 3 below), no manual step needed.
 - **Single instance, no Redis.** Rate limiting and account lockout run in-process on this deploy (see [Redis-optional](#why-theres-no-redis) below) — correct and safe for a single free-tier instance, but counters reset on every redeploy/restart and aren't shared if you ever scale to multiple instances.
 - **No auto-deploy wired up yet.** This pass deliberately does not connect a git push/merge to an automatic Render or Vercel deploy — every deploy is a manual action you trigger, until that's set up separately.
 
@@ -39,7 +39,7 @@ This is expected and does not block anything: the product's core flow — runnin
 | Key | Value | When to set it |
 |---|---|---|
 | `CORS_ALLOWED_ORIGINS` | Your Vercel URL, e.g. `https://investment-time-machine.vercel.app` | After Part 2 creates the Vercel project — come back and set this then. Until it's set, `app.core.config.Settings` refuses to boot (production fail-fast guard) if it's left at the `http://localhost:3000` default — so the very first deploy attempt failing is expected, not a bug. |
-| `FRED_API_KEY` | Optional — leave blank unless you want Economic Indicator ingestion | Never required for the core deploy; the starter asset catalog (Step 4) doesn't use it. |
+| `FRED_API_KEY` | Optional — leave blank unless you want Economic Indicator ingestion | Never required for the core deploy; the starter asset catalog (ingested automatically on first boot, Step 3) doesn't use it. |
 
 Every other required var (`DATABASE_URL`, `JWT_SECRET`, `ENVIRONMENT=production`, `COOKIE_SECURE=true`) is already set by `render.yaml`. `REDIS_URL` is deliberately **not set at all** — see [Why there's no Redis](#why-theres-no-redis).
 
@@ -47,37 +47,34 @@ For now, set `CORS_ALLOWED_ORIGINS` to a placeholder (e.g. `https://placeholder.
 
 ### Step 3 — Deploy and confirm it's healthy
 
+Migration and the one-time starter-catalog ingestion now happen **automatically on container boot** — `backend/Dockerfile`'s `CMD` runs `backend/scripts/start.sh`, which applies `alembic upgrade head`, ingests the starter catalog only if the `assets` table is still empty (a real DB query, not a step you trigger), and only then starts serving traffic. This exists specifically because **Render's free tier has no Shell/One-Off Jobs access** — there is no dashboard tab to run a one-off command from, so this can't be a manual step on this plan. Full design rationale: `docs/ARCHITECTURE_DECISIONS.md` ADR-048.
+
 1. Trigger (or wait for) a deploy from the **Manual Deploy** button on the `itm-backend` service page.
-2. Watch the deploy log. Once live, open the service's public URL (shown at the top of its dashboard page, something like `https://itm-backend.onrender.com`) and hit:
+2. Watch the deploy log. You should see, in order:
+   ```
+   [start.sh] Applying database migrations (alembic upgrade head)...
+   [start.sh] Migrations complete.
+   [start.sh] Asset catalog is empty — ingesting starter catalog (python -m app.ingestion.seed_real_catalog)...
+   [start.sh] Starter catalog ingestion complete.
+   [start.sh] Starting uvicorn...
+   INFO:     Uvicorn running on http://0.0.0.0:<port>
+   ```
+   The catalog ingestion step makes real, live HTTP requests to Yahoo's public chart endpoint from Render's network and can take a while (ten symbols' full price history). If it logs a `WARNING: starter catalog ingestion failed` line instead of "complete" — most likely a Yahoo rate-limit blip (`docs/KNOWN_ISSUES.md` KI-044) — the API still starts (this step is deliberately non-fatal); the `assets` table stays empty, so the **next** deploy or restart retries automatically. Manually redeploying is the fastest way to retry sooner.
+3. Once live, open the service's public URL (shown at the top of its dashboard page, something like `https://itm-backend.onrender.com`) and hit:
    ```
    https://itm-backend.onrender.com/healthz
    ```
-   Expect `{"success":true,"data":{"status":"healthy"}}`. If this fails, check the deploy log first — a fail-fast `Settings` validation error (missing/placeholder env var) shows up there immediately, in plain English, naming exactly which variable is wrong.
+   Expect `{"success":true,"data":{"status":"healthy"}}`. If this fails, check the deploy log first — a fail-fast `Settings` validation error (missing/placeholder env var) shows up there immediately, in plain English, naming exactly which variable is wrong; that check runs before migrations, so it would appear above the `[start.sh]` lines.
 
-### Step 4 — Run the one-shot migration + catalog ingestion
+**Every later restart or redeploy** (not just the first) re-runs `alembic upgrade head` (fast no-op once already at `head`) but **skips** ingestion — the deploy log shows `[start.sh] Asset catalog already present — skipping ingestion.` instead, and boot stays fast.
 
-**Why a manual one-shot instead of an automatic release command:** Render's free tier's support for a pre-deploy/release-command step has changed across product versions and isn't something this session could verify against a live account (no network access here). A manual command run once via Render's **Shell** tab is guaranteed to work on every plan tier, gives you direct visibility into exactly what ran and what it printed, and — since the production database starts completely empty — needs to happen exactly once per environment anyway, which a manual step handles just as well as an automated one. If your Render plan does support a pre-deploy command and you'd prefer to wire `alembic upgrade head` into it for future deploys, that's a safe, optional follow-up — the command itself is identical either way.
-
-1. On the `itm-backend` service page, open the **Shell** tab (a browser-based terminal into the running instance).
-2. Apply migrations:
-   ```bash
-   alembic upgrade head
-   ```
-   This creates all ten tables (nine Founder Specification domains). Safe to re-run — Alembic no-ops if already at `head`.
-3. Ingest the starter asset catalog (the production database starts empty — nothing is queryable until this runs):
-   ```bash
-   python -m app.ingestion.seed_real_catalog
-   ```
-   This ingests real daily price history (plus dividends/splits where available) for ten well-known symbols — AAPL, MSFT, TSLA, NVDA, GOOGL, AMZN, SPY, QQQ, BTC-USD, ETH-USD — via `YahooChartProvider` (`docs/KNOWN_ISSUES.md` KI-044/ADR-046). It's idempotent: safe to re-run later (e.g. to pick up new trading days) without duplicating rows.
-   - This step makes real, live HTTP requests to Yahoo's public chart endpoint from Render's network. If it fails with a rate-limit-shaped error, wait a few minutes and re-run — see KI-044 for the full failure mode this provider is built to tolerate.
-
-### Step 5 — Re-verify `/healthz` and a real API call
+### Step 4 — Confirm the catalog is really there
 
 ```
 curl https://itm-backend.onrender.com/healthz
 curl https://itm-backend.onrender.com/api/v1/assets?query=NVDA
 ```
-The second call should return NVDA in its results now that Step 4 has run.
+The second call should return NVDA in its results now that Step 3's boot-time ingestion has run.
 
 ---
 
@@ -134,6 +131,8 @@ This is a correct, safe choice for a **single-instance, free-tier** deployment: 
 
 ---
 
-## Local development is unaffected
+## Local development: Redis is unaffected, boot behavior is now shared with Render
 
-Everything above is about the **deployed** environment. `docker compose up` / `npm run dev` (root) still start Postgres **and Redis** locally exactly as before (`docker-compose.yml` is unchanged) — local dev keeps exercising the Redis-backed code path, not the fallback, so both paths stay covered by the local dev loop plus the test suite (`backend/tests/core/test_rate_limit.py`, `backend/tests/auth/test_lockout.py` — Redis-backed cases skip gracefully if Redis isn't reachable, matching this project's existing DB-integration test convention; in-process cases have no such dependency and always run).
+`docker compose up` / `npm run dev` (root) still start Postgres **and Redis** locally exactly as before (`docker-compose.yml` is unchanged) — local dev keeps exercising the Redis-backed code path, not the fallback, so both paths stay covered by the local dev loop plus the test suite (`backend/tests/core/test_rate_limit.py`, `backend/tests/auth/test_lockout.py` — Redis-backed cases skip gracefully if Redis isn't reachable, matching this project's existing DB-integration test convention; in-process cases have no such dependency and always run).
+
+**Boot behavior, however, is now identical locally and on Render** — `backend/scripts/start.sh` is the container's one and only entrypoint everywhere (ADR-048), so a fresh local `docker compose up --build` (an empty `postgres_data` volume, e.g. right after `docker compose down -v`) automatically applies migrations and ingests the real starter catalog on first boot too, exactly like Render's first deploy — not just `dev_seed`'s synthetic fixture data. `scripts/dev.mjs` no longer runs its own separate `alembic upgrade head` (redundant with, and previously capable of racing, the container's own boot-time migration) — it now waits for the backend's `/healthz` to respond instead. If you want the lightweight synthetic `dev_seed` fixtures (`docs/setup_guide.md`) instead of/alongside the real catalog, run `python -m app.ingestion.seed_dev_data` yourself as before; nothing about that changed.

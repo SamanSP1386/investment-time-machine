@@ -35,6 +35,30 @@ function fail(message) {
   process.exit(1);
 }
 
+// The backend container's own entrypoint (backend/scripts/start.sh,
+// ADR-048) now applies migrations and — on a fresh database only — ingests
+// the starter catalog automatically before uvicorn ever starts serving. A
+// separate `docker compose exec ... alembic upgrade head` here would be
+// redundant with that, and could race it against the same database, so
+// readiness is checked the direct way instead: poll /healthz until the API
+// actually answers. A generous budget (up to 3 minutes) accounts for a
+// first-ever boot's real-catalog ingestion, which can take a while.
+async function waitForBackendHealthy(url, { maxAttempts = 90, delayMs = 2000 } = {}) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return true;
+    } catch {
+      // Connection refused/reset — expected while the container is still
+      // migrating/ingesting and hasn't bound its port yet.
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return false;
+}
+
 const FRONTEND_PORT = 3000;
 
 // Finds the PID of whatever process is LISTENING on `port`, or null if the
@@ -116,28 +140,14 @@ if (run('docker', ['compose', 'up', '-d', '--build']) !== 0) {
   fail('docker compose up failed — is Docker Desktop running?');
 }
 
-// 2. Apply migrations inside the backend container. The backend container
-// itself has no healthcheck (only Postgres/Redis do), so its Python
-// environment may need a moment after `docker compose up` returns — retried
-// briefly rather than assumed ready on the first attempt.
-console.log('\nApplying database migrations (alembic upgrade head)...');
-const MAX_ATTEMPTS = 10;
-let migrated = false;
-for (let attempt = 1; attempt <= MAX_ATTEMPTS && !migrated; attempt += 1) {
-  const status = run('docker', ['compose', 'exec', '-T', 'backend', 'alembic', 'upgrade', 'head']);
-  if (status === 0) {
-    migrated = true;
-  } else if (attempt < MAX_ATTEMPTS) {
-    console.log(`Backend not ready yet (attempt ${attempt}/${MAX_ATTEMPTS}) — retrying in 2s...`);
-    spawnSync(isWindows ? 'timeout' : 'sleep', [isWindows ? '/t' : '2', ...(isWindows ? ['/nobreak'] : [])], {
-      stdio: 'ignore',
-      shell: isWindows,
-    });
-  }
+// 2. Wait for the backend to finish booting. See waitForBackendHealthy's
+// own comment above for why this replaced a separate migration step.
+console.log('\nWaiting for the backend to become healthy (migrations, and first-run catalog ingestion if this is a fresh database)...');
+const healthy = await waitForBackendHealthy('http://localhost:8000/healthz');
+if (!healthy) {
+  fail('Backend did not become healthy after repeated retries — check `docker compose logs backend`.');
 }
-if (!migrated) {
-  fail('alembic upgrade head did not succeed after repeated retries — check `docker compose logs backend`.');
-}
+console.log('Backend is healthy.');
 
 // 3. Frontend dependencies, installed on first run only.
 const frontendDir = path.join(repoRoot, 'frontend');

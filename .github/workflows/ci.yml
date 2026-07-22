@@ -101,42 +101,83 @@ jobs:
     # full, since it builds/runs the image directly rather than through
     # docker-compose, but it is real CI-parity coverage for the specific
     # artifact production actually ships, which previously had none at all).
+    #
+    # ADR-048: the image's CMD (backend/scripts/start.sh) now runs
+    # `alembic upgrade head` unconditionally, every boot, before uvicorn
+    # ever starts — so this job needs a genuinely reachable Postgres, not
+    # just a syntactically-valid placeholder DATABASE_URL. A plain
+    # `docker run` container (not a job-level `services:` entry) is used so
+    # it can share a private Docker network with the smoke-test container by
+    # name, mirroring exactly how this was verified locally.
     steps:
       - uses: actions/checkout@v4
 
       - name: Build the production image
         run: docker build --file backend/Dockerfile --tag itm-backend-ci backend
 
+      - name: Start a throwaway Postgres for the smoke test
+        run: |
+          docker network create itm-ci-net
+          docker run -d --name itm-ci-pg --network itm-ci-net \
+            -e POSTGRES_USER=ci_user -e POSTGRES_PASSWORD=ci_password -e POSTGRES_DB=ci_smoke \
+            postgres:16-alpine
+          for attempt in $(seq 1 30); do
+            if docker exec itm-ci-pg pg_isready -U ci_user -d ci_smoke >/dev/null 2>&1; then
+              echo "Postgres ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Postgres never became ready"
+          docker logs itm-ci-pg
+          exit 1
+
+      - name: Migrate, then pre-seed one asset row (skip live catalog ingestion in CI)
+        run: |
+          # This job verifies "does the image boot, migrate, and bind to
+          # $PORT" — not "does live catalog ingestion against the real
+          # internet succeed," which is slow and depends on Yahoo's
+          # availability (docs/KNOWN_ISSUES.md KI-044). This project has
+          # never let CI depend on a live third-party market-data API, for
+          # exactly that flakiness reason (yfinance/CoinGecko-backed tests
+          # have never run in CI either). Applying migrations directly here
+          # (the image's own `alembic`, bypassing start.sh via --entrypoint)
+          # and inserting one throwaway asset row through the real ORM model
+          # (not hand-written SQL that could silently drift from the
+          # schema) makes app.ingestion.catalog_status's real "is assets
+          # empty?" check see a non-empty table — so the smoke-test
+          # container below takes its normal, real "already seeded, skip
+          # ingestion" boot path, exactly like every actual Render redeploy
+          # after the very first one.
+          docker run --rm --network itm-ci-net \
+            -e DATABASE_URL="postgresql://ci_user:ci_password@itm-ci-pg:5432/ci_smoke" \
+            --entrypoint alembic \
+            itm-backend-ci upgrade head
+
+          docker run --rm --network itm-ci-net \
+            -e DATABASE_URL="postgresql://ci_user:ci_password@itm-ci-pg:5432/ci_smoke" \
+            --entrypoint python \
+            itm-backend-ci -c "
+          from app.core.database import session_scope
+          from app.models import Asset
+          from app.models.enums import AssetType
+          with session_scope() as session:
+              session.add(Asset(symbol='CISMOKE', name='CI Smoke Test Asset', asset_type=AssetType.STOCK, data_source='ci'))
+          print('Pre-seeded one asset row.')
+          "
+
       - name: Run it on a Render-shaped $PORT and smoke-test /healthz
         run: |
-          # ENVIRONMENT=test (not production): this step verifies the image
-          # builds and binds to Render's injected $PORT — it does not stand
-          # up a real Postgres or a real Vercel-deployed frontend, so it
-          # cannot honestly satisfy Settings' production fail-fast guard
-          # (app/core/config.py — DATABASE_URL must not be loopback,
-          # CORS_ALLOWED_ORIGINS/JWT_SECRET must not be placeholders,
-          # ENVIRONMENT=production only). That guard is correct and is
-          # exercised for real by backend/tests/core/test_config.py; this
-          # step's own job is narrower ("does the image boot and serve
-          # traffic"), so it runs under a non-production environment the
-          # guard already exempts, same as any other test/dev boot. Kept
-          # DATABASE_URL/CORS_ALLOWED_ORIGINS/JWT_SECRET set anyway (harmless
-          # under ENVIRONMENT=test) so this step still exercises the same
-          # startup code path — config loading, CORS middleware wiring, the
-          # Redis-optional startup log — a bare-minimum env would skip.
-          docker run -d --name itm-backend-ci \
+          docker run -d --name itm-backend-ci --network itm-ci-net \
             -p 10000:10000 \
             -e PORT=10000 \
             -e ENVIRONMENT=test \
-            -e DATABASE_URL="postgresql://ci_user:ci_password@localhost:5432/ci_placeholder" \
+            -e DATABASE_URL="postgresql://ci_user:ci_password@itm-ci-pg:5432/ci_smoke" \
             -e CORS_ALLOWED_ORIGINS="https://ci-placeholder.vercel.app" \
             -e JWT_SECRET="ci-only-not-a-real-secret-$(date +%s)" \
             itm-backend-ci
 
-          # /healthz never touches the database (app/main.py), so the
-          # container serving it correctly proves the image + PORT binding
-          # work, independent of whether DATABASE_URL is actually reachable.
-          for attempt in $(seq 1 15); do
+          for attempt in $(seq 1 30); do
             if curl -sf http://localhost:10000/healthz; then
               echo "healthz OK"
               exit 0
@@ -147,6 +188,9 @@ jobs:
           echo "::error::/healthz never returned 200 — dumping container logs"
           docker logs itm-backend-ci
           exit 1
+
+      - name: Assert ingestion was actually skipped (the fast, common boot path)
+        run: docker logs itm-backend-ci 2>&1 | grep -F "Asset catalog already present — skipping ingestion."
 
       - name: Container logs (always, for debugging)
         if: always()
