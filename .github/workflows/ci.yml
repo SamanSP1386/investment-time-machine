@@ -196,6 +196,85 @@ jobs:
         if: always()
         run: docker logs itm-backend-ci || true
 
+      # Production incident: start.sh's catalog-ingestion step (best-effort,
+      # non-fatal by design) hung on Render for 5+ minutes with no uvicorn
+      # port ever opened, because YahooChartProvider's per-*request* timeout
+      # has no aggregate ceiling across the ~30 HTTP calls one full ingestion
+      # run makes (10 symbols x up to 3 calls each — see start.sh's own
+      # comment on this). The fix (`timeout` wrapping the ingestion step,
+      # CATALOG_INGESTION_TIMEOUT_SECONDS) needs a real hung/unreachable
+      # upstream to prove it actually bounds boot time — the smoke test
+      # above never exercises this path at all (it pre-seeds one asset row
+      # specifically to skip ingestion, KI-044). `--add-host` here points
+      # Yahoo's chart hostname at 203.0.113.1 (RFC 5737 TEST-NET-3 —
+      # guaranteed non-routable, so every request genuinely times out
+      # instead of merely being slow) against a *fresh, empty* database, so
+      # `catalog_status` reports empty and ingestion actually runs into it.
+      - name: Start a second fresh Postgres for the ingestion-hang smoke test
+        run: |
+          docker run -d --name itm-ci-pg-2 --network itm-ci-net \
+            -e POSTGRES_USER=ci_user -e POSTGRES_PASSWORD=ci_password -e POSTGRES_DB=ci_smoke_hang \
+            postgres:16-alpine
+          for attempt in $(seq 1 30); do
+            if docker exec itm-ci-pg-2 pg_isready -U ci_user -d ci_smoke_hang >/dev/null 2>&1; then
+              echo "Postgres ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Postgres never became ready"
+          docker logs itm-ci-pg-2
+          exit 1
+
+      - name: Migrate the fresh database (empty assets table, ingestion must actually run)
+        run: |
+          docker run --rm --network itm-ci-net \
+            -e DATABASE_URL="postgresql://ci_user:ci_password@itm-ci-pg-2:5432/ci_smoke_hang" \
+            --entrypoint alembic \
+            itm-backend-ci upgrade head
+
+      - name: Run with Yahoo unreachable and confirm uvicorn still opens the port within a bounded time
+        run: |
+          docker run -d --name itm-backend-ci-hang --network itm-ci-net \
+            --add-host query2.finance.yahoo.com:203.0.113.1 \
+            -p 10001:10001 \
+            -e PORT=10001 \
+            -e ENVIRONMENT=test \
+            -e DATABASE_URL="postgresql://ci_user:ci_password@itm-ci-pg-2:5432/ci_smoke_hang" \
+            -e CORS_ALLOWED_ORIGINS="https://ci-placeholder.vercel.app" \
+            -e JWT_SECRET="ci-only-not-a-real-secret-$(date +%s)" \
+            -e CATALOG_INGESTION_TIMEOUT_SECONDS=20 \
+            itm-backend-ci
+
+          # 90s ceiling: migrations + a 20s ingestion cap + normal boot
+          # overhead should clear this easily. Render's real "no open ports"
+          # deploy timeout is several minutes — this bound only needs to
+          # prove the port opens well before that, not match it exactly.
+          for attempt in $(seq 1 90); do
+            if curl -sf http://localhost:10001/healthz; then
+              echo "healthz OK within bounded time"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "::error::/healthz never returned 200 within 90s — the ingestion timeout wrapper did not bound boot time — dumping container logs"
+          docker logs itm-backend-ci-hang
+          exit 1
+
+      - name: Assert ingestion actually timed out (not silently skipped or coincidentally fast)
+        run: |
+          docker logs itm-backend-ci-hang 2>&1 | grep -F "WARNING: starter catalog ingestion timed out after 20s"
+          # Must NOT claim success against an upstream that was never reachable.
+          if docker logs itm-backend-ci-hang 2>&1 | grep -qF "Starter catalog ingestion complete."; then
+            echo "::error::ingestion reported complete against an unreachable upstream — the smoke test's blackhole route isn't working as intended"
+            exit 1
+          fi
+
+      - name: Ingestion-hang container logs (always, for debugging)
+        if: always()
+        run: docker logs itm-backend-ci-hang || true
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:
