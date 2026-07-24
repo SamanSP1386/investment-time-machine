@@ -16,7 +16,10 @@ from datetime import date
 
 from app.ai.providers.base import ProviderResult
 from app.ai.safety import REQUIRED_EXPLANATION_SECTIONS
+from app.api.v1.dependencies import rate_limit_ai
+from app.api.v1.errors import RateLimitExceededError
 from app.api.v1.services import explanation_service
+from app.main import app
 from app.models import AuditLog
 from app.models.enums import AuditEventType
 from tests.simulation.conftest import make_asset, make_price
@@ -77,7 +80,7 @@ def _patch_provider(monkeypatch, provider) -> None:
     this suite was written.
     """
     monkeypatch.setattr(explanation_service, "get_ai_provider", lambda settings: provider)
-    fake_settings = _settings_with_caps(ai_provider="anthropic", ai_model_name=provider.model_name)
+    fake_settings = _settings_with_caps(ai_provider="groq", ai_model_name=provider.model_name)
     monkeypatch.setattr(explanation_service, "get_settings", lambda: fake_settings)
 
 
@@ -361,6 +364,55 @@ def test_followup_blocked_when_simulation_not_completed(client, db_session):
     assert response.json()["error"]["code"] == "SIMULATION_NOT_COMPLETED"
 
 
+# --- Founder Decision 015: AI rate-limit friendly messaging ----------------
+
+
+def test_ai_per_minute_limit_exceeded_returns_friendly_try_again_message(client, db_session):
+    simulation_id = _create_completed_simulation(client, db_session)
+
+    def _always_exceeded_minute():
+        raise RateLimitExceededError(window="minute")
+
+    app.dependency_overrides[rate_limit_ai] = _always_exceeded_minute
+    try:
+        response = client.post(
+            f"/api/v1/simulations/{simulation_id}/explanations/questions",
+            json={"question": "Why did dividends matter here?"},
+        )
+    finally:
+        app.dependency_overrides[rate_limit_ai] = lambda: None
+
+    assert response.status_code == 429
+    body = response.json()["error"]
+    assert body["code"] == "RATE_LIMIT_EXCEEDED"
+    assert "try again" in body["message"].lower()
+    assert "tomorrow" not in body["message"].lower()
+
+
+def test_ai_daily_cap_exceeded_returns_friendly_come_back_tomorrow_message(client, db_session):
+    """Founder Decision 015 clause 5: a daily cap must read as "come back
+    tomorrow," never the per-minute bucket's "try again shortly" — the two
+    are different situations and conflating them would be misleading."""
+    simulation_id = _create_completed_simulation(client, db_session)
+
+    def _always_exceeded_day():
+        raise RateLimitExceededError(window="day")
+
+    app.dependency_overrides[rate_limit_ai] = _always_exceeded_day
+    try:
+        response = client.post(
+            f"/api/v1/simulations/{simulation_id}/explanations/questions",
+            json={"question": "Why did dividends matter here?"},
+        )
+    finally:
+        app.dependency_overrides[rate_limit_ai] = lambda: None
+
+    assert response.status_code == 429
+    body = response.json()["error"]
+    assert body["code"] == "RATE_LIMIT_EXCEEDED"
+    assert "tomorrow" in body["message"].lower()
+
+
 # --- helpers -----------------------------------------------------------------
 
 
@@ -369,7 +421,7 @@ def _settings_with_caps(
     max_explanation_regenerations: int = 3,
     max_followup_questions: int = 10,
     ai_provider: str = "none",
-    ai_model_name: str = "claude-3-5-haiku-20241022",
+    ai_model_name: str = "llama-3.1-8b-instant",
 ):
     from app.core.config import Settings
 
@@ -379,7 +431,7 @@ def _settings_with_caps(
         ai_max_explanation_regenerations=max_explanation_regenerations,
         ai_max_followup_questions=max_followup_questions,
         ai_provider=ai_provider,
-        ai_provider_api_key="fake-key" if ai_provider != "none" else "",
+        groq_api_key="fake-key" if ai_provider != "none" else "",
         ai_model_name=ai_model_name,
     )
 

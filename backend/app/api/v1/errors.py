@@ -24,7 +24,21 @@ class ForbiddenError(Exception):
 
 
 class RateLimitExceededError(Exception):
-    """Raised by the rate-limit dependencies (`app.api.v1.dependencies`)."""
+    """Raised by the rate-limit dependencies (`app.api.v1.dependencies`).
+
+    `window` distinguishes which fixed-window bucket was actually exceeded —
+    every existing caller (simulation/read/auth buckets, and the AI bucket's
+    per-minute check) leaves it at the default `"minute"`, unchanged from
+    this class's original single-window shape. `rate_limit_ai`
+    (Founder Decision 015) is the first caller to ever pass `"day"`, so the
+    exception handler can give a daily cap its own, honest "come back
+    tomorrow" copy instead of the generic "try again shortly" a per-minute
+    limit gets — the same limit code, a message that actually matches what
+    happened (Founder Decision 015 clause 5)."""
+
+    def __init__(self, *, window: str = "minute") -> None:
+        self.window = window
+        super().__init__(f"Rate limit exceeded ({window})")
 
 
 class UnauthorizedError(Exception):

@@ -1,6 +1,8 @@
 """Tests for the M6 `Settings` startup guard (mirrors the existing
 `JWT_SECRET` guard, ADR-020 precedent): a real AI provider configured
 without an API key must fail loudly at startup, not silently degrade.
+Provider is Groq as of Founder Decision 019 (M7 Phase 4, ADR-049) — the
+guard's shape is otherwise unchanged from the original Anthropic version.
 
 Unlike the JWT_SECRET guard, this one applies in every environment,
 including development/test — there is no "convenient insecure default" to
@@ -21,26 +23,26 @@ def test_ai_provider_defaults_to_none_and_requires_no_key():
     assert settings.ai_provider == "none"
 
 
-def test_anthropic_provider_with_api_key_is_valid():
+def test_groq_provider_with_api_key_is_valid():
     settings = Settings(
         jwt_secret="test-secret",
         environment="test",
-        ai_provider="anthropic",
-        ai_provider_api_key="sk-fake-key",
+        ai_provider="groq",
+        groq_api_key="gsk-fake-key",
     )
-    assert settings.ai_provider == "anthropic"
+    assert settings.ai_provider == "groq"
 
 
-def test_anthropic_provider_without_api_key_raises():
+def test_groq_provider_without_api_key_raises():
     with pytest.raises(ValidationError):
         Settings(
             jwt_secret="test-secret",
             environment="test",
-            ai_provider="anthropic",
-            ai_provider_api_key="",
+            ai_provider="groq",
+            groq_api_key="",
         )
 
 
 def test_unknown_provider_value_raises():
     with pytest.raises(ValidationError):
-        Settings(jwt_secret="test-secret", environment="test", ai_provider="openai")
+        Settings(jwt_secret="test-secret", environment="test", ai_provider="anthropic")

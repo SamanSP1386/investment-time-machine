@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useId, useRef, useState, type CSSProperties, type SubmitEvent } from 'react';
 import { GrowthChart } from './growth-chart';
+import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
+import { Input } from '@/components/ui/input';
+import { useAskQuestion } from '@/hooks/use-ask-question';
 import { useAssetDetail } from '@/hooks/use-asset-detail';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useScramble } from '@/hooks/use-scramble';
 import { useSettleIn } from '@/hooks/use-settle-in';
+import { ApiError, getErrorCopy } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
   compareDecimalStrings,
@@ -655,6 +659,153 @@ export function TheProof({ sim }: { sim: SimulationResponse }) {
               alternative, not only a visual aid.
             </p>
             <GrowthDataTable sim={sim} />
+          </div>
+        </div>
+      </Disclosure>
+    </section>
+  );
+}
+
+/**
+ * Section 8 — Ask About This Result (M7 Phase 4, Founder Decision 015).
+ * Educational AI panel: anonymous, unauthenticated, rate-limit-protected —
+ * never access-gated (Founder Decision 004 decisions 6-7). Wired to the
+ * existing Financial Tutor follow-up endpoint (`POST
+ * /simulations/{id}/explanations/questions`, Founder Decision 003), which
+ * already enforces every hard guardrail this panel depends on: the AI only
+ * explains this simulation's own already-computed data, never performs a
+ * new calculation, never discusses another asset, never gives advice, and
+ * every response is checked for advice-like language before it can ever
+ * reach here (`app.ai.safety`). No question or answer is ever persisted
+ * across a page load — each submit is a fresh, independent request
+ * (`useAskQuestion`), matching Founder Decision 003's "no long-term memory"
+ * rule exactly.
+ *
+ * Collapsed by default via the shared `Disclosure` primitive, positioned
+ * directly after The Proof — the same subordinate, quiet posture every
+ * other supplementary section on this page already uses
+ * (docs/EXPERIENCE_CONSTITUTION.md §5: "An AI panel that competes visually
+ * with a calculated result... has broken Trust at the experience layer even
+ * if the underlying calculation is untouched"). A `generation_status:
+ * 'failed'` response (AI unconfigured, provider outage, or a rejected/unsafe
+ * generation) is a normal, successful backend response, not an error
+ * (Founder Decision 003) — rendered with the exact same calm, neutral
+ * treatment as a completed answer, never red/error styling
+ * (docs/frontend_design_system.md's own explicit warning about this).
+ */
+const SUGGESTED_QUESTIONS = [
+  'Why did dividends matter here?',
+  'What does CAGR mean?',
+  'What does inflation adjustment do to this number?',
+];
+
+/** Plain-text paragraph rendering only — AI output is untrusted display content, never parsed as HTML (schemas/explanations.py's own explicit rule). */
+function AnswerText({ text }: { text: string }) {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    // eslint-disable-next-line no-restricted-syntax -- string length comparison, not a DecimalString comparison (ADR-033).
+    .filter((paragraph) => paragraph.trim().length > 0);
+  return (
+    <div className="flex max-w-[70ch] flex-col gap-3 text-[15.5px] leading-relaxed text-ink-secondary">
+      {paragraphs.map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
+    </div>
+  );
+}
+
+export function AskAboutThisResult({ sim }: { sim: SimulationResponse }) {
+  const [question, setQuestion] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const reducedMotion = useReducedMotion();
+  const settled = useSettleIn(!reducedMotion);
+  const mutation = useAskQuestion(sim.id);
+
+  function handleOpenChange(open: boolean) {
+    if (open) {
+      // Land a keyboard/screen-reader user on the input as soon as the
+      // panel reveals, rather than an otherwise-empty newly-visible section
+      // (docs/frontend_design_system.md §11 keyboard-operability rule).
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }
+
+  function handleSuggestedClick(suggested: string) {
+    setQuestion(suggested);
+    inputRef.current?.focus();
+  }
+
+  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = question.trim();
+    if (trimmed.length === 0 || mutation.isPending) return;
+    mutation.mutate(trimmed);
+  }
+
+  const apiError = mutation.error instanceof ApiError ? mutation.error : null;
+  const rateLimited = apiError?.code === 'RATE_LIMIT_EXCEEDED';
+  const otherErrorCopy = apiError && !rateLimited ? getErrorCopy(apiError.code) : null;
+
+  const result = mutation.data;
+  const unavailable = result?.generation_status === 'failed';
+  const answerText =
+    result?.generation_status === 'completed' ? result.explanation_text : unavailable ? result.error_message : null;
+
+  return (
+    <section
+      aria-label="Ask about this result"
+      className={cn(
+        'flex flex-col gap-6 border-t border-border-hairline pt-7 transition delay-200 duration-[var(--duration-transition)] ease-in',
+        settled ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      )}
+    >
+      <Disclosure
+        summaryClassName="text-sm font-semibold text-ink-primary"
+        onOpenChange={handleOpenChange}
+        summary="Ask about this result"
+      >
+        <div className="mt-7 flex flex-col gap-5">
+          <p className="max-w-prose text-sm text-ink-secondary">
+            Ask a question about this simulation&rsquo;s own numbers above — CAGR, dividends, inflation adjustment,
+            or anything else already shown. This assistant explains what&rsquo;s already been calculated here; it
+            never performs new calculations, discusses other assets, or gives financial advice.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTED_QUESTIONS.map((suggested) => (
+              <button
+                key={suggested}
+                type="button"
+                onClick={() => handleSuggestedClick(suggested)}
+                className="target-brackets rounded-full border border-border-hairline px-3 py-1.5 text-xs text-ink-secondary transition-colors duration-150 ease-out hover:border-ink-muted hover:text-ink-primary focus-visible:border-ink-muted focus-visible:text-ink-primary"
+              >
+                {suggested}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <Input
+                ref={inputRef}
+                id={inputId}
+                label="Your question"
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                maxLength={500}
+                placeholder="e.g. Why did dividends matter here?"
+              />
+            </div>
+            <Button type="submit" variant="secondary" loading={mutation.isPending} disabled={question.trim().length === 0}>
+              Ask
+            </Button>
+          </form>
+
+          <div aria-live="polite" className="flex flex-col gap-3">
+            {rateLimited ? <p className="text-sm text-ink-secondary">{apiError.message}</p> : null}
+            {otherErrorCopy ? <p className="text-sm text-ink-secondary">{otherErrorCopy.description}</p> : null}
+            {answerText ? <AnswerText text={answerText} /> : null}
           </div>
         </div>
       </Disclosure>

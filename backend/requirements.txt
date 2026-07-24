@@ -19,5 +19,6 @@ redis==5.0.8
 argon2-cffi==23.1.0
 pyjwt==2.9.0
 
-# Educational AI System (Milestone 6)
-anthropic==0.116.0
+# Educational AI System (Milestone 6) — Groq's chat completions API is
+# OpenAI-compatible REST (Founder Decision 019); no vendor SDK needed, the
+# existing httpx dependency above (Milestone 2) is sufficient.

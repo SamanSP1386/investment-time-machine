@@ -116,6 +116,33 @@ class TestInMemoryRateLimiter:
         assert InMemoryRateLimiter(limit=1).allow(key) is True
         assert InMemoryRateLimiter(limit=1).allow(key) is False
 
+    def test_a_short_window_key_never_prunes_a_long_window_key(self):
+        """Regression test for a real bug caught while building Founder
+        Decision 015's daily AI cap (the first caller ever to construct this
+        class with two different `window_seconds` values — 60 and 86400 — in
+        the same process): the original `_prune` compared raw window-*index*
+        numbers, which have no shared meaning across different
+        `window_seconds` granularities. A 60s-windowed prune call was
+        deleting every 86400s-windowed entry on almost every call (a
+        day-index is always numerically far smaller than a same-instant
+        minute-index), silently resetting the "daily" counter back to 1 on
+        nearly every request. Interleaving a short-window key's `.allow()`
+        calls between a long-window key's must never affect the long-window
+        key's own count."""
+        short_key = f"test-short:{uuid.uuid4()}"
+        long_key = f"test-long:{uuid.uuid4()}"
+
+        assert InMemoryRateLimiter(limit=100, window_seconds=1).allow(short_key) is True
+        assert InMemoryRateLimiter(limit=2, window_seconds=86400).allow(long_key) is True
+        assert InMemoryRateLimiter(limit=100, window_seconds=1).allow(short_key) is True
+        assert InMemoryRateLimiter(limit=2, window_seconds=86400).allow(long_key) is True
+        assert InMemoryRateLimiter(limit=100, window_seconds=1).allow(short_key) is True
+        # The long-window key's third call is its third request against a
+        # limit of 2 — must be blocked, and must have been blocked by its
+        # own count (2 prior calls), not reset by the interleaved short-window
+        # key's own prune calls in between.
+        assert InMemoryRateLimiter(limit=2, window_seconds=86400).allow(long_key) is False
+
 
 class TestGetRateLimiter:
     """`get_rate_limiter()` — the single factory every call site uses — must

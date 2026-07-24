@@ -94,12 +94,32 @@ class Settings(BaseSettings):
     # NullProvider, so the platform is 100% functional with AI unconfigured
     # (Founder Specification Principle 3), not just with it "removed" after
     # the fact.
-    ai_provider: str = "none"  # "anthropic" | "none"
-    ai_provider_api_key: str = ""
-    ai_model_name: str = "claude-3-5-haiku-20241022"
+    #
+    # Provider is Groq, not Anthropic, as of Founder Decision 019 (M7 Phase
+    # 4) — this project's only deployment target (Render free tier,
+    # docs/DEPLOYMENT.md) has no budget for a paid AI vendor, and Groq's
+    # free tier is real and sufficient for this feature's bounded,
+    # short-answer educational use case. `groq_api_key` (env var
+    # `GROQ_API_KEY`) replaces the prior generic `ai_provider_api_key` name
+    # now that exactly one real provider exists, matching the
+    # provider-specific naming convention `fred_api_key`/`jwt_secret`
+    # already use elsewhere in this class. See ADR-049.
+    ai_provider: str = "none"  # "groq" | "none"
+    groq_api_key: str = ""
+    ai_model_name: str = "llama-3.1-8b-instant"
     ai_max_output_tokens: int = 800
     ai_request_timeout_seconds: float = 12.0
+    # Founder Decision 015 (Option D): anonymous callers get a lower
+    # per-minute rate plus a new daily cap; authenticated callers keep the
+    # Founder Specification's explicit, spec-mandated 20/min (unchanged)
+    # plus a materially higher daily cap. `rate_limit_ai` (app.api.v1.
+    # dependencies) selects between the two pairs based on whether the
+    # caller has a valid session, keyed by user id (authenticated) or IP
+    # address (anonymous, the only identifier available).
     rate_limit_ai_per_minute: int = 20
+    rate_limit_ai_anonymous_per_minute: int = 5
+    rate_limit_ai_authenticated_per_day: int = 150
+    rate_limit_ai_anonymous_per_day: int = 15
     # Cost control (M6 design review §13/14): bounds how many times the
     # Explanation Engine's explanation may be regenerated, and how many
     # Financial Tutor follow-up questions may be asked, per simulation. A
@@ -127,13 +147,13 @@ class Settings(BaseSettings):
         selected with no API key would fail on the first request, in
         production, with no warning anyone would see until a user hits it.
         Fail loudly at startup instead."""
-        if self.ai_provider not in {"none", "anthropic"}:
+        if self.ai_provider not in {"none", "groq"}:
             raise ValueError(
-                f"AI_PROVIDER must be one of 'none' or 'anthropic', got {self.ai_provider!r}."
+                f"AI_PROVIDER must be one of 'none' or 'groq', got {self.ai_provider!r}."
             )
-        if self.ai_provider != "none" and not self.ai_provider_api_key:
+        if self.ai_provider != "none" and not self.groq_api_key:
             raise ValueError(
-                f"AI_PROVIDER is set to {self.ai_provider!r} but AI_PROVIDER_API_KEY is empty — "
+                f"AI_PROVIDER is set to {self.ai_provider!r} but GROQ_API_KEY is empty — "
                 "refusing to start with a provider that cannot authenticate."
             )
         return self

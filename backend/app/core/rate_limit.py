@@ -78,9 +78,27 @@ class InMemoryRateLimiter:
     and resets on restart. That is an accepted, documented tradeoff of a
     free-tier, no-Redis, single-instance deployment (docs/DEPLOYMENT.md) —
     correct behavior for that topology, not a bug.
-    """
+
+    `_prune` compares each key's own stored wall-clock expiry time against
+    `now`, not raw window-index numbers, specifically so keys created under
+    *different* `window_seconds` values can safely share this one class-level
+    `_store` (Founder Decision 015, M7 Phase 4, is the first caller to ever
+    construct this class with two different `window_seconds` — 60 and 86400
+    — in the same process, for the AI bucket's per-minute and daily-cap
+    checks). The original implementation compared `window` (a window-*index*,
+    whose units depend on `window_seconds`) directly against the pruning
+    call's own `current_window` — a 60s-windowed index and an 86400s-windowed
+    index are both just integers with no shared meaning, so a 60s-windowed
+    prune call was silently deleting every 86400s-windowed entry on almost
+    every call (a day-index is always numerically far smaller than a
+    same-instant minute-index), resetting the daily counter back to 1 on
+    nearly every request and making the daily cap never actually trigger.
+    Caught by FD-015's own test suite (`tests/api/test_rate_limit_ai.py`)
+    before shipping — every existing single-window call site (60s only) was
+    unaffected by the bug and remains unaffected by this fix."""
 
     _store: dict[str, tuple[int, int]] = {}
+    _expiry: dict[str, float] = {}
     _lock = threading.Lock()
 
     def __init__(self, limit: int, window_seconds: int = 60) -> None:
@@ -88,23 +106,29 @@ class InMemoryRateLimiter:
         self._window_seconds = window_seconds
 
     def allow(self, key: str) -> bool:
-        window = int(time.time() // self._window_seconds)
+        now = time.time()
+        window = int(now // self._window_seconds)
         store_key = f"ratelimit:{key}"
         with self._lock:
-            self._prune(window)
+            self._prune(now)
             stored_window, count = self._store.get(store_key, (window, 0))
             count = count + 1 if stored_window == window else 1
             self._store[store_key] = (window, count)
+            self._expiry[store_key] = (window + 1) * self._window_seconds
             return count <= self._limit
 
     @classmethod
-    def _prune(cls, current_window: int) -> None:
-        """Drops entries from a prior window so the shared dict stays
-        bounded by "distinct keys active in the last ~2 windows" rather than
-        growing unboundedly over a long-running process's lifetime."""
-        stale_keys = [k for k, (window, _count) in cls._store.items() if window < current_window]
+    def _prune(cls, now: float) -> None:
+        """Drops entries whose window has actually elapsed (by wall-clock
+        expiry, not by comparing window-index numbers across possibly
+        different `window_seconds` granularities — see class docstring) so
+        the shared dict stays bounded by "distinct keys active in the last
+        ~2 windows" rather than growing unboundedly over a long-running
+        process's lifetime."""
+        stale_keys = [k for k, expiry in cls._expiry.items() if expiry <= now]
         for stale_key in stale_keys:
-            del cls._store[stale_key]
+            cls._store.pop(stale_key, None)
+            cls._expiry.pop(stale_key, None)
 
 
 def get_rate_limiter(limit: int, window_seconds: int = 60) -> RateLimiter | InMemoryRateLimiter:

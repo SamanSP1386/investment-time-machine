@@ -122,11 +122,23 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RateLimitExceededError)
     def handle_rate_limit_exceeded(request: Request, exc: RateLimitExceededError) -> JSONResponse:
+        # Founder Decision 015 clause 5: a daily cap reads as "come back
+        # tomorrow," never "try again shortly" — the two are different
+        # situations and a user who just hit a 15/day anonymous AI cap
+        # should not be told to retry in a minute, which would be false.
+        # Every other rate-limited bucket (simulation/read/auth, and the AI
+        # bucket's own per-minute check) is unaffected — `window` defaults
+        # to "minute", the original single-window message, unchanged.
+        message = (
+            "You've reached today's limit for this. Please come back tomorrow."
+            if exc.window == "day"
+            else "Too many requests. Please try again later."
+        )
         return _envelope(
             request,
             status.HTTP_429_TOO_MANY_REQUESTS,
             "RATE_LIMIT_EXCEEDED",
-            "Too many requests. Please try again later.",
+            message,
         )
 
     @app.exception_handler(SimulationNotCompletedError)

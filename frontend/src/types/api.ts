@@ -148,3 +148,30 @@ export interface SimulationResponse {
   error_message: string | null;
   created_at: string;
 }
+
+export type AIExplanationType = 'initial' | 'follow_up';
+
+export type AIGenerationStatus = 'pending' | 'completed' | 'failed';
+
+/**
+ * `POST /api/v1/simulations/{id}/explanations/questions` (the Financial
+ * Tutor follow-up endpoint, Founder Specification Part 2.7, M6) — the AI
+ * panel's only backend call (M7 Phase 4). A `generation_status: 'failed'`
+ * response is a normal, successful HTTP response, not an error (Founder
+ * Decision 003) — `explanation_text` is null and `error_message` carries the
+ * fixed, calm "AI explanation is temporarily unavailable" fallback text,
+ * which must render with the same neutral visual treatment as a completed
+ * answer, never red/error styling (docs/frontend_design_system.md).
+ */
+export interface ExplanationResponse {
+  id: string;
+  simulation_id: string;
+  explanation_type: AIExplanationType;
+  question_text: string | null;
+  explanation_text: string | null;
+  generation_status: AIGenerationStatus;
+  model_name: string;
+  prompt_version: string;
+  error_message: string | null;
+  created_at: string;
+}

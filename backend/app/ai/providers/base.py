@@ -23,7 +23,7 @@ class ProviderResult:
 
 @runtime_checkable
 class AIProvider(Protocol):
-    name: str  # e.g. "anthropic", "none" — matches ai_explanations.model_name's provider family
+    name: str  # e.g. "groq", "none" — matches ai_explanations.model_name's provider family
 
     def generate(
         self, *, system_prompt: str, user_content: str, max_tokens: int

@@ -300,3 +300,24 @@ Security review record, one entry per milestone. See [.claude/DOCUMENTATION_POLI
 **Remaining Risks**: KI-016, KI-039, KI-042 — all unaffected by this phase's scope (no deployment configuration, cookie behavior, or split-consistency logic was touched). KI-021 (`growth_series` persistence) remains open with no new security implication — an empty array is returned identically to before, not new attacker-influenceable behavior.
 
 **Threats Deferred**: Unchanged — a full CSRF/XSS review still waits on AI-rendered content existing to review; this pass renders no AI-generated or otherwise untrusted markdown/HTML.
+
+---
+
+## M7 Phase 4 — Educational AI Panel (Founder Decision 015, Groq Provider Swap) (2026-07-23)
+
+**Risks Found**: This is the first milestone to render genuinely AI-generated (untrusted) content, and the first to send any user-authored free text to a third-party vendor via the newly-swapped Groq provider — both reviewed directly.
+
+**Severity**: Low — every relevant control (prompt-injection defense, output safety gates, plain-text-only rendering, privacy allowlist) predates this milestone and is provider-agnostic; this pass adds a consumer, not a new control surface.
+
+**Findings**:
+1. **AI output is rendered as plain text only, never HTML.** `AnswerText` (`results-sections.tsx`) splits `explanation_text`/`error_message` on blank lines and renders each as a `<p>` — no `dangerouslySetInnerHTML`, no markdown parser, no HTML interpolation anywhere in the new component. Matches `schemas/explanations.py`'s own explicit rule ("the frontend renders it as plain/markdown text, never raw HTML — AI output is untrusted display content").
+2. **The user's free-text question is never sent anywhere except the existing, already-reviewed backend endpoint.** `askFollowUpQuestion` posts `{question}` to `POST /simulations/{id}/explanations/questions` only — the same prompt-injection defense already in place (`app.ai.prompt`: the question is placed only inside a delimited block in the user turn, the system prompt is fixed and never concatenates user text, and the model is explicitly instructed to treat both `SIMULATION_DATA` and `QUESTION` as data, never as instructions) is unchanged by this pass and unaffected by the provider swap.
+3. **The Groq provider swap sends the same allowlisted fields Anthropic did, and nothing more.** `GroqProvider` receives only the already-built `system_prompt`/`user_content` strings from `app.ai.service` — it has no access to a database session, a `Simulation`, or a `User`, identical to the removed `AnthropicProvider`'s own access shape. `_build_simulation_facts`'s strict allowlist (asset symbol, investment amount, dates, simulation outputs, dividend/inflation options — no email/name/user id/IP/session id/request id) is unmodified by this pass.
+4. **`GROQ_API_KEY` is a backend-only secret**, read via `Settings.groq_api_key` and used only inside `GroqProvider`'s constructor — never serialized into any API response, log line, or frontend-reachable code path. Confirmed by direct review: no `console.log`/`print` of the key anywhere in the diff, and the frontend has no reference to it at all (matches the task's own "the API key NEVER reaches the frontend" requirement).
+5. **Rate-limit keying by authenticated user id (new this pass) is a strict improvement, not a new PII exposure.** `f"user:{user.id}"` uses the same UUID primary key already used throughout the codebase as a non-secret identifier (e.g. `Simulation.user_id`) — no new field is read, stored, or logged.
+
+**Mitigations Implemented**: None required as a fix — every finding above is a review confirmation of an already-correct existing control being correctly reused/extended, not a defect.
+
+**Remaining Risks**: KI-016, KI-039, KI-042 — unaffected by this pass. A full `axe-core`/screen-reader pass on the new panel specifically was not run (matches the existing, already-disclosed gap carried forward from prior M7 phases) — keyboard operability and `aria-live`/label-association were verified via targeted component tests (`ask-about-this-result.test.tsx`) instead.
+
+**Threats Deferred**: A dedicated abuse-pattern review of the AI endpoint under real traffic (distinguishing a legitimate curious user from a scripted probe attempting to extract advice-like language past the regex-based `check_advice_language` filter) is deferred until real usage data exists post-deploy — `app.ai.safety`'s own module docstring already discloses this as "best-effort, not exhaustive," unchanged by this pass.

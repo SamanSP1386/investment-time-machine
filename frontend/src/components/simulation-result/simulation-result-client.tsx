@@ -12,6 +12,7 @@ import { ProductShell } from '@/components/shell/product-shell';
 import { OpeningSequenceHeading } from '@/components/simulation-result/opening-sequence-heading';
 import { ResultsSkeleton } from '@/components/simulation-result/results-skeleton';
 import {
+  AskAboutThisResult,
   GrowthOverTime,
   KeyTakeaways,
   SupportingFacts,
@@ -244,6 +245,7 @@ export function SimulationResultClient({ id }: { id: string }) {
             <WhyExplanation sim={sim} />
             <KeyTakeaways sim={sim} />
             <TheProof sim={sim} />
+            <AskAboutThisResult sim={sim} />
             <ResultActions />
           </OpeningSequenceHeading>
         </div>

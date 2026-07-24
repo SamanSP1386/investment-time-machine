@@ -67,17 +67,6 @@ def rate_limit_auth(request: Request) -> None:
         raise RateLimitExceededError()
 
 
-def rate_limit_ai(request: Request) -> None:
-    """Founder Specification Part 2.8.13: "AI Endpoints: 20 requests per
-    minute." Keyed by IP, matching the existing general pattern (M6 design
-    review §13) — per-user keying is deferred until real abuse patterns
-    justify it, not built speculatively."""
-    settings = get_settings()
-    limiter = get_rate_limiter(limit=settings.rate_limit_ai_per_minute)
-    if not limiter.allow(f"ai:{_client_key(request)}"):
-        raise RateLimitExceededError()
-
-
 def get_current_user_optional(
     request: Request, session: Session = Depends(get_db_session)
 ) -> User | None:
@@ -105,6 +94,43 @@ def get_current_user_optional(
     if user is None or not user.is_active:
         return None
     return user
+
+
+def rate_limit_ai(request: Request, user: User | None = Depends(get_current_user_optional)) -> None:
+    """Founder Decision 015 (Option D): anonymous callers get a lower
+    per-minute rate plus a new daily cap; authenticated callers keep the
+    Founder Specification's explicit 20/min (Part 2.8.13, unchanged) plus a
+    materially higher daily cap. `get_current_user_optional` is re-declared
+    here as a dependency (not called directly) so FastAPI's per-request
+    dependency cache — not a second DB round trip — supplies `user`; every
+    route already resolves it once for its own handler, and `use_cache=True`
+    is the default.
+
+    Authenticated callers are keyed by user id (a real, stable identifier
+    now exists); anonymous callers are keyed by IP, matching the existing
+    general pattern (M6 design review §13) since no other anonymous
+    identifier exists (Founder Decision 015's own text). Both the
+    per-minute and the daily window are checked on every call — either one
+    exceeded blocks the request, with `RateLimitExceededError.window`
+    telling the exception handler which happened, so a daily-cap message
+    never gets a per-minute "try again shortly" reply."""
+    settings = get_settings()
+    if user is not None:
+        scope_key = f"user:{user.id}"
+        minute_limit = settings.rate_limit_ai_per_minute
+        day_limit = settings.rate_limit_ai_authenticated_per_day
+    else:
+        scope_key = f"ip:{_client_key(request)}"
+        minute_limit = settings.rate_limit_ai_anonymous_per_minute
+        day_limit = settings.rate_limit_ai_anonymous_per_day
+
+    minute_limiter = get_rate_limiter(limit=minute_limit)
+    if not minute_limiter.allow(f"ai:minute:{scope_key}"):
+        raise RateLimitExceededError(window="minute")
+
+    day_limiter = get_rate_limiter(limit=day_limit, window_seconds=86400)
+    if not day_limiter.allow(f"ai:day:{scope_key}"):
+        raise RateLimitExceededError(window="day")
 
 
 def get_current_user_required(

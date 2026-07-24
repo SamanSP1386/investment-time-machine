@@ -239,3 +239,23 @@ System performance over time, one entry per milestone. See [.claude/DOCUMENTATIO
 **Optimizations**: None applied — nothing in this pass's scope (route foundation, hero numbers, snapshot, technical details) has a performance-sensitive path yet; the growth chart (a genuinely data-volume-sensitive future addition, once `growth_series` is persisted per Founder Decision 014) is explicitly out of scope for this pass.
 
 **Future Improvements**: Once `growth_series` persistence (Founder Decision 014) lands and the growth chart is built on top of it, revisit whether a multi-hundred-point series needs pagination, downsampling, or a dedicated lighter-weight retrieval shape — not a concern for this pass, since no code path reads that field yet.
+
+---
+
+## M7 Phase 4 — Educational AI Panel (Founder Decision 015, Groq Provider Swap) (2026-07-23)
+
+**API Response Time**: The Financial Tutor follow-up endpoint itself is unchanged (Founder Decision 003) — this pass adds a frontend consumer and a provider swap, not a new query or code path in the request's hot path. `rate_limit_ai` now performs two in-process/Redis-fixed-window checks per call instead of one (a new per-day check alongside the existing per-minute one) — both are the same O(1) dict-lookup-or-`INCR` operation the existing limiter already performed once per request; the added cost is a second lookup of the same shape, not a new class of operation. Groq's own response latency was not measured live (no `GROQ_API_KEY` available this session) — bounded by the existing `ai_request_timeout_seconds=12.0` regardless of which provider is configured, unchanged from the Anthropic-era value.
+
+**Database Query Time**: Unchanged — no new table, column, index, or query shape. The AI panel's answer is never persisted to a new location beyond the existing `AIExplanation` row the Financial Tutor endpoint already wrote before this pass.
+
+**Memory Usage**: `InMemoryRateLimiter` now maintains two class-level dicts (`_store`, `_expiry`) instead of one — a small, fixed per-key overhead (one extra float per active key), already bounded by the existing prune-on-every-call discipline; not separately measured, judged negligible given the existing dict was already unmeasured for the same reason.
+
+**Startup Time**: `npx vitest run` (377 tests total, 373 passed/4 skipped, up from the prior entry's 162) ran in ~22s; `npx pytest`'s full backend suite ran in ~506s (0:08:26) this session, in line with this project's existing Redis-integration-skip-heavy suite shape (most of the wall-clock time is Redis-connection-timeout retries on the skipped Redis-integration tests, an existing, disclosed characteristic of running without local Redis, not a regression this pass introduced).
+
+**Bundle size**: No new external dependency added to the frontend (`Input`/`Button`/`Disclosure` were all already in the component library). Backend: the `anthropic` SDK dependency is *removed* from `requirements.txt` (Groq needs none, talking to a plain REST endpoint via the already-present `httpx`) — a net decrease in installed dependency footprint.
+
+**Performance Bottlenecks**: None identified. The AI panel's one network call (`useAskQuestion`'s mutation) is bounded by the existing `apiClient` 15s timeout, same as every other mutation in this codebase.
+
+**Optimizations**: None applied — out of scope for this pass. The daily-cap `InMemoryRateLimiter` bug fix (see `docs/ARCHITECTURE_DECISIONS.md` ADR-049) is a correctness fix, not a performance optimization, though it does mean the daily limiter now actually prunes stale entries correctly rather than (incorrectly) always appearing "fresh."
+
+**Future Improvements**: Once real anonymous traffic exists against the AI panel, revisit FD-015's proposed 5/min-15/day-150/day defaults against real usage patterns, per that decision's own explicit revisit posture. If Groq's free-tier throughput ever becomes a real constraint, `get_ai_provider`'s single-call-site abstraction (validated by this pass's own provider swap) is what a future fallback/multi-provider strategy would build on.

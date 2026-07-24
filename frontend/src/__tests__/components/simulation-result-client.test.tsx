@@ -22,6 +22,20 @@ vi.mock('@/hooks/use-asset-detail', () => ({
   useAssetDetail: () => ({ data: undefined, isPending: true, isError: false }),
 }));
 
+// The AI panel (Section 8, M7 Phase 4) is exercised in its own dedicated
+// suite (ask-about-this-result.test.tsx) against a real QueryClientProvider
+// — mocked here to a no-op idle mutation so this file's page-level
+// assertions don't need a QueryClient in context at all.
+vi.mock('@/hooks/use-ask-question', () => ({
+  useAskQuestion: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    data: undefined,
+  }),
+}));
+
 const BASE_SIM: SimulationResponse = {
   id: 'sim-123',
   status: 'completed',

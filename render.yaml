@@ -76,7 +76,10 @@ services:
       - key: FRED_API_KEY
         sync: false
       # Optional: the Educational AI System. Leave AI_PROVIDER=none (the
-      # default — no key required, NullProvider) unless a real Anthropic key
-      # is being configured for this deployment.
+      # default — no key required, NullProvider) unless a real Groq key
+      # (GROQ_API_KEY, free tier: https://console.groq.com/keys) is being
+      # configured for this deployment (Founder Decision 019, ADR-049).
       - key: AI_PROVIDER
         value: none
+      - key: GROQ_API_KEY
+        sync: false
