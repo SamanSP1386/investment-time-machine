@@ -28,14 +28,44 @@ from app.ai.providers.base import ProviderResult
 
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
+# Bound how much of a vendor error body ever reaches a log line or an
+# exception message — Groq's own error responses are small JSON objects in
+# practice, but nothing here should ever forward an unbounded response body.
+_ERROR_DETAIL_MAX_CHARS = 500
+
+
+def _safe_error_detail(response: httpx.Response) -> str:
+    """Extracts Groq's own error-body detail (e.g. `{"error": {"message":
+    "Invalid API Key provided", "code": "invalid_api_key"}}`) for the
+    exception message. This is the vendor's *response*, describing what it
+    rejected and why — it never contains anything from our own outgoing
+    request (the API key, headers, or prompt content), so it is always safe
+    to log. Reading `response.json()` here is deliberate: `raise_for_status()`
+    alone discards the response body entirely, silently downgrading a
+    specific, actionable error ("model_decommissioned", "invalid_api_key",
+    "rate_limit_exceeded") to a bare HTTP status code with no way to tell
+    those apart later."""
+    try:
+        body = response.json()
+    except ValueError:
+        return response.text[:_ERROR_DETAIL_MAX_CHARS]
+    detail = body.get("error", body) if isinstance(body, dict) else body
+    return str(detail)[:_ERROR_DETAIL_MAX_CHARS]
+
 
 class GroqProvider:
     name = "groq"
 
     def __init__(self, *, api_key: str, model_name: str, timeout_seconds: float) -> None:
+        # `.strip()` guards against a trailing newline/space in a
+        # copy-pasted dashboard secret — httpx itself already normalizes an
+        # embedded newline in a header value (confirmed directly: it does
+        # not raise and does not send the newline), so this is defensive
+        # hardening against a real, common class of credential-entry bug,
+        # not a fix for a proven failure mode in this codebase specifically.
         self._client = httpx.Client(
             base_url=_GROQ_BASE_URL,
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {api_key.strip()}"},
             timeout=timeout_seconds,
         )
         self._model_name = model_name
@@ -54,6 +84,14 @@ class GroqProvider:
                 },
             )
             response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            # The one exception type here that has a response body worth
+            # reading — every other httpx.HTTPError subtype (timeout,
+            # connect error, protocol error) has no HTTP response to inspect.
+            detail = _safe_error_detail(exc.response)
+            raise AIProviderUnavailableError(
+                f"Groq provider returned HTTP {exc.response.status_code}: {detail}"
+            ) from exc
         except httpx.HTTPError as exc:
             raise AIProviderUnavailableError(f"Groq provider error: {exc}") from exc
 
@@ -62,7 +100,10 @@ class GroqProvider:
             text = body["choices"][0]["message"]["content"] or ""
             model_name = body.get("model") or self._model_name
         except (KeyError, IndexError, TypeError) as exc:
-            raise AIProviderUnavailableError(f"Groq response malformed: {exc}") from exc
+            truncated_body = str(body)[:_ERROR_DETAIL_MAX_CHARS]
+            raise AIProviderUnavailableError(
+                f"Groq response malformed: {exc}; response body: {truncated_body}"
+            ) from exc
 
         if not text:
             raise AIProviderUnavailableError("Groq response contained no text content")

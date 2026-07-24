@@ -236,6 +236,24 @@ def test_explanation_audit_log_written_on_failure(client, db_session):
     assert logs[0].details["error_type"] == "AIProviderUnavailableError"
 
 
+def test_generation_failure_is_logged_with_the_real_exception_detail(client, db_session, caplog):
+    """Regression test for the 2026-07-24 production incident: before this
+    fix, a generation failure recorded only a bare exception *class* name in
+    the (database-only) audit log and nothing at all to the application
+    log — the actual failure reason was invisible everywhere. This asserts
+    a real WARNING-level log record now exists and carries the exception's
+    own message, not just its type."""
+    simulation_id = _create_completed_simulation(client, db_session)
+
+    with caplog.at_level("WARNING", logger="app.api.v1.services.explanation_service"):
+        client.post(f"/api/v1/simulations/{simulation_id}/explanations", json={})
+
+    matching = [r for r in caplog.records if "AI generation failed" in r.message]
+    assert len(matching) == 1
+    assert "AIProviderUnavailableError" in matching[0].message
+    assert "AI_PROVIDER is set to 'none'" in matching[0].message
+
+
 # --- Financial Tutor (follow-up questions) ----------------------------------
 
 

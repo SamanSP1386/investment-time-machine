@@ -48,9 +48,12 @@ class _FakeResponse:
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
             request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
-            raise httpx.HTTPStatusError(
-                "error", request=request, response=httpx.Response(self.status_code, request=request)
-            )
+            # A real httpx.Response, with a real JSON error body attached
+            # (matching what Groq's actual API returns on a rejected
+            # request) — `exc.response` needs a working `.json()` for
+            # `_safe_error_detail` to read.
+            real_response = httpx.Response(self.status_code, request=request, json=self._json_body)
+            raise httpx.HTTPStatusError("error", request=request, response=real_response)
 
     def json(self) -> dict:
         return self._json_body
@@ -102,6 +105,44 @@ def test_groq_provider_wraps_http_status_errors():
 
     with pytest.raises(AIProviderUnavailableError):
         provider.generate(system_prompt="sys", user_content="user", max_tokens=200)
+
+
+def test_groq_provider_surfaces_the_real_error_body_on_http_status_error():
+    """Regression test for the 2026-07-24 production incident: the original
+    code called `response.raise_for_status()` and wrapped whatever httpx's
+    own generic exception said, discarding Groq's own error-response body
+    entirely — an "AIProviderUnavailableError" audit-logged with no way to
+    tell an invalid key, a decommissioned model, and a rate limit apart.
+    `_safe_error_detail` must now read that body and include it verbatim in
+    the raised exception's message."""
+    provider = GroqProvider(api_key="fake", model_name="llama-x", timeout_seconds=5.0)
+    fake_client = _FakeGroqClient(
+        response=_FakeResponse(
+            status_code=401,
+            json_body={"error": {"message": "Invalid API Key", "code": "invalid_api_key"}},
+        )
+    )
+    provider._client = fake_client
+
+    with pytest.raises(AIProviderUnavailableError) as exc_info:
+        provider.generate(system_prompt="sys", user_content="user", max_tokens=200)
+
+    assert "Invalid API Key" in str(exc_info.value)
+    assert "invalid_api_key" in str(exc_info.value)
+    assert "401" in str(exc_info.value)
+
+
+def test_groq_provider_strips_whitespace_from_the_api_key():
+    """Defensive hardening against a trailing newline/space in a
+    copy-pasted dashboard secret — httpx itself already normalizes an
+    embedded newline in a header value, but stripping at construction time
+    means the header sent is provably clean regardless of httpx's own
+    normalization behavior."""
+    provider = GroqProvider(
+        api_key="  fake-key-with-whitespace  \n", model_name="x", timeout_seconds=5.0
+    )
+
+    assert provider._client.headers["authorization"] == "Bearer fake-key-with-whitespace"
 
 
 def test_groq_provider_raises_on_empty_text_response():

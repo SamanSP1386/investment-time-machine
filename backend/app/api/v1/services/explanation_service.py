@@ -21,8 +21,26 @@ and returned as a normal, successful HTTP response carrying that FAILED
 status plus the literal safe fallback message. The simulation itself is
 never affected; this module is never called from the simulation-creation
 path at all.
+
+Every failure is also logged at WARNING via the standard `logging` module
+(`_log_generation_failure` below) — added after a real production incident
+(2026-07-24) where `generation_status` was silently "failed" on every real
+request with zero diagnostic signal anywhere: the pre-existing code recorded
+only `type(exc).__name__` (a bare exception *class* name, e.g.
+"AIIntegrityViolationError") in the `audit_logs` table, never the
+exception's own message, and never anything to Render's actual application
+logs at all — the M6 design review's own stated intent ("log, not block
+silently, when the advice-language filter triggers, so this can be tuned
+later") had never actually been implemented. The log line includes the
+exception's message and, for the two safety-gate exception types, the
+specific offending values/matched phrases that caused the rejection — this
+is always safe to log: it is either the vendor's own error-response body
+(never our outgoing request, never the API key — see
+`app.ai.providers.groq_provider._safe_error_detail`'s own docstring for why)
+or a fragment of the AI's own generated text, never a secret.
 """
 
+import logging
 import uuid
 
 from sqlalchemy import func, select
@@ -47,6 +65,8 @@ from app.api.v1.errors import (
 from app.core.config import get_settings
 from app.models import AIExplanation, Simulation
 from app.models.enums import AIExplanationType, AIGenerationStatus, AuditEventType, SimulationStatus
+
+logger = logging.getLogger(__name__)
 
 # Every exception type `app.ai` can raise is handled identically here: the
 # attempt is recorded as FAILED and a safe, generic message is returned.
@@ -347,6 +367,32 @@ def list_explanations(
     return list(session.execute(stmt).scalars().all())
 
 
+def _log_generation_failure(
+    exc: Exception, *, simulation_id: uuid.UUID, explanation_id: uuid.UUID, kind: str
+) -> None:
+    """The one place a real AI generation failure becomes visible outside
+    the database (see this module's own docstring for the 2026-07-24
+    incident this closes). `str(exc)` is always safe to log for every
+    exception type raised anywhere in `app.ai`/`app.ai.providers`: a
+    provider error is either the vendor's own error-response body (never
+    our request, never the API key — confirmed directly against httpx's own
+    exception formatting, and `GroqProvider` never constructs a message from
+    request headers) or a JSON-shape mismatch detail; a safety-gate error's
+    `offending_values`/`matched_phrases` are fragments of the AI's own
+    generated text, never a secret. WARNING, not ERROR — an AI generation
+    failure is an expected, handled outcome (Founder Specification Part
+    2.7.13), not an application bug; it still needs to be visible, not
+    silent."""
+    logger.warning(
+        "AI generation failed (kind=%s, simulation_id=%s, explanation_id=%s): %s: %s",
+        kind,
+        simulation_id,
+        explanation_id,
+        type(exc).__name__,
+        exc,
+    )
+
+
 def _mark_failed_and_audit(
     session: Session,
     row: AIExplanation,
@@ -360,6 +406,12 @@ def _mark_failed_and_audit(
     """`explanation_text` is left `NULL` — a rejected/unsafe generation is
     never persisted, even partially (M6: "do not return unsafe
     explanation")."""
+    _log_generation_failure(
+        exc,
+        simulation_id=simulation_id,
+        explanation_id=row.id,
+        kind=extra_details.get("type", "unknown"),
+    )
     row.generation_status = AIGenerationStatus.FAILED
     row.error_message = SAFE_UNAVAILABLE_MESSAGE
     session.commit()
