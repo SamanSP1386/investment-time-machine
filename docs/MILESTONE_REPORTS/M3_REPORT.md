@@ -49,7 +49,7 @@ All cited to exact Founder Specification sections (full detail in `docs/simulati
 - `test_dividend_reinvestment_two_events_known_answer` / `test_split_ratio_never_multiplies_share_count`: hand-traced multi-step scenarios confirmed exactly.
 - `test_engine_determinism.py` (2 tests): identical inputs produced byte-identical Decimal output across every field, run 3 times in the more complex (dividends + inflation) case.
 
-## Security Review
+## Security Review()
 
 - The Simulation Engine has no external network calls and no user-facing endpoint yet (M4) — it reads only already-validated, already-stored data (Founder Specification 2.14.6).
 - `adjusted_close_price` is structurally never read — verified by a dedicated test that would fail loudly if a future change introduced a read, not just documented.
