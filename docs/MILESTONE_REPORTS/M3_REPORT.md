@@ -40,7 +40,7 @@ All cited to exact Founder Specification sections (full detail in `docs/simulati
 - **18 pure-math/precision tests** (`test_formulas.py`, `test_precision.py`) — no database required, run anywhere. Several reproduce the Founder Specification's own worked examples verbatim (2.14.7: $1,000 → 10 shares → $2,500; 2.14.11: $10,000 nominal → $7,900 real). CAGR is cross-checked against Python's `math` module — an independent code path from `decimal` — rather than re-deriving the same formula under test.
 - **18 DB-integration tests** (transaction-isolated, rolled back per test, run against a live Postgres instance): full known-answer scenarios through the real engine and database, the documented error-handling asymmetry (pre-flight errors persist nothing; mid-simulation errors persist a failed `Simulation` row), determinism (identical inputs against identical stored data produce byte-identical output across repeated runs), and split-disclosure behavior (splits surfaced but never multiply share counts).
 
-## Known-Answer Test Results()
+## Known-Answer Test Results()()
 
 **All 36 simulation tests passed** against a live Postgres instance (Docker Desktop was not running at the start of this session; started directly and `docker compose up -d postgres` brought the database up). Full project suite: **129/129 passing**. Notable results:
 - `test_basic_growth_matches_founder_spec_2_14_7_example`: exact match to the specification's own $1,000/$100/$250/$2,500 example.
